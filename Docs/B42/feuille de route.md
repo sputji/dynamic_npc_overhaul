@@ -1,5 +1,5 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise à jour : 19 mai 2026 | Version 1.0.0
+> Mise à jour : 19 mai 2026 | Version 1.0.0 | Dernier commit : `434c700`
 
 ---
 
@@ -10,7 +10,7 @@
 | Élément | Détail |
 |---------|--------|
 | Structure mod B42 native | `common/media/lua/` + `42/` — détection PZ OK |
-| `mod.info` | Format B42 correct, `poster=preview.png`, `icon=icon.png` |
+| `mod.info` | `versionMin=42.0`, `poster=poster.png`, `require=` absent — mod **VERT** (activable) ✅ |
 | `sandbox-options.txt` | 17 options, format bloc, type=integer (pas d'enum) |
 | `common/` + `42/` déployés | Sync vers `Zomboid/mods/` et dossier Steam |
 | Script `tools/sync_to_mods.ps1` | Déploiement en un clic vers les deux destinations |
@@ -95,10 +95,16 @@ Objectif : le joueur peut interagir avec le PNJ.
 
 ---
 
-## Rappel structure B42 (leçon apprise)
+## Rappel structure B42 (leçons apprises)
 
 > En B42, le dossier **`common/`** est **obligatoire** pour que PZ détecte le mod.  
 > Tout fichier Lua dans `media/lua/` à la **racine** est **ignoré** (structure B41 uniquement).
+
+> **`require=` vide** dans mod.info → PZ interprète comme « dépendance ID vide » → **mod rouge**.  
+> Toujours **supprimer la ligne** si aucune dépendance.
+
+> **`versionMin`** doit être au format `build.major` (ex : `42.0`).  
+> Valeur `42` seule (sans `.0`) n'est **pas reconnue**. Absent = comportement indéfini.
 
 ```
 PH_DynamicNPCOverhaul/
