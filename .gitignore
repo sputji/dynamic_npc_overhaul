@@ -1,0 +1,38 @@
+# ============================================================
+# Dynamic NPC Overhaul — .gitignore
+# ============================================================
+
+# Dossiers de référence uniquement (pas liés au jeu)
+B41/
+B42/mod example/
+B42/Docs/
+
+# Dossiers temporaires et builds
+*.tmp
+*.bak
+*.log
+*.zip
+*.tar.gz
+
+# Systèmes d'exploitation
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Éditeurs
+.vscode/
+*.sublime-workspace
+*.suo
+*.user
+
+# Node (si outils de build futurs)
+node_modules/
+
+# Python (si scripts d'outillage)
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Sortie de LuaCheck
+lua_check.txt
