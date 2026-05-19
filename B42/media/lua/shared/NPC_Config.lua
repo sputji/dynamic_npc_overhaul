@@ -13,8 +13,8 @@ local Log = PHNPC.getModule("NPC_Logger")
 -- Valeurs par défaut (miroir de sandbox-options.txt)
 -- ============================================================
 local DEFAULTS = {
-    -- Général
-    ActiveProfile                    = "realistic",
+    -- Général  (ActiveProfile = entier 1-5, correspond à sandbox-options.txt type=integer)
+    ActiveProfile                    = 2,
     DebugMode                        = false,
 
     -- Spawn & performance

@@ -2,10 +2,12 @@
 # Dynamic NPC Overhaul — .gitignore
 # ============================================================
 
-# Dossiers de référence uniquement (pas liés au jeu)
-B41/
-B42/mod example/
-B42/Docs/
+# Dossiers de référence / exemples (pas le code du mod)
+mod example/
+
+# Fichiers de travail locaux
+lua_check.txt
+Retour_VSCode.md
 
 # Dossiers temporaires et builds
 *.tmp
