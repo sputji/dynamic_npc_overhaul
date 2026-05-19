@@ -163,17 +163,26 @@ local function convertToNPC(zombie, md)
     -- 7. Valeur de rotation sur alerte (Bandits : ligne 198)
     pcall(function() zombie:setTurnAlertedValues(-5, 5) end)
 
-    -- 8. Genre et visuals humains
+    -- 8. Voice prefix humain — CRITIQUE : sans ça PZ garde les animations/sons zombie
+    -- Bandits utilise "Bandit", on réutilise le même car il désactive le comportement zombie
+    pcall(function() zombie:getDescriptor():setVoicePrefix("Bandit") end)
+
+    -- 9. Marqueur "Bandit" = flag interne PZ pour désactiver l'IA zombie native
+    pcall(function() zombie:setVariable("Bandit", true) end)
+    pcall(function() zombie:setVariable("NoLungeAttack", true) end)
+    pcall(function() zombie:clearAggroList() end)
+
+    -- 10. Genre et visuals humains
     pcall(function() zombie:setFemaleEtc(isFemale) end)
     applyHumanVisuals(zombie, isFemale)
 
-    -- 9. Empêcher le moteur de re-vêtir l'entité automatiquement
+    -- 11. Empêcher le moteur de re-vêtir l'entité automatiquement
     pcall(function() zombie:setDressInRandomOutfit(false) end)
 
-    -- 10. Animation initiale pour sortir de Zombie_Idle
+    -- 12. Animation initiale pour sortir de Zombie_Idle
     pcall(function() zombie:setBumpType("Shrug") end)
 
-    -- 11. Marquer comme converti pour ne pas re-exécuter cette fonction
+    -- 13. Marquer comme converti pour ne pas re-exécuter cette fonction
     md.PHNPC_Converted = true
 
     if Log then
@@ -215,6 +224,11 @@ local function enforceNPC(zombie)
     -- Aucune morsure, aucune cible zombie
     pcall(function() zombie:setNoTeeth(true) end)
     pcall(function() zombie:setTarget(nil) end)
+    pcall(function() zombie:clearAggroList() end)
+    -- Flag Bandit : maintenu chaque tick pour que le moteur ne réactive pas l'IA zombie
+    pcall(function() zombie:setVariable("Bandit", true) end)
+    pcall(function() zombie:setVariable("NoLungeAttack", true) end)
+    pcall(function() zombie:setVariable("ZombieHitReaction", "Chainsaw") end)
     -- Santé très haute : les dégâts réels sont dans PHNPC_Health en ModData
     pcall(function() zombie:setHealth(10000) end)
     -- Empêcher le moteur de marquer l'entité comme "useless" (arrêt de l'IA)
@@ -234,8 +248,7 @@ local function doFollow(zombie, player)
     local dist = math.sqrt(dx * dx + dy * dy)
 
     if dist <= FOLLOW_MIN_DIST then
-        -- Assez proche : arrêt du pathfinding
-        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+        -- Assez proche : arrêt du pathfinding (on ne change pas l'état du moteur)
         return
     end
 

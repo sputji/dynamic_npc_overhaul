@@ -11,10 +11,6 @@ local NPC_Dialogue = {
     _locale = "FR",   -- langue par défaut
 }
 
--- Fallback pcall : en Kahlua, pcall peut devenir nil après une KahluaException
--- dans un fichier chargé précédemment ; le wrapper garantit un appel sûr.
-local _pcall = pcall or function(f, ...) return true, f(...) end
-
 -- ============================================================
 -- Banque de dialogues de fallback (FR + EN)
 -- ============================================================
@@ -96,12 +92,19 @@ function NPC_Dialogue.ollamaFallback(npcData, playerMsg)
     return NPC_Dialogue.get(ctx, { name = npcData and npcData.firstName or "?" })
 end
 
--- Détecter la langue du jeu (B42 : Translator)
+-- Détecter la langue du jeu (B42)
+-- NOTE : on utilise des nil-guards et non pcall (pcall peut être nil en Kahlua)
 Events.OnGameBoot.Add(function()
-    local ok, lang = _pcall(function()
-        return getCore and getCore():getLanguage() or "FR"
-    end)
-    if ok and type(lang) == "string" then
+    if not getCore then return end
+    local core = getCore()
+    if not core then return end
+    -- getLanguage() retourne un objet Java Language, on le convertit en string
+    local lang = nil
+    if core.getLanguage then
+        local raw = core:getLanguage()
+        if raw then lang = tostring(raw) end
+    end
+    if lang and type(lang) == "string" then
         NPC_Dialogue.setLocale(lang:upper():sub(1, 2))
     end
 end)
