@@ -15,6 +15,11 @@
 -- Registre { [isoZombie] = NPCDataModel } partagé par tous les modules client.
 PHNPC._activeNPCs = PHNPC._activeNPCs or {}
 
+-- File d'attente client des PNJs spawned côté serveur, non encore détectés
+-- par Events.OnZombieUpdate. Chaque entrée : { x, y, isFemale, outfit, name }
+-- Utilisée par NPC_FollowTick comme méthode C de détection cross-VM.
+PHNPC._pendingNPCs = PHNPC._pendingNPCs or {}
+
 -- ============================================================
 -- Démarrage
 -- ============================================================
@@ -38,12 +43,23 @@ Events.OnServerCommand.Add(function(module, command, args)
     if command ~= "PHNPC_SpawnConfirm" then return end
 
     local Log = PHNPC.getModule("NPC_Logger")
-    if not Log then return end
 
     if args and args.success then
-        Log.ok("Client/Init", "Spawn confirmé par le serveur",
-            { outfit = tostring(args.outfit), x = tostring(args.x), y = tostring(args.y) })
+        -- Stocker le PNJ en attente : NPC_FollowTick.onZombieUpdate
+        -- l'identifiera par proximité de position (méthode C cross-VM).
+        table.insert(PHNPC._pendingNPCs, {
+            x        = tonumber(args.x)   or 0,
+            y        = tonumber(args.y)   or 0,
+            isFemale = args.isFemale      or false,
+            outfit   = args.outfit        or "Survivor",
+            name     = args.name          or "Survivant",
+        })
+        if Log then
+            Log.ok("Client/Init", "PNJ en attente de conversion",
+                { name = tostring(args.name), x = tostring(args.x), y = tostring(args.y),
+                  pending = tostring(#PHNPC._pendingNPCs) })
+        end
     else
-        Log.warn("Client/Init", "Spawn refusé par le serveur")
+        if Log then Log.warn("Client/Init", "Spawn refusé par le serveur") end
     end
 end)

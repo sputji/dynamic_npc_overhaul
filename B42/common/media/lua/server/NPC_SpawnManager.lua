@@ -143,6 +143,16 @@ local function onClientCommand(module, command, player, args)
         return
     end
 
+    -- ---- Marquage Java cross-VM (PRIORITAIRE sur ModData) ----
+    -- En B42, serveur et client ont des VMs Lua séparées même en solo.
+    -- zombie:setVariable() stocke côté Java (IsoEntity) et est lisible
+    -- depuis n'importe quelle VM via getVariableBoolean() / getVariableString().
+    pcall(function()
+        zombie:setVariable("PHNPC_IsNPC",    true)
+        zombie:setVariable("PHNPC_IsFemale", isFemale)
+        zombie:setVariable("PHNPC_Outfit",   outfit)
+    end)
+
     -- ---- Marquage ModData (détecté par client/NPC_FollowTick via OnZombieUpdate) ----
     -- On écrit uniquement les données stables ici ; la conversion visuelle
     -- (setWalkType, setHumanVisual, etc.) est laissée au client.

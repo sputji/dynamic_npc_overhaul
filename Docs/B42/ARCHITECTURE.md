@@ -20,6 +20,7 @@ Chaque module s'enregistre via `PHNPC.registerModule(name, tbl)` et se retrouve 
 | **Corps serveur** (`server/`) | Spawn, réseau serveur, commandes admin | 🔶 Squelette créé |
 | **Corps client** (`client/`) | Menu clic-droit, FollowTick, debug spawn | 🔶 Squelette créé |
 | **UI** (`client/UI/`) | Fenêtres ISPanel (commerce, chat, quêtes) | ❌ À créer |
+| Wiki PZ modding B42 | [Référence API](https://pzwiki.net/wiki/Build_42) |
 
 ---
 

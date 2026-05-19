@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Remplace l'animation zombie walk par l'animation humaine Bob_Walk
+     quand le zombie a PHNPC_IsNPC = true.
+     Combine notre condition métier avec le walkType "Walk" pour que
+     seuls nos NPCs soient affectés (même si un autre mod change le walkType). -->
+<animNode>
+    <m_Name>PHNPC_Walk</m_Name>
+    <m_AnimName>Bob_Walk</m_AnimName>
+    <m_deferredBoneAxis>Y</m_deferredBoneAxis>
+    <m_SpeedScale>0.90</m_SpeedScale>
+    <m_BlendTime>0.20</m_BlendTime>
+    <m_Conditions>
+        <m_Name>PHNPC_IsNPC</m_Name>
+        <m_Type>BOOL</m_Type>
+        <m_BoolValue>true</m_BoolValue>
+    </m_Conditions>
+    <m_Events>
+        <m_EventName>Footstep</m_EventName>
+        <m_TimePc>0.15</m_TimePc>
+        <m_ParameterValue>walk</m_ParameterValue>
+    </m_Events>
+    <m_Events>
+        <m_EventName>Footstep</m_EventName>
+        <m_TimePc>0.60</m_TimePc>
+        <m_ParameterValue>walk</m_ParameterValue>
+    </m_Events>
+</animNode>

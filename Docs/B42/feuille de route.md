@@ -14,6 +14,7 @@
 | `sandbox-options.txt` | 17 options, format bloc, type=integer (pas d'enum) |
 | `common/` + `42/` déployés | Sync vers `Zomboid/mods/` et dossier Steam |
 | Script `tools/sync_to_mods.ps1` | Déploiement en un clic vers les deux destinations |
+| Wiki PZ modding B42 | [Référence API](https://pzwiki.net/wiki/Build_42) |
 
 ### ✅ Terminé — Cerveau (`shared/`)
 

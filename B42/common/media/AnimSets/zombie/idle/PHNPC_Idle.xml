@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Remplace l'animation zombie_idle par l'animation humaine Bob_Idle
+     dès que PHNPC_IsNPC est mis à true (via zombie:setVariable).
+     Bob_Idle est une animation vanilla PZ B42 (model "Bob" = personnage joueur). -->
+<animNode>
+    <m_Name>PHNPC_Idle</m_Name>
+    <m_AnimName>Bob_Idle</m_AnimName>
+    <m_deferredBoneAxis>Y</m_deferredBoneAxis>
+    <m_SpeedScale>0.80</m_SpeedScale>
+    <m_BlendTime>0.35</m_BlendTime>
+    <m_randomAdvanceFraction>0.50</m_randomAdvanceFraction>
+    <m_Conditions>
+        <m_Name>PHNPC_IsNPC</m_Name>
+        <m_Type>BOOL</m_Type>
+        <m_BoolValue>true</m_BoolValue>
+    </m_Conditions>
+</animNode>

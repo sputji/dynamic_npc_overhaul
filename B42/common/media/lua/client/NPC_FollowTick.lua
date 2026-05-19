@@ -19,6 +19,10 @@
 
 local PHNPC_FollowTick = {}
 
+-- Table locale (VM client) pour éviter de re-convertir le même zombie chaque tick.
+-- Clé = objet Java IsoZombie (utilisable comme clé de table en Kahlua).
+local _convertedNPCs = {}
+
 -- Distance (en cases) en dessous de laquelle le PNJ s'arrête.
 local FOLLOW_MIN_DIST = 2.5
 -- Distance au-delà de laquelle le PNJ court pour rattraper le joueur.
@@ -128,9 +132,9 @@ end
 -- Basé sur le pattern "Banditize" du mod Bandits B42, validé par NPC_Helper_Mod.
 -- ============================================================
 
-local function convertToNPC(zombie, md)
+local function convertToNPC(zombie, isFemale)
     local Log = PHNPC.getModule("NPC_Logger")
-    local isFemale = md.PHNPC_IsFemale or false
+    isFemale = isFemale or false
 
     -- 1. Désactiver les mécaniques zombie (Bandits : lignes 164-204)
     pcall(function() zombie:setNoTeeth(true) end)
@@ -182,12 +186,15 @@ local function convertToNPC(zombie, md)
     -- 12. Animation initiale pour sortir de Zombie_Idle
     pcall(function() zombie:setBumpType("Shrug") end)
 
-    -- 13. Marquer comme converti pour ne pas re-exécuter cette fonction
-    md.PHNPC_Converted = true
+    -- 13. Marquer côté Java pour les ticks suivants (cross-VM safe)
+    pcall(function()
+        zombie:setVariable("PHNPC_IsNPC",    true)
+        zombie:setVariable("PHNPC_IsFemale", isFemale)
+    end)
 
     if Log then
         Log.ok("FollowTick", "Entité convertie en PNJ",
-            { name = tostring(md.PHNPC_FullName), isFemale = tostring(isFemale) })
+            { isFemale = tostring(isFemale) })
     end
 end
 
@@ -195,9 +202,13 @@ end
 -- Attachement du DataModel (une seule fois par entité)
 -- ============================================================
 
-local function attachDataModel(zombie, md)
+local function attachDataModel(zombie)
     local DataModel = PHNPC.getModule("NPC_DataModel")
     if not DataModel then return end
+
+    -- Lire ModData si disponible (même VM solo) ; sinon tout en défaut.
+    local md = {}
+    pcall(function() md = zombie:getModData() or {} end)
 
     -- Reconstruire une instance NPCDataModel à partir des données ModData
     local npcData = DataModel.deserialize({
@@ -278,37 +289,77 @@ end
 local function onZombieUpdate(zombie)
     if not zombie then return end
 
-    -- Lecture ModData avec protection
-    local mdOk, md = pcall(function() return zombie:getModData() end)
-    if not mdOk or not md or not md.PHNPC_IsNPC then return end
+    -- ================================================================
+    -- DÉTECTION : triple méthode pour robustesse face aux VMs séparées B42
+    -- En B42, même en solo, serveur et client ont des états Lua distincts.
+    -- ModData set côté serveur n'est pas visible dans Events.OnZombieUpdate
+    -- (qui s'exécute dans la VM client). On utilise 3 méthodes de fallback.
+    -- ================================================================
+    local isNPC   = false
+    local isFemale = false
 
-    -- Timer de stabilisation initial (quelques ticks pour que le moteur
-    -- initialise les animations avant d'activer l'IA)
-    if (md.PHNPC_ShowTimer or 0) > 0 then
-        md.PHNPC_ShowTimer = md.PHNPC_ShowTimer - 1
-        -- Neutralisation minimale pendant l'init
-        pcall(function() zombie:setNoTeeth(true) end)
-        pcall(function() zombie:setTarget(nil) end)
-        return
+    -- Méthode A : variable Java (zombie:setVariable) — cross-VM car stockée
+    -- directement sur l'objet Java IsoEntity, pas dans une KahluaTable.
+    pcall(function()
+        isNPC   = zombie:getVariableBoolean("PHNPC_IsNPC") == true
+        if isNPC then
+            isFemale = zombie:getVariableBoolean("PHNPC_IsFemale") == true
+        end
+    end)
+
+    -- Méthode B : ModData — fonctionne quand client/serveur partagent la même VM
+    -- (certaines versions solo B42 ou futur moteur unifié).
+    if not isNPC then
+        local mdOk, md = pcall(function() return zombie:getModData() end)
+        if mdOk and md and md.PHNPC_IsNPC then
+            isNPC    = true
+            isFemale = md.PHNPC_IsFemale or false
+        end
     end
 
-    -- Première détection : conversion visuelle + attachement DataModel
-    if not md.PHNPC_Converted then
-        convertToNPC(zombie, md)
-        attachDataModel(zombie, md)
+    -- Méthode C : position proche d'un spawn pending reçu via PHNPC_SpawnConfirm.
+    -- Le serveur envoie sendServerCommand → client stocke dans PHNPC._pendingNPCs.
+    if not isNPC and PHNPC._pendingNPCs and #PHNPC._pendingNPCs > 0 then
+        local zx, zy = zombie:getX(), zombie:getY()
+        for i = #PHNPC._pendingNPCs, 1, -1 do
+            local p = PHNPC._pendingNPCs[i]
+            if math.abs(zx - p.x) < 3.0 and math.abs(zy - p.y) < 3.0 then
+                isNPC    = true
+                isFemale = p.isFemale or false
+                table.remove(PHNPC._pendingNPCs, i)
+                -- Marquer côté Java pour que les méthodes A/B fonctionnent ensuite
+                pcall(function()
+                    zombie:setVariable("PHNPC_IsNPC",    true)
+                    zombie:setVariable("PHNPC_IsFemale", isFemale)
+                end)
+                local Log = PHNPC.getModule("NPC_Logger")
+                if Log then
+                    Log.ok("FollowTick", "PNJ détecté via position pending",
+                        { x = tostring(math.floor(zx)), y = tostring(math.floor(zy)) })
+                end
+                break
+            end
+        end
+    end
+
+    if not isNPC then return end
+
+    -- ================================================================
+    -- CONVERSION (une seule fois — table locale, pas ModData)
+    -- ================================================================
+    if not _convertedNPCs[zombie] then
+        convertToNPC(zombie, isFemale)
+        attachDataModel(zombie)
+        _convertedNPCs[zombie] = true
     end
 
     -- Enforce chaque tick
     enforceNPC(zombie)
 
-    -- FSM minimal : "idle" et "follow" utilisent tous les deux le pathfinding.
-    -- NPC_Brain sera branché ici plus tard via PHNPC.getModule("NPC_Brain").
-    local fsmState = md.PHNPC_FsmState or "idle"
-    if fsmState == "idle" or fsmState == "follow" then
-        local player = getPlayer()
-        if player then
-            doFollow(zombie, player)
-        end
+    -- FSM minimal : toujours suivre le joueur
+    local player = getPlayer()
+    if player then
+        doFollow(zombie, player)
     end
 end
 
@@ -317,21 +368,19 @@ end
 -- ============================================================
 
 Events.OnTick.Add(function()
-    -- Vérifié toutes les ~300 ticks pour limiter le coût CPU
-    -- Utilise un compteur statique sur la table module
     PHNPC_FollowTick._cleanTick = (PHNPC_FollowTick._cleanTick or 0) + 1
     if PHNPC_FollowTick._cleanTick < 300 then return end
     PHNPC_FollowTick._cleanTick = 0
 
+    -- Nettoyer les entrées mortes/déchargées des deux tables
     local toRemove = {}
     for isoObj, _ in pairs(PHNPC._activeNPCs) do
         local ok, dead = pcall(function() return isoObj:isDead() end)
-        if not ok or dead then
-            toRemove[#toRemove + 1] = isoObj
-        end
+        if not ok or dead then toRemove[#toRemove + 1] = isoObj end
     end
     for _, isoObj in ipairs(toRemove) do
-        PHNPC._activeNPCs[isoObj] = nil
+        PHNPC._activeNPCs[isoObj]  = nil
+        _convertedNPCs[isoObj]     = nil
     end
 end)
 
