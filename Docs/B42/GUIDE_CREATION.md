@@ -16,6 +16,7 @@
 | Git | Versionnage |
 | Project Zomboid B42 (Steam) | Test en jeu |
 | Lua 5.1 (optionnel) | Tests unitaires hors-jeu |
+| Wiki PZ modding B42 | [Référence API](https://pzwiki.net/wiki/Build_42) |
 
 Répertoire de test en jeu : `C:\Users\<USER>\Zomboid\mods\PH_DynamicNPCOverhaul\`
 

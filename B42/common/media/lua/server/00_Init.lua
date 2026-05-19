@@ -12,7 +12,7 @@
     server/NPC_SpawnManager.lua.
 ]]
 
-Events.OnServerStarted.Add(function()
+Events.OnGameStart.Add(function()
     local Log = PHNPC.getModule("NPC_Logger")
     if Log then
         Log.info("Server/Init", "Module serveur B42 démarré",

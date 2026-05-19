@@ -4,7 +4,8 @@
 
     Dispatcher réseau SOLO / MULTI.
     - SOLO  : zéro overhead réseau, appels directs en mémoire.
-    - MULTI : sendServerCommand / sendClientCommand PZ B42.
+    MULTI : B42 API — CLIENT→SERVEUR : sendClientCommand(getPlayer(), mod, cmd, args)
+             SERVEUR→CLIENT : sendServerCommand(player, mod, cmd, args).
 
     API unifiée : NPC_NetworkDispatcher.send(target, cmd, data)
       target = "server" | "client" | "all"
@@ -80,20 +81,25 @@ function NPC_NetworkDispatcher.send(target, cmd, data, player)
     end
 
     -- Multi
+    -- B42 : CLIENT→SERVEUR = sendClientCommand(player, mod, cmd, args)
+    --        SERVEUR→CLIENT = sendServerCommand(player, mod, cmd, args)
     if target == "server" then
-        if type(sendServerCommand) == "function" then
-            sendServerCommand(NPC_NetworkDispatcher.MOD_ID, cmd, data or {})
+        -- Appelé depuis le client pour envoyer au serveur
+        if type(sendClientCommand) == "function" then
+            sendClientCommand(getPlayer(), NPC_NetworkDispatcher.MOD_ID, cmd, data or {})
         end
     elseif target == "client" then
-        if type(sendClientCommand) == "function" then
-            sendClientCommand(player, NPC_NetworkDispatcher.MOD_ID, cmd, data or {})
+        -- Appelé depuis le serveur pour envoyer à un client spécifique
+        if type(sendServerCommand) == "function" then
+            sendServerCommand(player, NPC_NetworkDispatcher.MOD_ID, cmd, data or {})
         end
     elseif target == "all" then
-        if type(sendClientCommand) == "function" then
+        -- Appelé depuis le serveur pour diffuser à tous les clients
+        if type(sendServerCommand) == "function" then
             local players = getOnlinePlayers and getOnlinePlayers() or {}
-            for i = 0, (players:size and players:size() or #players) - 1 do
-                local p = players:get and players:get(i) or players[i + 1]
-                if p then sendClientCommand(p, NPC_NetworkDispatcher.MOD_ID, cmd, data or {}) end
+            for i = 0, (players.size and players:size() or #players) - 1 do
+                local p = players.get and players:get(i) or players[i + 1]
+                if p then sendServerCommand(p, NPC_NetworkDispatcher.MOD_ID, cmd, data or {}) end
             end
         end
     end

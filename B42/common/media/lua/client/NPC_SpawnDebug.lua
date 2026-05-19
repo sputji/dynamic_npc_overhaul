@@ -7,7 +7,7 @@
 
     Visible uniquement si le joueur est admin ou si le mode debug PZ est actif.
 
-    Flux solo   : client → sendServerCommand → Events.OnClientCommand (même Lua) → spawn
+    Flux solo   : client → sendClientCommand → Events.OnClientCommand (même Lua) → spawn
     Flux multi  : client → réseau → serveur → spawn → PHNPC_SpawnConfirm → client
 
     Le spawn réel de l'entité est toujours exécuté côté serveur
@@ -62,8 +62,9 @@ function PHNPC_SpawnDebug.requestSpawn(player)
             { x = math.floor(player:getX()), y = math.floor(player:getY()) })
     end
 
+    -- B42 : CLIENT→SERVEUR = sendClientCommand(getPlayer(), module, cmd, args)
     -- Le serveur cherchera lui-même une case libre autour de ces coordonnées.
-    sendServerCommand(PHNPC.MOD_ID, "PHNPC_SpawnRequest", {
+    sendClientCommand(getPlayer(), PHNPC.MOD_ID, "PHNPC_SpawnRequest", {
         x = player:getX(),
         y = player:getY(),
         z = player:getZ(),

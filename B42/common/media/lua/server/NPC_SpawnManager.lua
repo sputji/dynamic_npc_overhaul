@@ -6,16 +6,16 @@
 
     Reçoit la commande "PHNPC_SpawnRequest" envoyée par le client admin,
     valide la requête, exécute le spawn via addZombiesInOutfit, marque
-    l'entité en ModData, puis répond au client via sendClientCommand.
+    l'entité en ModData, puis répond au client via sendServerCommand.
 
     Flux de données :
-      client (NPC_SpawnDebug) ─sendServerCommand──► Events.OnClientCommand (ici)
+      client (NPC_SpawnDebug) ─sendClientCommand──► Events.OnClientCommand (ici)
                                                          │
                                              addZombiesInOutfit(x,y,z,1,outfit,%)
                                                          │
                                              zombie:getModData() ← PHNPC_IsNPC = true
                                                          │
-                             sendClientCommand ◄──────── PHNPC_SpawnConfirm
+                             sendServerCommand ◄──────── PHNPC_SpawnConfirm
                                                          │
       client (NPC_FollowTick) ◄── Events.OnZombieUpdate picks up the new zombie
                                    and converts it (visuals + DataModel)
@@ -23,11 +23,11 @@
     En solo, Events.OnClientCommand est déclenché dans le même état Lua
     que le client (appel synchrone, pas de réseau).
 
-    Note B42 : addZombiesInOutfit est accessible côté serveur.
-    Les entités spawned se propagent automatiquement aux clients connectés.
-    La conversion visuelle (setWalkType, setHumanVisual...) est intentionnellement
-    laissée au client via Events.OnZombieUpdate — ces APIs nécessitent le contexte
-    de rendu client.
+    Note B42 API réseau :
+      CLIENT→SERVEUR : sendClientCommand(getPlayer(), module, cmd, args)
+                       déclenche Events.OnClientCommand côté serveur.
+      SERVEUR→CLIENT : sendServerCommand(player, module, cmd, args)
+                       déclenche Events.OnServerCommand côté client.
 ]]
 
 local NPC_SpawnManager = {}
@@ -88,7 +88,7 @@ local function onClientCommand(module, command, player, args)
             Log.warn("Server/SpawnManager", "Spawn refusé — joueur non admin",
                 { player = tostring(player:getUsername()) })
         end
-        sendClientCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", { success = false })
+        sendServerCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", { success = false })
         return
     end
 
@@ -108,7 +108,7 @@ local function onClientCommand(module, command, player, args)
         if Log then
             Log.warn("Server/SpawnManager", "Aucune case libre trouvée", { x = reqX, y = reqY })
         end
-        sendClientCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", { success = false })
+        sendServerCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", { success = false })
         return
     end
 
@@ -132,14 +132,14 @@ local function onClientCommand(module, command, player, args)
             Log.error("Server/SpawnManager", "addZombiesInOutfit échoué",
                 { err = tostring(spawnErr) })
         end
-        sendClientCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", { success = false })
+        sendServerCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", { success = false })
         return
     end
 
     local zombie = zombieList:get(0)
     if not zombie then
         if Log then Log.error("Server/SpawnManager", "Zombie nil après addZombiesInOutfit") end
-        sendClientCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", { success = false })
+        sendServerCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", { success = false })
         return
     end
 
@@ -183,7 +183,7 @@ local function onClientCommand(module, command, player, args)
     end
 
     -- ---- Confirmation au client ----
-    sendClientCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", {
+    sendServerCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", {
         success  = true,
         x        = spawnX,
         y        = spawnY,
