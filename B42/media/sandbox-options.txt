@@ -1,38 +1,31 @@
 VERSION = 1,
 
--- ============================================================
--- Project Humain : Dynamic NPC Overhaul — Sandbox Options
--- Page: PHNPC (affichée dans le menu Sandbox du jeu)
--- ============================================================
-
--- ----------------------------------------------------------
--- GENERAL
--- ----------------------------------------------------------
 option PHNPC.ActiveProfile
 {
-    type = enum,
-    numValues = 5,
+    type = integer,
+    min = 1,
+    max = 5,
     default = 2,
-    page = PHNPC, translation = PHNPC_ActiveProfile,
+    page = PHNPC,
+    translation = PHNPC_ActiveProfile,
 }
 
 option PHNPC.DebugMode
 {
     type = boolean,
     default = false,
-    page = PHNPC, translation = PHNPC_DebugMode,
+    page = PHNPC,
+    translation = PHNPC_DebugMode,
 }
 
--- ----------------------------------------------------------
--- SPAWN & PERFORMANCE
--- ----------------------------------------------------------
 option PHNPC.MaxActiveNPCs
 {
     type = integer,
     min = 1,
     max = 40,
     default = 12,
-    page = PHNPC, translation = PHNPC_MaxActiveNPCs,
+    page = PHNPC,
+    translation = PHNPC_MaxActiveNPCs,
 }
 
 option PHNPC.PerPlayerBudget
@@ -41,7 +34,8 @@ option PHNPC.PerPlayerBudget
     min = 1,
     max = 10,
     default = 4,
-    page = PHNPC, translation = PHNPC_PerPlayerBudget,
+    page = PHNPC,
+    translation = PHNPC_PerPlayerBudget,
 }
 
 option PHNPC.SpawnRadius
@@ -50,7 +44,8 @@ option PHNPC.SpawnRadius
     min = 10,
     max = 80,
     default = 32,
-    page = PHNPC, translation = PHNPC_SpawnRadius,
+    page = PHNPC,
+    translation = PHNPC_SpawnRadius,
 }
 
 option PHNPC.DespawnRadius
@@ -59,7 +54,8 @@ option PHNPC.DespawnRadius
     min = 20,
     max = 120,
     default = 48,
-    page = PHNPC, translation = PHNPC_DespawnRadius,
+    page = PHNPC,
+    translation = PHNPC_DespawnRadius,
 }
 
 option PHNPC.FSMRange
@@ -68,7 +64,8 @@ option PHNPC.FSMRange
     min = 10,
     max = 80,
     default = 40,
-    page = PHNPC, translation = PHNPC_FSMRange,
+    page = PHNPC,
+    translation = PHNPC_FSMRange,
 }
 
 option PHNPC.NetworkSyncIntervalTenths
@@ -77,24 +74,24 @@ option PHNPC.NetworkSyncIntervalTenths
     min = 1,
     max = 20,
     default = 5,
-    page = PHNPC, translation = PHNPC_NetworkSyncIntervalTenths,
+    page = PHNPC,
+    translation = PHNPC_NetworkSyncIntervalTenths,
 }
 
--- ----------------------------------------------------------
--- DIALOGUE IA (OLLAMA)
--- ----------------------------------------------------------
 option PHNPC.EnableOllama
 {
     type = boolean,
     default = false,
-    page = PHNPC, translation = PHNPC_EnableOllama,
+    page = PHNPC,
+    translation = PHNPC_EnableOllama,
 }
 
 option PHNPC.OllamaModel
 {
     type = string,
     default = neural-chat,
-    page = PHNPC, translation = PHNPC_OllamaModel,
+    page = PHNPC,
+    translation = PHNPC_OllamaModel,
 }
 
 option PHNPC.OllamaTimeoutMs
@@ -103,7 +100,8 @@ option PHNPC.OllamaTimeoutMs
     min = 1000,
     max = 30000,
     default = 8000,
-    page = PHNPC, translation = PHNPC_OllamaTimeoutMs,
+    page = PHNPC,
+    translation = PHNPC_OllamaTimeoutMs,
 }
 
 option PHNPC.OllamaCacheSize
@@ -112,19 +110,18 @@ option PHNPC.OllamaCacheSize
     min = 0,
     max = 200,
     default = 50,
-    page = PHNPC, translation = PHNPC_OllamaCacheSize,
+    page = PHNPC,
+    translation = PHNPC_OllamaCacheSize,
 }
 
--- ----------------------------------------------------------
--- GESTION DES MORSURES
--- ----------------------------------------------------------
 option PHNPC.BiteCoughIntervalSec
 {
     type = integer,
     min = 10,
     max = 120,
     default = 30,
-    page = PHNPC, translation = PHNPC_BiteCoughIntervalSec,
+    page = PHNPC,
+    translation = PHNPC_BiteCoughIntervalSec,
 }
 
 option PHNPC.BiteCoughProbabilityPercent
@@ -133,19 +130,18 @@ option PHNPC.BiteCoughProbabilityPercent
     min = 1,
     max = 100,
     default = 15,
-    page = PHNPC, translation = PHNPC_BiteCoughProbabilityPercent,
+    page = PHNPC,
+    translation = PHNPC_BiteCoughProbabilityPercent,
 }
 
--- ----------------------------------------------------------
--- APPRENTISSAGE PASSIF
--- ----------------------------------------------------------
 option PHNPC.ObservationRange
 {
     type = integer,
     min = 4,
     max = 30,
     default = 12,
-    page = PHNPC, translation = PHNPC_ObservationRange,
+    page = PHNPC,
+    translation = PHNPC_ObservationRange,
 }
 
 option PHNPC.ObservationIntervalSec
@@ -154,17 +150,16 @@ option PHNPC.ObservationIntervalSec
     min = 1,
     max = 10,
     default = 2,
-    page = PHNPC, translation = PHNPC_ObservationIntervalSec,
+    page = PHNPC,
+    translation = PHNPC_ObservationIntervalSec,
 }
 
--- ----------------------------------------------------------
--- ECONOMIE
--- ----------------------------------------------------------
 option PHNPC.DisableNeedsDecay
 {
     type = boolean,
     default = false,
-    page = PHNPC, translation = PHNPC_DisableNeedsDecay,
+    page = PHNPC,
+    translation = PHNPC_DisableNeedsDecay,
 }
 
 option PHNPC.ServiceBasePriceMultiplierTenths
@@ -173,5 +168,6 @@ option PHNPC.ServiceBasePriceMultiplierTenths
     min = 1,
     max = 50,
     default = 10,
-    page = PHNPC, translation = PHNPC_ServiceBasePriceMultiplierTenths,
+    page = PHNPC,
+    translation = PHNPC_ServiceBasePriceMultiplierTenths,
 }

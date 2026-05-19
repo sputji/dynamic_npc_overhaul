@@ -1,10 +1,9 @@
 name=Project Humain : Dynamic NPC Overhaul
 id=PH_DynamicNPCOverhaul
+description=Autonomous NPCs with AI brain (FSM), Ollama dialogues, trading, hidden bites and passive learning. Compatible B42.
 poster=poster.png
-description=PNJ autonomes avec cerveau IA (FSM), dialogues Ollama, commerce, morsures cachees et apprentissage passif. Compatible B42.
-url=
+icon=icon.png
 author=sputji
-pzversion=42
-modversion=2.0.0
-versionMin=42.0
-tags=NPC;AI;Survival;Multiplayer
+version=2.0.0
+targetVersion=42.0
+category=npcs

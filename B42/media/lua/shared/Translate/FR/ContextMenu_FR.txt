@@ -1,0 +1,8 @@
+ContextMenu_FR = {
+
+    ContextMenu_PHNPC_NPC = "Survivant"
+    ContextMenu_PHNPC_Talk = "Parler à"
+    ContextMenu_PHNPC_Trade = "Commercer avec"
+    ContextMenu_PHNPC_Examine = "Examiner"
+
+}

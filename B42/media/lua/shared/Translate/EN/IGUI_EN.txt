@@ -1,0 +1,43 @@
+IGUI_EN = {
+
+    IGUI_PHNPC_Speech_Greeting_01 = "Hey there, stranger."
+    IGUI_PHNPC_Speech_Greeting_02 = "You look like you've had a rough day."
+    IGUI_PHNPC_Speech_Greeting_03 = "Careful out there. Lots of dead walking around."
+
+    IGUI_PHNPC_Speech_Idle_01 = "Just trying to get by."
+    IGUI_PHNPC_Speech_Idle_02 = "This world went to hell fast."
+    IGUI_PHNPC_Speech_Idle_03 = "Stay sharp."
+
+    IGUI_PHNPC_Speech_Trade_01 = "I've got things to trade if you're interested."
+    IGUI_PHNPC_Speech_Trade_02 = "Looking for supplies? I might have what you need."
+
+    IGUI_PHNPC_Speech_TradeAccept_01 = "Deal. Pleasure doing business."
+    IGUI_PHNPC_Speech_TradeAccept_02 = "Fair trade. Take care."
+
+    IGUI_PHNPC_Speech_TradeRefuse_01 = "That's not enough. Come back when you have more."
+    IGUI_PHNPC_Speech_TradeRefuse_02 = "No deal."
+
+    IGUI_PHNPC_Speech_Hostile_01 = "Back off!"
+    IGUI_PHNPC_Speech_Hostile_02 = "Don't make me do this."
+    IGUI_PHNPC_Speech_Hostile_03 = "Last warning!"
+
+    IGUI_PHNPC_Speech_Flee_01 = "I need to get out of here!"
+    IGUI_PHNPC_Speech_Flee_02 = "Too many of them!"
+
+    IGUI_PHNPC_Speech_Cough_01 = "*coughs*"
+    IGUI_PHNPC_Speech_Cough_02 = "Excuse me... just a tickle in my throat."
+    IGUI_PHNPC_Speech_Cough_03 = "I'm fine. Really."
+
+    IGUI_PHNPC_Speech_BiteDeny_01 = "I'm fine! Leave me alone."
+    IGUI_PHNPC_Speech_BiteDeny_02 = "It's just a scratch."
+
+    IGUI_PHNPC_Speech_Death_01 = "Tell them... I tried."
+    IGUI_PHNPC_Speech_Death_02 = "I should've been more careful..."
+
+    IGUI_PHNPC_Speech_QuestGive_01 = "I need your help with something."
+    IGUI_PHNPC_Speech_QuestGive_02 = "If you're willing, I have a job for you."
+
+    IGUI_PHNPC_Speech_QuestComplete_01 = "You actually did it. Thank you."
+    IGUI_PHNPC_Speech_QuestComplete_02 = "I won't forget this."
+
+}

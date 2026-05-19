@@ -1,0 +1,59 @@
+Sandbox_FR = {
+
+    Sandbox_PHNPC = "Dynamic NPC Overhaul"
+
+    Sandbox_PHNPC_ActiveProfile = "Profil IA actif"
+    Sandbox_PHNPC_ActiveProfile_tooltip = "1=Minimal, 2=Équilibré (défaut), 3=Roleplay, 4=Hardcore, 5=Personnalisé"
+
+    Sandbox_PHNPC_DebugMode = "Mode Débogage"
+    Sandbox_PHNPC_DebugMode_tooltip = "Active les logs DEBUG détaillés dans la console"
+
+    Sandbox_PHNPC_MaxActiveNPCs = "Nombre max de PNJ actifs"
+    Sandbox_PHNPC_MaxActiveNPCs_tooltip = "Nombre maximum de PNJ simultanément présents dans le monde (1-40)"
+
+    Sandbox_PHNPC_PerPlayerBudget = "Budget PNJ par joueur"
+    Sandbox_PHNPC_PerPlayerBudget_tooltip = "Nombre de PNJ pouvant apparaître près de chaque joueur connecté (1-10)"
+
+    Sandbox_PHNPC_SpawnRadius = "Rayon d'apparition (cases)"
+    Sandbox_PHNPC_SpawnRadius_tooltip = "Distance autour du joueur dans laquelle les PNJ peuvent apparaître (10-80)"
+
+    Sandbox_PHNPC_DespawnRadius = "Rayon de disparition (cases)"
+    Sandbox_PHNPC_DespawnRadius_tooltip = "Distance à partir de laquelle les PNJ sont retirés quand ils sont loin (20-120)"
+
+    Sandbox_PHNPC_FSMRange = "Portée IA FSM (cases)"
+    Sandbox_PHNPC_FSMRange_tooltip = "Portée dans laquelle le cerveau IA du PNJ est pleinement actif (10-80)"
+
+    Sandbox_PHNPC_NetworkSyncIntervalTenths = "Intervalle de synchro réseau (x0.1s)"
+    Sandbox_PHNPC_NetworkSyncIntervalTenths_tooltip = "Fréquence à laquelle l'état des PNJ est envoyé aux clients (1=0.1s, 10=1s)"
+
+    Sandbox_PHNPC_EnableOllama = "Activer les dialogues IA (Ollama)"
+    Sandbox_PHNPC_EnableOllama_tooltip = "Si activé, les PNJ utilisent l'API Ollama locale pour générer des dialogues dynamiques"
+
+    Sandbox_PHNPC_OllamaModel = "Nom du modèle Ollama"
+    Sandbox_PHNPC_OllamaModel_tooltip = "Nom du modèle chargé dans Ollama (ex : neural-chat, mistral)"
+
+    Sandbox_PHNPC_OllamaTimeoutMs = "Délai d'attente Ollama (ms)"
+    Sandbox_PHNPC_OllamaTimeoutMs_tooltip = "Temps d'attente max pour une réponse Ollama avant d'utiliser un dialogue de secours (1000-30000)"
+
+    Sandbox_PHNPC_OllamaCacheSize = "Taille du cache Ollama"
+    Sandbox_PHNPC_OllamaCacheSize_tooltip = "Nombre de réponses PNJ récentes à mettre en cache pour éviter les appels API en double (0=désactivé)"
+
+    Sandbox_PHNPC_BiteCoughIntervalSec = "Intervalle entre toux (s)"
+    Sandbox_PHNPC_BiteCoughIntervalSec_tooltip = "Délai minimum entre deux événements de toux pour un PNJ mordu (10-120)"
+
+    Sandbox_PHNPC_BiteCoughProbabilityPercent = "Probabilité de toux (%)"
+    Sandbox_PHNPC_BiteCoughProbabilityPercent_tooltip = "Chance qu'un PNJ mordu tousse à chaque intervalle (1-100)"
+
+    Sandbox_PHNPC_ObservationRange = "Portée d'observation (cases)"
+    Sandbox_PHNPC_ObservationRange_tooltip = "Distance dans laquelle un PNJ peut observer et apprendre des actions du joueur (4-30)"
+
+    Sandbox_PHNPC_ObservationIntervalSec = "Intervalle d'observation (s)"
+    Sandbox_PHNPC_ObservationIntervalSec_tooltip = "Fréquence à laquelle l'apprentissage passif est évalué (1-10)"
+
+    Sandbox_PHNPC_DisableNeedsDecay = "Désactiver la décroissance des besoins"
+    Sandbox_PHNPC_DisableNeedsDecay_tooltip = "Si activé, la faim, la soif et la fatigue des PNJ ne diminuent plus"
+
+    Sandbox_PHNPC_ServiceBasePriceMultiplierTenths = "Multiplicateur de prix de base (x0.1)"
+    Sandbox_PHNPC_ServiceBasePriceMultiplierTenths_tooltip = "Multiplicateur global des prix du commerce. 10 = x1.0 (normal), 5 = x0.5 (pas cher), 20 = x2.0 (cher)"
+
+}
