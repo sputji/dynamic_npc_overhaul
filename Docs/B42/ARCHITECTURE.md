@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Architecture B42
-> Version 2.0.0 | Project Zomboid Build 42 | Auteur : sputji  
-> **État actuel : Phase 1 complète — Cerveau implémenté, Corps à créer**
+> Version 1.0.0 | Project Zomboid Build 42 | Auteur : sputji  
+> **État actuel : Structure B42 native ✅ — Cerveau ✅ — Corps initial ✅ — UI à compléter**
 
 ---
 
@@ -17,7 +17,9 @@ Chaque module s'enregistre via `PHNPC.registerModule(name, tbl)` et se retrouve 
 | Couche | Rôle | État |
 |--------|------|------|
 | **Cerveau** (`shared/`) | Logique pure, données, IA, réseau abstrait | ✅ Implémenté |
-| **Corps** (`server/` + `client/`) | Implémentations B42 spécifiques (spawn, UI, hooks) | ❌ À créer |
+| **Corps serveur** (`server/`) | Spawn, réseau serveur, commandes admin | 🔶 Squelette créé |
+| **Corps client** (`client/`) | Menu clic-droit, FollowTick, debug spawn | 🔶 Squelette créé |
+| **UI** (`client/UI/`) | Fenêtres ISPanel (commerce, chat, quêtes) | ❌ À créer |
 
 ---
 
@@ -37,58 +39,63 @@ D:\PZ Mods\Dynamic_NPC_Overhaul\
 │       ├── GUIDE_CREATION.md        # Guide complet "depuis zéro"
 │       └── feuille de route.md      # Roadmap fonctionnelle
 │
-└── B42\
-    ├── mod.info                     # id, name, version=2.0.0, targetVersion=42.0, category=npcs
-    ├── poster.png
-    ├── 42\                          # Assets spécifiques B42 (futur)
-    ├── common\                      # Assets multi-version (futur)
+└── B42\                             # Structure B42 native (common/ + 42/)
+    ├── mod.info                     # id, name, version=1.0.0, poster=preview.png
+    ├── preview.png                  # Visuel mod (128×128, référencé par poster=)
+    ├── icon.png                     # Icône Workshop
     │
-    └── media\
-        ├── sandbox-options.txt      # Options Sandbox (format bloc, type=integer)
-        │
-        └── lua\
+    ├── tools\
+    │   └── sync_to_mods.ps1         # Synchronise workspace → dossiers mods PZ
+    │
+    ├── 42\                          # Chargé uniquement en B42.x
+    │   ├── mod.info                 # Copie du mod.info racine (requis par PZ B42)
+    │   └── media\lua\               # Vide — contenu dans common/
+    │
+    └── common\                      # Chargé dans TOUTES les versions B42
+        └── media\
+            ├── sandbox-options.txt  # Options Sandbox (format bloc, type=integer)
             │
-            ├── shared\              ✅ CERVEAU — Chargé CLIENT + SERVEUR
-            │   ├── 00_Core.lua      # Namespace PHNPC, utilitaires, vérif version
-            │   ├── NPC_Logger.lua   # Logger TRACE→FAIL, ring buffer 2000 entrées
-            │   ├── NPC_Config.lua   # Lecture SandboxVars.PHNPC + defaults
-            │   ├── NPC_DataModel.lua# Classe PNJ OO : stats, besoins, sérialisation
-            │   ├── NPC_Professions.lua # Catalogue 5 métiers + outfits B42
-            │   ├── NPC_FactionManager.lua # 4 factions, relations −100/+100
-            │   ├── NPC_Dialogue.lua # Banques FR/EN, substitution, fallback Ollama
-            │   ├── NPC_NetworkDispatcher.lua # Réseau transparent Solo/Multi
-            │   ├── NPC_Brain.lua    # FSM 7 états, boucle OnTick ~33 ms
-            │   │
-            │   └── Translate\
-            │       ├── EN\
-            │       │   ├── Sandbox_EN.txt      # Sandbox_EN = {}
-            │       │   ├── UI_EN.txt           # UI_EN = {}
-            │       │   ├── ContextMenu_EN.txt  # ContextMenu_EN = {}
-            │       │   └── IGUI_EN.txt         # IGUI_EN = {}
-            │       └── FR\
-            │           ├── Sandbox_FR.txt
-            │           ├── UI_FR.txt
-            │           ├── ContextMenu_FR.txt
-            │           └── IGUI_FR.txt
-            │
-            ├── server\              ❌ CORPS — À créer (API B42 à vérifier)
-            │   ├── 00_Init.lua      # Point d'entrée serveur
-            │   ├── NPC_SpawnManager.lua    # Spawn/despawn (IsoPlayer, SurvivorFactory)
-            │   ├── NPC_NetworkServer.lua   # Handlers commandes client→serveur
-            │   ├── NPC_BiteManagement.lua  # Morsure cachée → transformation zombie
-            │   ├── NPC_ObservationLearning.lua # XP passif par observation
-            │   ├── OllamaBridge.lua        # Bridge HTTP → Ollama (HTTPRequest B42)
-            │   └── AdminCommands.lua       # /phnpc list/spawn/kill/bite/debug/reload
-            │
-            └── client\              ❌ CORPS — À créer (API B42 à vérifier)
-                ├── 00_Init.lua      # Point d'entrée client
-                ├── NPC_InteractionClient.lua # Menu clic-droit (OnFillWorldObjectContextMenu)
-                └── UI\
-                    ├── NPC_UI.lua          # Fiche info PNJ (ISPanel)
-                    ├── SpeechBubbles.lua   # Bulles 3D (TextDrawObject)
-                    ├── TradeWindow.lua     # Fenêtre commerce
-                    ├── OllamaChatUI.lua    # Chat IA (async, historique)
-                    └── QuestJournalUI.lua  # Journal de quêtes (touche J)
+            └── lua\
+                │
+                ├── shared\          ✅ CERVEAU — Chargé CLIENT + SERVEUR
+                │   ├── 00_Core.lua      # Namespace PHNPC, utilitaires, vérif version
+                │   ├── NPC_Logger.lua   # Logger TRACE→FAIL, ring buffer 2000 entrées
+                │   ├── NPC_Config.lua   # Lecture SandboxVars.PHNPC + defaults
+                │   ├── NPC_DataModel.lua# Classe PNJ OO : stats, besoins, sérialisation
+                │   ├── NPC_Professions.lua # Catalogue 5 métiers + outfits B42
+                │   ├── NPC_FactionManager.lua # 4 factions, relations −100/+100
+                │   ├── NPC_Dialogue.lua # Banques FR/EN, substitution, fallback Ollama
+                │   ├── NPC_NetworkDispatcher.lua # Réseau transparent Solo/Multi
+                │   ├── NPC_Brain.lua    # FSM 7 états, boucle OnTick ~33 ms
+                │   │
+                │   └── Translate\
+                │       ├── EN\
+                │       │   ├── Sandbox_EN.txt      # Sandbox_EN = {}
+                │       │   ├── UI_EN.txt           # UI_EN = {}
+                │       │   ├── ContextMenu_EN.txt  # ContextMenu_EN = {}
+                │       │   └── IGUI_EN.txt         # IGUI_EN = {}
+                │       └── FR\
+                │           ├── Sandbox_FR.txt
+                │           ├── UI_FR.txt
+                │           ├── ContextMenu_FR.txt
+                │           └── IGUI_FR.txt
+                │
+                ├── server\          🔶 CORPS SERVEUR — Squelette actif
+                │   ├── 00_Init.lua          # Point d'entrée serveur
+                │   └── NPC_SpawnManager.lua # Spawn/despawn (à compléter)
+                │   ── (À créer) NPC_NetworkServer.lua, NPC_BiteManagement.lua
+                │   ── (À créer) NPC_ObservationLearning.lua, OllamaBridge.lua
+                │   ── (À créer) AdminCommands.lua
+                │
+                └── client\          🔶 CORPS CLIENT — Squelette actif
+                    ├── 00_Init.lua              # Point d'entrée client
+                    ├── NPC_FollowTick.lua        # Tick suivi client-side
+                    ├── NPC_InteractionClient.lua # Menu clic-droit
+                    ├── NPC_SpawnDebug.lua        # Commandes debug spawn
+                    └── UI\                       # ❌ À créer
+                        ── (À créer) NPC_UI.lua, SpeechBubbles.lua
+                        ── (À créer) TradeWindow.lua, OllamaChatUI.lua
+                        ── (À créer) QuestJournalUI.lua
 ```
 
 ---
@@ -99,16 +106,16 @@ D:\PZ Mods\Dynamic_NPC_Overhaul\
 ```
 name=Project Humain : Dynamic NPC Overhaul
 id=PH_DynamicNPCOverhaul
-description=Dynamic NPCs with AI, factions, quests and trade for Build 42.
-poster=poster.png
-icon=icon.png
 author=sputji
-version=2.0.0
-targetVersion=42.0
-category=npcs
+description=Autonomous NPCs with AI brain (FSM), Ollama dialogues, trading, hidden bites and passive learning. Compatible B42.
+poster=preview.png
+icon=icon.png
+version=1.0.0
+require=
 ```
 
-> Champs standard B42. Supprimé : `pzversion`, `modversion`, `versionMin`, `tags`, `url`.
+> Champs standard B42 minimal. `targetVersion` absent = compatible avec toutes les versions B42.  
+> `require=` vide = aucune dépendance. Supprimé : `pzversion`, `modversion`, `versionMin`, `tags`, `url`, `category`.
 
 ### `media/sandbox-options.txt` — Format bloc
 
@@ -274,4 +281,6 @@ end
 | Option Sandbox absente | `type = enum` dans sandbox-options | Utiliser `type = integer` |
 | Commentaires ignorés/plantent | `--` non supporté dans sandbox | Supprimer tous les `--` |
 | Mod non chargé | `pzversion` au lieu de `targetVersion` | Corriger mod.info |
+| **Mod invisible en B42** | `common/` absent dans le dossier mod | Créer `common/` (même vide) — condition **obligatoire** B42 |
+| **Lua ignoré en B42** | Fichiers dans `media/lua/` (racine) | Déplacer dans `common/media/lua/` ou `42/media/lua/` |
 | `pcall` nil au chargement | Runtime Kahlua instable | Wrapper `pcall(...)` systématique |

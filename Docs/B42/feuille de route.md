@@ -1,54 +1,110 @@
-**Phase 1 : Bilan de l'existant (Ce que ton mod fait aujourd'hui sur la B41)**
+# Dynamic NPC Overhaul — Feuille de route B42
+> Mise à jour : 19 mai 2026 | Version 1.0.0
 
-Le Cerveau (AI Decision Engine) : Une boucle de ~33ms qui calcule les besoins (faim, soif, moral) et exécute des machines à états finis (FSM) pour 6 ordres principaux (Étudier, Construire, Cuisiner, Commercer, Défendre, Garder).
+---
 
-Le Dialogue IA : Un pont HTTP asynchrone vers Ollama, soutenu par un système de fallback intelligent (16+ réponses contextuelles) et multilingue.
+## État actuel (mai 2026)
 
-Le Métier : 5 professions (Artisan, Cuisinier, Bâtisseur, Marchand, Explorateur) avec des cycles de production et de consommation réels.
+### ✅ Terminé — Fondations
 
-La Survie et Psychologie : Un système de morsure cachée (avec toux et anxiété), des traumas de type PTSD (gel/rage), et l'impact de la météo.
+| Élément | Détail |
+|---------|--------|
+| Structure mod B42 native | `common/media/lua/` + `42/` — détection PZ OK |
+| `mod.info` | Format B42 correct, `poster=preview.png`, `icon=icon.png` |
+| `sandbox-options.txt` | 17 options, format bloc, type=integer (pas d'enum) |
+| `common/` + `42/` déployés | Sync vers `Zomboid/mods/` et dossier Steam |
+| Script `tools/sync_to_mods.ps1` | Déploiement en un clic vers les deux destinations |
 
-L'Apprentissage : Une observation passive où les PNJ gagnent de l'XP en regardant le joueur agir.
+### ✅ Terminé — Cerveau (`shared/`)
 
-Le Réseau (Dispatcher v1.0.5) : Une séparation stricte entre le mode SOLO (0 overhead réseau) et MULTI (synchronisation via transmitModData toutes les 5 secondes).
+| Fichier | Rôle |
+|---------|------|
+| `00_Core.lua` | Namespace `PHNPC`, utilitaires, vérif version PZ |
+| `NPC_Logger.lua` | Logger 7 niveaux, ring buffer 2000 entrées |
+| `NPC_Config.lua` | Lecture `SandboxVars.PHNPC` + valeurs par défaut |
+| `NPC_DataModel.lua` | Classe PNJ OO : stats, besoins, santé, économie |
+| `NPC_Professions.lua` | 5 métiers avec FSM priorities et outfits B42 |
+| `NPC_FactionManager.lua` | 4 factions, relations croisées −100/+100 |
+| `NPC_Dialogue.lua` | Banques FR/EN, 11 contextes, fallback clés |
+| `NPC_NetworkDispatcher.lua` | Réseau transparent Solo (mémoire) / Multi (commandes) |
+| `NPC_Brain.lua` | FSM 7 états, boucle OnTick ~33 ms |
+| `Translate/EN/ + FR/` | Sandbox, UI, ContextMenu, IGUI |
 
+### 🔶 En cours — Squelette Corps
 
-**Phase 2 : Feuille de route pour la Build 42**
+| Fichier | État |
+|---------|------|
+| `server/00_Init.lua` | Créé (squelette) |
+| `server/NPC_SpawnManager.lua` | Créé (à compléter avec API B42) |
+| `client/00_Init.lua` | Créé (squelette) |
+| `client/NPC_FollowTick.lua` | Créé (à compléter) |
+| `client/NPC_InteractionClient.lua` | Créé (squelette clic-droit) |
+| `client/NPC_SpawnDebug.lua` | Créé (debug spawn) |
 
-Étape 1 : Nettoyage et R&D (Environnement B42)
+---
 
-Archiver le vieux code : Mets de côté tout ce qui concerne NPCSpawner_SOLO.lua, NPCSpawner_MULTI.lua, et tes hooks de pathfinding personnalisés.
+## Prochaines étapes
 
-Étudier l'API Animale : Télécharge un mod ou regarde le code source de la B42 concernant les animaux (cerfs, vaches). Identifie comment le jeu instancie ces entités, gère leurs groupes, et utilise les nouveaux arbres de comportement (Behavior Trees).
+### Étape 1 — Spawn d'un PNJ jouable *(priorité haute)*
 
-Migrer la Configuration : Supprime ton ModOptionsEngine.lua embarqué et recrée tes paramètres (Profils, URL Ollama, etc.) en utilisant l'UI native de configuration de mods de la B42.
+Objectif : faire spawner un PNJ visible en jeu, capable de marcher.
 
-Étape 2 : Le "Nouveau Corps" (Fondations et Mouvement)
+- [ ] Compléter `server/NPC_SpawnManager.lua` :
+  - Étudier l'API de `NPC_Helper_Mod` et `Bandits` (mods exemples)
+  - Utiliser `SurvivorFactory.CreateSurvivor()` + `dressInNamedOutfit()`
+  - Marquer comme NPC : `iso:setNPC(true)`
+  - Mouvement : `iso:pathToLocationF(x, y, z)` (**pas** `pathToCharacter` → ClassCastException)
+- [ ] Valider en jeu : spawner une coquille vide, vérifier déplacement sans crash
 
-Instanciation Native : Crée ta nouvelle entité PNJ en te basant sur l'architecture des animaux de la B42, mais en lui appliquant un modèle visuel humain et un inventaire.
+### Étape 2 — Greffe du Cerveau
 
-Pathfinding Natif : Connecte les ordres de déplacement de ton mod aux nouvelles fonctions de pathfinding du jeu. Laisse le moteur gérer les collisions et l'évitement d'obstacles.
+Objectif : connecter `NPC_Brain.lua` à l'entité spawnable.
 
-Test de Stabilité : Fais spawner un PNJ "coquille vide" et vérifie qu'il peut se déplacer sans générer d'erreurs d'affichage (adieu les crashs IsoFallingClothing).
+- [ ] Associer un `NPC_DataModel` à chaque IsoPlayer NPC via `modData`
+- [ ] Brancher la boucle FSM sur `Events.OnTick` (serveur)
+- [ ] Tester les 7 états : idle → wander → work → trade → defend → flee → guard
 
-Étape 3 : Greffe du Cerveau (Logique et FSM)
+### Étape 3 — Interactions client
 
-Réintégration de NPCBrain.lua : Connecte ton moteur de décision (calcul des besoins à 33ms) à la nouvelle entité.
+Objectif : le joueur peut interagir avec le PNJ.
 
-Traduction des Ordres : Convertis tes anciens ordres FSM (Garder, Défendre, Construire) pour qu'ils pilotent les nouvelles animations et actions de la B42.
+- [ ] Compléter `client/NPC_InteractionClient.lua` : menu clic-droit (`OnFillWorldObjectContextMenu`)
+- [ ] Créer `client/UI/NPC_UI.lua` : fiche info PNJ (ISPanel)
+- [ ] Créer `client/UI/SpeechBubbles.lua` : bulles de dialogue 3D
 
-Test des Métiers : Réactive tes 5 professions et vérifie que la production et l'échange d'objets fonctionnent avec la nouvelle gestion d'inventaire.
+### Étape 4 — Commerce et dialogues
 
-Étape 4 : Le Multijoueur et l'UI (Le grand test)
+- [ ] Créer `client/UI/TradeWindow.lua` : fenêtre d'échange d'objets
+- [ ] Compléter `server/NPC_NetworkServer.lua` : handlers commandes client→serveur
+- [ ] Valider synchronisation Solo et Multijoueur
 
-Synchronisation Native : Observe comment la B42 synchronise les animaux en multijoueur. Remplace tes appels intensifs à transmitModData par le système réseau natif des entités non-joueuses (ce qui devrait réduire tes lags).
+### Étape 5 — Systèmes avancés
 
-Refonte de l'Interface : Réécris ton NPC_UI.lua et OllamaChatUI.lua pour t'assurer que les clics droits et les fenêtres s'affichent correctement avec le nouveau moteur de rendu.
+- [ ] `server/OllamaBridge.lua` : bridge HTTP → Ollama (`HTTPRequest` B42 async)
+- [ ] `client/UI/OllamaChatUI.lua` : fenêtre chat IA
+- [ ] `server/NPC_BiteManagement.lua` : morsure cachée → transformation zombie
+- [ ] `server/NPC_ObservationLearning.lua` : XP passif par observation du joueur
+- [ ] `client/UI/QuestJournalUI.lua` : journal de quêtes (touche J)
 
-Étape 5 : Réintégration des systèmes avancés (La surcouche)
+### Étape 6 — Finitions et déploiement
 
-Le pont Ollama : Réintègre OllamaBridge.lua. Comme c'est du HTTP pur, cela devrait fonctionner presque sans modification.
+- [ ] `server/AdminCommands.lua` : `/phnpc list/spawn/kill/debug/reload`
+- [ ] Tests multijoueur (serveur dédié)
+- [ ] Publication Workshop Steam
+- [ ] Montée de version → `1.1.0`
 
-Survie et Apprentissage : Réactive le système de morsure cachée, l'apprentissage passif et la gestion des traumas.
+---
 
-Commandes Admin : Remets en place tes commandes /phnpc pour faciliter le débogage final.
+## Rappel structure B42 (leçon apprise)
+
+> En B42, le dossier **`common/`** est **obligatoire** pour que PZ détecte le mod.  
+> Tout fichier Lua dans `media/lua/` à la **racine** est **ignoré** (structure B41 uniquement).
+
+```
+PH_DynamicNPCOverhaul/
+├── 42/           ← présence requise (même vide)
+├── common/       ← OBLIGATOIRE — contient tout le Lua
+│   └── media/lua/{shared,server,client}/
+├── mod.info
+└── preview.png
+```

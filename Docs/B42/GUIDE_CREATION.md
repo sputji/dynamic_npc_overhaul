@@ -23,18 +23,28 @@ Répertoire de test en jeu : `C:\Users\<USER>\Zomboid\mods\PH_DynamicNPCOverhaul
 
 ## 1. Structure du dossier mod
 
-La structure **minimale** pour que PZ charge le mod :
+La structure **obligatoire** pour que PZ B42 charge le mod :
+
+> **Important** : En B42, `common/` est **requis** pour que le mod soit détecté dans le menu.  
+> Les fichiers dans `media/lua/` à la racine sont ignorés (structure B41 uniquement).
 
 ```
 B42/
 ├── mod.info                    ← OBLIGATOIRE
-├── poster.png                  ← Icône 128×128 (Workshop)
-└── media/
-    ├── sandbox-options.txt     ← Options Sandbox (format bloc)
-    └── lua/
-        ├── shared/             ← Chargé côté CLIENT + SERVEUR
-        ├── server/             ← Chargé côté SERVEUR uniquement
-        └── client/             ← Chargé côté CLIENT uniquement
+├── preview.png                 ← Visuel 128×128 (référencé poster=preview.png)
+├── icon.png                    ← Icône Workshop
+├── tools/
+│   └── sync_to_mods.ps1        ← Déploiement en un clic
+├── 42/                         ← Chargé uniquement en B42.x
+│   ├── mod.info                ← Copie du mod.info racine
+│   └── media/lua/              ← Peut rester vide (contenu dans common/)
+└── common/                     ← OBLIGATOIRE — Chargé dans toutes les versions B42
+    └── media/
+        ├── sandbox-options.txt
+        └── lua/
+            ├── shared/             ← Chargé CLIENT + SERVEUR
+            ├── server/             ← Chargé SERVEUR uniquement
+            └── client/             ← Chargé CLIENT uniquement
 ```
 
 ---
@@ -44,20 +54,19 @@ B42/
 ```
 name=Project Humain : Dynamic NPC Overhaul
 id=PH_DynamicNPCOverhaul
-description=Dynamic NPCs with AI, factions, quests and trade for Build 42.
-poster=poster.png
-icon=icon.png
 author=sputji
-version=2.0.0
-targetVersion=42.0
-category=npcs
+description=Autonomous NPCs with AI brain (FSM), Ollama dialogues, trading, hidden bites and passive learning. Compatible B42.
+poster=preview.png
+icon=icon.png
+version=1.0.0
+require=
 ```
 
 > **Règles** :
-> - `version` = version du mod (pas `modversion` ni `pzversion`)
-> - `targetVersion` = version PZ minimale
-> - `category` = catégorie Workshop (npcs, items, clothing, maps…)
-> - Pas de `url`, `tags`, `versionMin` → non reconnus en B42
+> - `poster=` = nom du fichier image à la racine du mod
+> - `require=` vide = aucune dépendance
+> - `targetVersion` absent = compatible avec toutes les versions B42
+> - Supprimé : `url`, `tags`, `versionMin`, `category`, `pzversion` → non reconnus en B42
 
 ---
 
@@ -289,8 +298,9 @@ end)
 
 ## 8. Ordre d'implémentation recommandé
 
-### Phase 1 — Fondations (déjà faites ✅)
+### Phase 1 — Fondations (faites ✅)
 - [x] `mod.info` + `sandbox-options.txt` + traductions
+- [x] Structure B42 native (`common/` + `42/` + `tools/`)
 - [x] `shared/00_Core.lua` — namespace PHNPC
 - [x] `shared/NPC_Logger.lua` — système de logs
 - [x] `shared/NPC_Config.lua` — lecture SandboxVars
@@ -301,14 +311,16 @@ end)
 - [x] `shared/NPC_NetworkDispatcher.lua` — réseau transparent
 - [x] `shared/NPC_Brain.lua` — FSM IA
 
-### Phase 2 — Spawn & Vie (Corps à créer)
-- [ ] `server/00_Init.lua` — point d'entrée serveur
-- [ ] `server/NPC_SpawnManager.lua` — spawn/despawn B42
-- [ ] `server/NPC_NetworkServer.lua` — réception commandes clients
+### Phase 2 — Spawn & Vie (squelette créé 🔶)
+- [x] `server/00_Init.lua` — point d'entrée serveur (squelette)
+- [x] `server/NPC_SpawnManager.lua` — spawn/despawn (à compléter)
+- [ ] `server/NPC_NetworkServer.lua` — handlers commandes clients
 
-### Phase 3 — Interactions client
-- [ ] `client/00_Init.lua` — point d'entrée client
-- [ ] `client/NPC_InteractionClient.lua` — menu clic-droit
+### Phase 3 — Interactions client (squelette créé 🔶)
+- [x] `client/00_Init.lua` — point d'entrée client (squelette)
+- [x] `client/NPC_InteractionClient.lua` — menu clic-droit (squelette)
+- [x] `client/NPC_FollowTick.lua` — tick client-side
+- [x] `client/NPC_SpawnDebug.lua` — debug spawn
 - [ ] `client/UI/NPC_UI.lua` — fiche info PNJ
 
 ### Phase 4 — Fonctionnalités avancées
@@ -329,11 +341,13 @@ end)
 
 ### Synchronisation rapide
 ```powershell
-# Copier le mod dans le dossier Zomboid pour tester
-$src = "D:\PZ Mods\Dynamic_NPC_Overhaul\B42"
-$dst = "C:\Users\$env:USERNAME\Zomboid\mods\PH_DynamicNPCOverhaul"
-Copy-Item -Path "$src\*" -Destination $dst -Recurse -Force
+# Depuis D:\PZ Mods\Dynamic_NPC_Overhaul\B42\tools\
+.\sync_to_mods.ps1
+# Synchronise workspace → C:\Users\Nicolas\Zomboid\mods\PH_DynamicNPCOverhaul\
+# et              → F:\Steam Games\steamapps\common\ProjectZomboid\mods\PH_DynamicNPCOverhaul\
 ```
+
+Le script supprime l'ancienne version et recopie proprement `42/`, `common/`, `mod.info`, `preview.png`, `icon.png`.
 
 ### Activer les logs en jeu
 Dans `sandbox-options.txt`, `DebugMode = true` active les logs `TRACE/DEBUG`.
