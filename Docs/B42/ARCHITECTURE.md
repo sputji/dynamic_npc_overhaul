@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Architecture B42
 > Version 1.0.0 | Project Zomboid Build 42 | Auteur : sputji  
-> **État actuel : Structure B42 native ✅ — Cerveau ✅ — Corps initial ✅ — UI à compléter**
+> **État actuel : Structure B42 native ✅ — mod.info corrigé (versionMin + require) ✅ — Cerveau ✅ — Corps initial ✅ — UI à compléter**
 
 ---
 
@@ -40,8 +40,9 @@ D:\PZ Mods\Dynamic_NPC_Overhaul\
 │       └── feuille de route.md      # Roadmap fonctionnelle
 │
 └── B42\                             # Structure B42 native (common/ + 42/)
-    ├── mod.info                     # id, name, version=1.0.0, poster=preview.png
-    ├── preview.png                  # Visuel mod (128×128, référencé par poster=)
+    ├── mod.info                     # id, name, version=1.0.0, versionMin=42.0, poster=poster.png
+    ├── poster.png                   # Visuel mod (128×128, référencé par poster=)
+    ├── preview.png                  # Image alternative / Workshop
     ├── icon.png                     # Icône Workshop
     │
     ├── tools\
@@ -108,14 +109,15 @@ name=Project Humain : Dynamic NPC Overhaul
 id=PH_DynamicNPCOverhaul
 author=sputji
 description=Autonomous NPCs with AI brain (FSM), Ollama dialogues, trading, hidden bites and passive learning. Compatible B42.
-poster=preview.png
+poster=poster.png
 icon=icon.png
 version=1.0.0
-require=
+versionMin=42.0
 ```
 
-> Champs standard B42 minimal. `targetVersion` absent = compatible avec toutes les versions B42.  
-> `require=` vide = aucune dépendance. Supprimé : `pzversion`, `modversion`, `versionMin`, `tags`, `url`, `category`.
+> `versionMin=42.0` — format obligatoire `build.major` (pas `42` seul) ; absent = comportement indéfini selon les builds.  
+> `require=` **absent** — une ligne `require=` vide est parsée comme « dépendance ID vide manquante » → **mod rouge** en jeu.  
+> Supprimé : `pzversion`, `modversion`, `tags`, `url`, `category`.
 
 ### `media/sandbox-options.txt` — Format bloc
 
@@ -283,4 +285,6 @@ end
 | Mod non chargé | `pzversion` au lieu de `targetVersion` | Corriger mod.info |
 | **Mod invisible en B42** | `common/` absent dans le dossier mod | Créer `common/` (même vide) — condition **obligatoire** B42 |
 | **Lua ignoré en B42** | Fichiers dans `media/lua/` (racine) | Déplacer dans `common/media/lua/` ou `42/media/lua/` |
+| **Mod rouge — dépendance manquante** | `require=` avec valeur vide dans mod.info | Supprimer la ligne `require=` si aucune dépendance |
+| **Mod rouge — incompatibilité version** | `versionMin` absent ou mal formaté | Utiliser `versionMin=42.0` (format `build.major` obligatoire) |
 | `pcall` nil au chargement | Runtime Kahlua instable | Wrapper `pcall(...)` systématique |
