@@ -37,9 +37,17 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
     for i = 0, zombieList:size() - 1 do
         local zombie = zombieList:get(i)
         if zombie then
-            -- Lecture ModData protégée
-            local mdOk, md = pcall(function() return zombie:getModData() end)
-            if mdOk and md and md.PHNPC_IsNPC then
+            -- Détection robuste cross-VM (B42 : ModData inaccessible entre VMs)
+            -- Méthode 1 : registre _activeNPCs (populé par attachDataModel côté client)
+            local isNPC = PHNPC._activeNPCs ~= nil and PHNPC._activeNPCs[zombie] ~= nil
+            -- Méthode 2 : variable Java setVariable/getVariableBoolean (cross-VM safe)
+            if not isNPC then
+                pcall(function()
+                    isNPC = zombie:getVariableBoolean("PHNPC_IsNPC") == true
+                end)
+            end
+
+            if isNPC then
                 -- Calcul de distance
                 local distOk, dist = pcall(function()
                     local dx = zombie:getX() - px
@@ -48,7 +56,8 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
                 end)
 
                 if distOk and dist <= INTERACT_DIST then
-                    local npcName = md.PHNPC_FullName or "PNJ Inconnu"
+                    local npcData = PHNPC._activeNPCs and PHNPC._activeNPCs[zombie]
+                    local npcName = (npcData and npcData.fullName) or "Survivant"
                     context:addOption(
                         "Parler à " .. npcName,
                         zombie,

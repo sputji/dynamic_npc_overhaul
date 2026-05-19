@@ -167,9 +167,10 @@ local function convertToNPC(zombie, isFemale)
     -- 7. Valeur de rotation sur alerte (Bandits : ligne 198)
     pcall(function() zombie:setTurnAlertedValues(-5, 5) end)
 
-    -- 8. Voice prefix humain — CRITIQUE : sans ça PZ garde les animations/sons zombie
-    -- Bandits utilise "Bandit", on réutilise le même car il désactive le comportement zombie
-    pcall(function() zombie:getDescriptor():setVoicePrefix("Bandit") end)
+    -- 8. Voice prefix — genre différencié ; si le préfixe n'existe pas → silencieux (pas de son zombie)
+    pcall(function()
+        zombie:getDescriptor():setVoicePrefix(isFemale and "PHNPC_Female" or "PHNPC_Male")
+    end)
 
     -- 9. Marqueur "Bandit" = flag interne PZ pour désactiver l'IA zombie native
     pcall(function() zombie:setVariable("Bandit", true) end)
@@ -180,22 +181,29 @@ local function convertToNPC(zombie, isFemale)
     pcall(function() zombie:setFemaleEtc(isFemale) end)
     applyHumanVisuals(zombie, isFemale)
 
+    -- 10b. Santé initiale raisonnable (appliquée une seule fois, pas en enforceNPC)
+    pcall(function() zombie:setMaxHealth(500) end)
+    pcall(function() zombie:setHealth(500) end)
+
     -- 11. Empêcher le moteur de re-vêtir l'entité automatiquement
     pcall(function() zombie:setDressInRandomOutfit(false) end)
 
-    -- 12. Animation initiale pour sortir de Zombie_Idle
-    pcall(function() zombie:setBumpType("Shrug") end)
-
-    -- 13. Marquer côté Java pour les ticks suivants (cross-VM safe)
+    -- 12. Marquer côté Java AVANT l'animation de sortie (condition AnimSet déjà vraie lors de la transition)
     pcall(function()
         zombie:setVariable("PHNPC_IsNPC",    true)
         zombie:setVariable("PHNPC_IsFemale", isFemale)
     end)
 
+    -- 13. Animation initiale pour sortir de Zombie_Idle (PHNPC_IsNPC déjà positionné → Bob_Idle actif)
+    pcall(function() zombie:setBumpType("Shrug") end)
+
     if Log then
         Log.ok("FollowTick", "Entité convertie en PNJ",
             { isFemale = tostring(isFemale) })
     end
+    print(string.format("[PHNPC] NPC converti : %s @ %d,%d",
+        isFemale and "FEMME" or "HOMME",
+        math.floor(zombie:getX()), math.floor(zombie:getY())))
 end
 
 -- ============================================================
@@ -236,12 +244,14 @@ local function enforceNPC(zombie)
     pcall(function() zombie:setNoTeeth(true) end)
     pcall(function() zombie:setTarget(nil) end)
     pcall(function() zombie:clearAggroList() end)
+    -- Maintenir le flag d'identité NPC côté Java chaque tick (cross-VM)
+    pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
     -- Flag Bandit : maintenu chaque tick pour que le moteur ne réactive pas l'IA zombie
     pcall(function() zombie:setVariable("Bandit", true) end)
     pcall(function() zombie:setVariable("NoLungeAttack", true) end)
     pcall(function() zombie:setVariable("ZombieHitReaction", "Chainsaw") end)
-    -- Santé très haute : les dégâts réels sont dans PHNPC_Health en ModData
-    pcall(function() zombie:setHealth(10000) end)
+    -- Silencer les sons zombie (stopAll chaque tick empêche tout son résiduel)
+    pcall(function() zombie:getEmitter():stopAll() end)
     -- Empêcher le moteur de marquer l'entité comme "useless" (arrêt de l'IA)
     pcall(function() zombie:setUseless(false) end)
     -- Garder la marche humaine
@@ -288,6 +298,13 @@ end
 
 local function onZombieUpdate(zombie)
     if not zombie then return end
+
+    -- DEBUG : confirme que l'event fire (imprime au 1er appel puis toutes les 500 calls)
+    PHNPC_FollowTick._dbgCount = (PHNPC_FollowTick._dbgCount or 0) + 1
+    if PHNPC_FollowTick._dbgCount == 1 or PHNPC_FollowTick._dbgCount % 500 == 0 then
+        print("[PHNPC DEBUG] onZombieUpdate appels=" .. PHNPC_FollowTick._dbgCount
+            .. "  pendingNPCs=" .. tostring(PHNPC._pendingNPCs and #PHNPC._pendingNPCs or 0))
+    end
 
     -- ================================================================
     -- DÉTECTION : triple méthode pour robustesse face aux VMs séparées B42

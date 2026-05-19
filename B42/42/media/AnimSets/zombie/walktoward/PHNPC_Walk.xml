@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Remplace l'animation zombie walk par l'animation humaine Bob_Walk
-     quand le zombie a PHNPC_IsNPC = true.
-     Combine notre condition métier avec le walkType "Walk" pour que
-     seuls nos NPCs soient affectés (même si un autre mod change le walkType). -->
+<!-- NPC PHNPC : animation humaine marche (Bob_Walk) au lieu du shuffle zombie.
+     Condition : PHNPC_IsNPC = true  ET  zombieWalkType = Walk.
+     Si le NPC court (walkType=Run), c'est PHNPC_Run.xml qui prend le relais. -->
 <animNode>
     <m_Name>PHNPC_Walk</m_Name>
     <m_AnimName>Bob_Walk</m_AnimName>
