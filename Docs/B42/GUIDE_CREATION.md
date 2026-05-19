@@ -56,17 +56,17 @@ name=Project Humain : Dynamic NPC Overhaul
 id=PH_DynamicNPCOverhaul
 author=sputji
 description=Autonomous NPCs with AI brain (FSM), Ollama dialogues, trading, hidden bites and passive learning. Compatible B42.
-poster=preview.png
+poster=poster.png
 icon=icon.png
 version=1.0.0
-require=
+versionMin=42.0
 ```
 
 > **Règles** :
-> - `poster=` = nom du fichier image à la racine du mod
-> - `require=` vide = aucune dépendance
-> - `targetVersion` absent = compatible avec toutes les versions B42
-> - Supprimé : `url`, `tags`, `versionMin`, `category`, `pzversion` → non reconnus en B42
+> - `poster=` = nom du fichier image à la racine du mod (`poster.png`)
+> - `versionMin=42.0` — format **obligatoire** `build.major` ; `42` seul (sans `.0`) n'est pas reconnu
+> - `require=` **absent** — une ligne `require=` vide est parsée par PZ comme « dépendance ID vide » → **mod rouge**
+> - Supprimé : `url`, `tags`, `category`, `pzversion`, `targetVersion`
 
 ---
 
@@ -372,3 +372,5 @@ Dans `sandbox-options.txt`, `DebugMode = true` active les logs `TRACE/DEBUG`.
 | Option Sandbox absente | `type = enum` dans sandbox-options.txt | Utiliser `type = integer` |
 | Commentaires `--` ignorés/plantent | Parseur PZ sandbox ne lit pas Lua | Supprimer tous les `--` du sandbox |
 | Mod non chargé | `pzversion` au lieu de `targetVersion` | Corriger mod.info |
+| **Mod rouge — dépendance manquante** | `require=` avec valeur vide dans mod.info | Supprimer la ligne `require=` si aucune dépendance |
+| **Mod rouge — incompatibilité version** | `versionMin` absent ou mal formaté | Utiliser `versionMin=42.0` (format `build.major` obligatoire) |
