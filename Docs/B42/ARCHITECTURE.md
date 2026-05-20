@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Architecture B42
-> Version 1.0.0 | Project Zomboid Build 42 | Auteur : sputji  
-> **État actuel : Structure B42 native ✅ — mod.info corrigé (versionMin + require) ✅ — Cerveau ✅ — Corps initial ✅ — UI à compléter**
+> Version 1.0.0 | Project Zomboid Build 42.18.0 | Auteur : sputji  
+> **État actuel : Fondations ✅ — Cerveau ✅ — Corps Serveur ✅ — Corps Client ✅ — AnimSets ✅ — UI ⚠️ à créer**
 
 ---
 
@@ -17,10 +17,11 @@ Chaque module s'enregistre via `PHNPC.registerModule(name, tbl)` et se retrouve 
 | Couche | Rôle | État |
 |--------|------|------|
 | **Cerveau** (`shared/`) | Logique pure, données, IA, réseau abstrait | ✅ Implémenté |
-| **Corps serveur** (`server/`) | Spawn, réseau serveur, commandes admin | 🔶 Squelette créé |
-| **Corps client** (`client/`) | Menu clic-droit, FollowTick, debug spawn | 🔶 Squelette créé |
+| **Corps serveur** (`server/`) | Spawn, réseau serveur, commandes admin | ✅ Fonctionnel |
+| **Corps client** (`client/`) | Menu clic-droit, FollowTick, debug spawn | ✅ Fonctionnel |
+| **AnimSets** (`42/media/AnimSets/`) | Animations humaines Bob_Idle / Bob_Walk | ✅ Actif |
 | **UI** (`client/UI/`) | Fenêtres ISPanel (commerce, chat, quêtes) | ❌ À créer |
-| Wiki PZ modding B42 | [Référence API](https://pzwiki.net/wiki/Build_42) |
+| **Wiki PZ modding B42** | [Référence API](https://pzwiki.net/wiki/Build_42) |
 
 ---
 
@@ -82,22 +83,68 @@ D:\PZ Mods\Dynamic_NPC_Overhaul\
                 │           ├── ContextMenu_FR.txt
                 │           └── IGUI_FR.txt
                 │
-                ├── server\          🔶 CORPS SERVEUR — Squelette actif
-                │   ├── 00_Init.lua          # Point d'entrée serveur
-                │   └── NPC_SpawnManager.lua # Spawn/despawn (à compléter)
+                ├── server\          ✅ CORPS SERVEUR — Fonctionnel
+                │   ├── 00_Init.lua          # Point d'entrée serveur, handler PHNPC_SpawnRequest
+                │   └── NPC_SpawnManager.lua # Spawn via addZombiesInOutfit B42, noms/professions
                 │   ── (À créer) NPC_NetworkServer.lua, NPC_BiteManagement.lua
                 │   ── (À créer) NPC_ObservationLearning.lua, OllamaBridge.lua
                 │   ── (À créer) AdminCommands.lua
                 │
-                └── client\          🔶 CORPS CLIENT — Squelette actif
-                    ├── 00_Init.lua              # Point d'entrée client
-                    ├── NPC_FollowTick.lua        # Tick suivi client-side
-                    ├── NPC_InteractionClient.lua # Menu clic-droit
-                    ├── NPC_SpawnDebug.lua        # Commandes debug spawn
-                    └── UI\                       # ❌ À créer
+                └── client\          ✅ CORPS CLIENT — Fonctionnel
+                    ├── 00_Init.lua              # Point d'entrée client, handler PHNPC_SpawnConfirm
+                    ├── NPC_FollowTick.lua        # Conversion zombie→NPC, visuals humains, suivi, animations
+                    ├── NPC_InteractionClient.lua # Menu clic-droit (détecte NPC, dialogue stub)
+                    ├── NPC_SpawnDebug.lua        # Commandes debug spawn (mode -debug)
+                    └── UI\                       # ⚠️ À créer
                         ── (À créer) NPC_UI.lua, SpeechBubbles.lua
                         ── (À créer) TradeWindow.lua, OllamaChatUI.lua
                         ── (À créer) QuestJournalUI.lua
+```
+
+---
+
+## AnimSets B42 — Animations humaines
+
+Les animations humaines sont activées via des fichiers XML placés dans `42/media/AnimSets/zombie/`.  
+PZ charge les XML **par ordre alphabétique** dans chaque sous-dossier ; les fichiers préfixés `PHNPC_` overrident les animations zombie natives.
+
+> **Confirmé en jeu** : la console affiche `overrides media/animsets/zombie/idle/phnpc_idle.xml` et `...phnpc_walk.xml` au chargement du mod.
+
+### Fichiers créés
+
+| Fichier | Condition(s) | Animation |
+|---------|-------------|-----------|
+| `idle/PHNPC_Idle.xml` | `PHNPC_IsNPC=BOOL true` | `Bob_Idle` (humain) |
+| `walktoward/PHNPC_Walk.xml` | `PHNPC_IsNPC=BOOL true` **+** `zombieWalkType=STRING "Walk"` | `Bob_Walk` (humain) |
+| `walktoward/PHNPC_Run.xml` | `PHNPC_IsNPC=BOOL true` **+** `zombieWalkType=STRING "Run"` | `Bob_Run` (humain) |
+| `faceTarget/PHNPC_FaceTarget.xml` | `PHNPC_IsNPC=BOOL true` | Face humaine |
+
+### ⚠️ Points critiques
+
+1. **`PHNPC_IsNPC` doit être en BOOL** — `zombie:setVariable("PHNPC_IsNPC", true)` **hors pcall**.  
+   En Kahlua, un `pcall` peut avaler l'écriture silencieusement → variable jamais envoyée côté Java.
+
+2. **`zombieWalkType` est requis par PHNPC_Walk.xml** — DEUX conditions dans ce fichier :  
+   - `PHNPC_IsNPC=BOOL true`  
+   - `zombieWalkType=STRING "Walk"`  
+   Si la 2ème est absente, `Bob_Walk` ne se déclenche **jamais**. Envoyer à chaque tick de déplacement :
+   ```lua
+   zombie:setVariable("zombieWalkType", "Walk")  -- ou "Run" selon la vitesse
+   ```
+
+3. **`getActionContext():clear()`** doit être appelé dans `convertToNPC` pour forcer le re-scan des conditions XML.
+
+### Pattern de déclenchement Lua
+
+```lua
+-- convertToNPC : écriture garantie hors pcall
+zombie:setVariable("PHNPC_IsNPC",    "true")  -- STRING fallback (sûreté)
+zombie:setVariable("PHNPC_IsNPC",    true)     -- BOOL (condition XML)
+
+-- doFollow : mise à jour chaque tick de déplacement
+local speed = (dist > FOLLOW_RUN_DIST) and "Run" or "Walk"
+zombie:setVariable("zombieWalkType", speed)   -- CRITIQUE : condition 2 de PHNPC_Walk.xml
+pcall(function() zombie:setWalkType(speed) end)
 ```
 
 ---
@@ -288,4 +335,11 @@ end
 | **Lua ignoré en B42** | Fichiers dans `media/lua/` (racine) | Déplacer dans `common/media/lua/` ou `42/media/lua/` |
 | **Mod rouge — dépendance manquante** | `require=` avec valeur vide dans mod.info | Supprimer la ligne `require=` si aucune dépendance |
 | **Mod rouge — incompatibilité version** | `versionMin` absent ou mal formaté | Utiliser `versionMin=42.0` (format `build.major` obligatoire) |
-| `pcall` nil au chargement | Runtime Kahlua instable | Wrapper `pcall(...)` systématique |
+| **`pcall` nil au chargement** | Runtime Kahlua instable | Wrapper `pcall(...)` systématique |
+| **AnimSets ignorent la variable** | `setVariable` dans un pcall qui échoue silencieusement | Appeler `zombie:setVariable("PHNPC_IsNPC", true)` **hors pcall** |
+| **Bob_Walk jamais joué** | `PHNPC_Walk.xml` a 2 conditions : `PHNPC_IsNPC` ET `zombieWalkType=Walk` | Envoyer `zombie:setVariable("zombieWalkType", "Walk")` dans `doFollow` |
+| **Bob_Idle ne se déclenche pas** | Contexte d'action courant pas vidé | Appeler `zombie:getActionContext():clear()` dans `convertToNPC` |
+| **Crash `setMaxHealth` en boucle** | `setMaxHealth`/`setHealth` inexistants sur IsoZombie B42 | Supprimer ces appels ; la boucle infinie vient de `_convertedNPCs` non marqué |
+| **`getGameMode()` = Multiplayer en solo** | B42 retourne toujours `"Multiplayer"` | Utiliser `not isMultiplayer()` pour détecter le solo |
+| **`getOptionCount()` crash au lancement** | `getServerOptions()` retourne un objet sans cette méthode en solo | Guard `type(opts.getOptionCount) == "function"` avant l'appel |
+| **Zombie re-cible le joueur** | Moteur conserve la mémoire de chair fraîche | `zombie:setTimeSinceSeenFlesh(1000000)` dans `convertToNPC` et `enforceNPC` |

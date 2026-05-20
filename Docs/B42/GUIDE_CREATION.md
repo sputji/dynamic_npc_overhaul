@@ -148,49 +148,177 @@ client/
 
 ### 6.1 Spawn d'un PNJ — `server/NPC_SpawnManager.lua`
 
-> ⚠️ Les APIs de spawn ont changé entre B41 et B42.
-> Référence : mod exemple `NPC_Helper_Mod` et `Bandits`.
+> ✅ API validée en jeu sur PZ B42.18.0 — `addZombiesInOutfit` est la méthode fonctionnelle.
 
-**À vérifier dans les mods exemples :**
-- Comment utiliser `IsoPlayer.new()` vs les nouveaux helpers B42
-- `SurvivorFactory` : méthodes `CreateSurvivor`, `getRandomForename`, `getRandomSurname`
-- Appliquer un outfit : `desc:dressInNamedOutfit(outfitName)`
-- Marquer comme NPC : `iso:setNPC(true)`
-- Attacher à la grille : `getWorld():getCell()`, `IsoDirections.SE`
-
-**Structure minimale :**
+**API de spawn B42 confirmée :**
 ```lua
 -- server/NPC_SpawnManager.lua
-if not isServer() then return end
-
-local NPC_SpawnManager = {}
-
-function NPC_SpawnManager.spawnAt(x, y, z, npcData)
-    -- TODO : implémenter avec l'API B42 vérifiée
-    -- Référence : mod example/NPC_Helper_Mod/
-end
-
-Events.EveryOneMinute.Add(function()
-    -- Boucle de spawn/despawn
-end)
-
-PHNPC.registerModule("NPC_SpawnManager", NPC_SpawnManager)
+-- addZombiesInOutfit(x, y, z, count, outfitName, female) → table d'IsoZombie
+local npcs = addZombiesInOutfit(x, y, z, 1, "Survivor", isFemale)
+local zombie = npcs and npcs[1]
 ```
 
-### 6.2 Mouvement du PNJ — `server/NPC_SpawnManager.lua`
+> **Note** : `addZombiesInOutfit` retourne des `IsoZombie`, pas des `IsoPlayer`.  
+> C'est intentionnel pour B42 — la conversion humaine se fait ensuite côté client via `NPC_FollowTick.lua`.
 
-> ⚠️ `pathToCharacter()` cause un `ClassCastException` avec les IsoPlayer NPCs.
-> Utiliser `pathToLocationF(x, y, z)` à la place.
-
+**Marquage cross-VM (serveur → client) :**
 ```lua
--- BON :
-iso:pathToLocationF(targetX, targetY, targetZ)
+-- Via ModData Java (persiste entre VM, accessible dans Events.OnZombieUpdate côté client)
+zombie:getModData()["PHNPC_id"]      = npcData.id
+zombie:getModData()["PHNPC_IsNPC"]   = true
+zombie:getModData()["PHNPC_Female"]  = isFemale
 
--- MAUVAIS (crash) :
-iso:pathToCharacter(player)   -- ClassCastException IsoPlayer/IsoZombie
+-- Via variable Java AnimEngine (accessible immédiatement dans la même VM)
+zombie:setVariable("PHNPC_IsNPC", true)
 ```
 
-### 6.3 Menus contextuels — `client/NPC_InteractionClient.lua`
+**Structure complète du handler spawn :**
+```lua
+Events.OnClientCommand.Add(function(module, cmd, player, args)
+    if module ~= PHNPC.MOD_ID or cmd ~= "PHNPC_SpawnRequest" then return end
+    local x = player:getX() + (math.random(-3, 3))
+    local y = player:getY() + (math.random(-3, 3))
+    local z = player:getZ()
+    local isFemale = (math.random(0, 1) == 1)
+    local npcs = addZombiesInOutfit(x, y, z, 1, "Survivor", isFemale)
+    if npcs and npcs[1] then
+        local zombie = npcs[1]
+        zombie:getModData()["PHNPC_IsNPC"]  = true
+        zombie:getModData()["PHNPC_Female"] = isFemale
+        zombie:setVariable("PHNPC_IsNPC", true)
+        sendServerCommand(player, PHNPC.MOD_ID, "PHNPC_SpawnConfirm", {
+            id = tostring(zombie:getOnlineID()),
+            female = isFemale,
+        })
+    end
+end)
+```
+
+### 6.2 Conversion zombie → NPC (pattern Banditize) — `client/NPC_FollowTick.lua`
+
+> PZ B42 ne fournit pas d'API `IsoPlayer` NPC propre. La stratégie est :  
+> **spawner un `IsoZombie` + le convertir en humain côté client** via `Events.OnZombieUpdate`.
+
+**Déclencheur de conversion :**
+```lua
+-- client/NPC_FollowTick.lua
+Events.OnZombieUpdate.Add(function(zombie)
+    -- Triple détection : variable Java / ModData / liste pending
+    local isNPC = zombie:getVariableBoolean("PHNPC_IsNPC")
+              or (zombie:getModData()["PHNPC_IsNPC"] == true)
+              or _pendingNPCIds[tostring(zombie:getOnlineID())]
+    if not isNPC then return end
+
+    local isFemale = zombie:getModData()["PHNPC_Female"] == true
+
+    if not _convertedNPCs[zombie] then
+        _convertedNPCs[zombie] = true  -- AVANT convertToNPC (anti-boucle infinie)
+        convertToNPC(zombie, isFemale)
+        attachDataModel(zombie)
+    else
+        enforceNPC(zombie)
+        doFollow(zombie, getPlayer())
+    end
+end)
+```
+
+> **⚠️ Piège critique** : marquer `_convertedNPCs[zombie] = true` **AVANT** d'appeler `convertToNPC`.  
+> Si `convertToNPC` plante (ex : méthode inexistante), le zombie est quand même marqué.  
+> Sans ce guard, chaque tick retentera la conversion → crash en boucle sur la console.
+
+**Fonctions clés de `convertToNPC` :**
+```lua
+local function convertToNPC(zombie, isFemale)
+    -- CRITIQUE : hors pcall pour garantir l'écriture vers l'AnimEngine Java
+    zombie:setVariable("PHNPC_IsNPC", "true")  -- STRING fallback
+    zombie:setVariable("PHNPC_IsNPC", true)     -- BOOL (condition XML PHNPC_Idle.xml)
+    zombie:setVariable("PHNPC_IsFemale", isFemale)
+
+    -- Vider le contexte d'action → force AnimEngine à re-lire les XML
+    pcall(function()
+        if zombie:getActionContext() then zombie:getActionContext():clear() end
+    end)
+
+    -- Désactiver mécaniques zombie
+    pcall(function() zombie:setNoTeeth(true) end)
+    pcall(function() zombie:setTarget(nil) end)
+    pcall(function() zombie:clearAggroList() end)
+    pcall(function() zombie:setTimeSinceSeenFlesh(1000000) end)
+
+    -- Type de marche humaine
+    pcall(function() zombie:setWalkType("Walk") end)
+    pcall(function() zombie:setVariable("GCWalkType", "Walk") end)
+
+    -- Visuels humains
+    applyHumanVisuals(zombie, isFemale)
+    pcall(function() zombie:setDressInRandomOutfit(false) end)
+end
+```
+
+> **⚠️ `setMaxHealth`/`setHealth` n'existent PAS sur `IsoZombie` en B42.**  
+> Les appeler dans un pcall produit `Object tried to call nil in pcall` qui **remonte** et crashe la fonction.
+
+**`enforceNPC` — ré-appliqué à chaque tick :**
+```lua
+local function enforceNPC(zombie)
+    zombie:setVariable("PHNPC_IsNPC", true)  -- hors pcall, garanti chaque tick
+    pcall(function() zombie:setNoTeeth(true) end)
+    pcall(function() zombie:setTarget(nil) end)
+    pcall(function() zombie:clearAggroList() end)
+    pcall(function() zombie:setTimeSinceSeenFlesh(1000000) end)
+end
+```
+
+**`doFollow` — navigation + animation Walk :**
+```lua
+local function doFollow(zombie, player)
+    local dist = -- calculer distance zombie↔joueur
+    if dist <= FOLLOW_MIN_DIST then
+        zombie:setVariable("zombieWalkType", "")  -- → PHNPC_Idle.xml
+        pcall(function() zombie:faceThisObject(player) end)
+        return
+    end
+    local speed = (dist > FOLLOW_RUN_DIST) and "Run" or "Walk"
+    zombie:setVariable("zombieWalkType", speed)  -- ⚠️ CRITIQUE : condition 2 PHNPC_Walk.xml
+    pcall(function() zombie:setWalkType(speed) end)
+    pcall(function() zombie:WalkTo(targetX, targetY, targetZ) end)
+end
+```
+
+### 6.3 AnimSets XML — animer comme un humain
+
+Les AnimSets sont des fichiers XML qui définissent des **règles de substitution d'animation**.  
+Pour un `IsoZombie` converti en NPC, on crée des fichiers dans `42/media/AnimSets/zombie/<etat>/`.
+
+> **Confirmé en jeu** : PZ log `overrides media/animsets/zombie/idle/phnpc_idle.xml` au chargement.
+
+**Structure des fichiers :**
+```
+42/media/AnimSets/zombie/
+├── idle/PHNPC_Idle.xml           # PHNPC_IsNPC=true → Bob_Idle
+├── walktoward/PHNPC_Walk.xml     # PHNPC_IsNPC=true + zombieWalkType=Walk → Bob_Walk
+├── walktoward/PHNPC_Run.xml      # PHNPC_IsNPC=true + zombieWalkType=Run → Bob_Run
+└── faceTarget/PHNPC_FaceTarget.xml
+```
+
+**Exemple — PHNPC_Walk.xml (DEUX conditions obligatoires) :**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<animset>
+    <animset_override>
+        <conditions>
+            <condition name="PHNPC_IsNPC"    type="BOOL"   value="true"/>
+            <condition name="zombieWalkType" type="STRING" value="Walk"/>
+        </conditions>
+        <anims><anim name="Bob_Walk"/></anims>
+    </animset_override>
+</animset>
+```
+
+> **⚠️ Les deux conditions sont obligatoires** — `PHNPC_Walk.xml` ne se déclenche pas si  
+> `zombieWalkType` n'est pas envoyé via `zombie:setVariable("zombieWalkType", "Walk")`.
+
+### 6.4 Menus contextuels — `client/NPC_InteractionClient.lua`
 
 ```lua
 -- Ajouter une entrée au menu clic-droit sur un PNJ
@@ -312,17 +440,18 @@ end)
 - [x] `shared/NPC_NetworkDispatcher.lua` — réseau transparent
 - [x] `shared/NPC_Brain.lua` — FSM IA
 
-### Phase 2 — Spawn & Vie (squelette créé 🔶)
-- [x] `server/00_Init.lua` — point d'entrée serveur (squelette)
-- [x] `server/NPC_SpawnManager.lua` — spawn/despawn (à compléter)
-- [ ] `server/NPC_NetworkServer.lua` — handlers commandes clients
+### Phase 2 — Spawn & Corps ✅ (TERMINÉ)
+- [x] `server/00_Init.lua` — point d'entrée serveur, handler PHNPC_SpawnRequest
+- [x] `server/NPC_SpawnManager.lua` — spawn via `addZombiesInOutfit` B42 ✅
+- [x] `client/00_Init.lua` — point d'entrée client, handler PHNPC_SpawnConfirm
+- [x] `client/NPC_FollowTick.lua` — conversion zombie→NPC, visuals humains, animations ✅
+- [x] `client/NPC_SpawnDebug.lua` — menu debug spawn (visible avec `-debug` flag)
+- [x] `42/media/AnimSets/zombie/` — AnimSets XML (Bob_Idle, Bob_Walk, Bob_Run) ✅
 
-### Phase 3 — Interactions client (squelette créé 🔶)
-- [x] `client/00_Init.lua` — point d'entrée client (squelette)
-- [x] `client/NPC_InteractionClient.lua` — menu clic-droit (squelette)
-- [x] `client/NPC_FollowTick.lua` — tick client-side
-- [x] `client/NPC_SpawnDebug.lua` — debug spawn
-- [ ] `client/UI/NPC_UI.lua` — fiche info PNJ
+### Phase 3 — Interactions client 🔶 (en cours)
+- [x] `client/NPC_InteractionClient.lua` — détecte le NPC, option "Parler" visible
+- [ ] `client/NPC_InteractionClient.lua` — implémenter la fenêtre de dialogue
+- [ ] `server/NPC_NetworkServer.lua` — handlers commandes clients→serveur
 
 ### Phase 4 — Fonctionnalités avancées
 - [ ] `server/NPC_BiteManagement.lua` — morsure → zombie

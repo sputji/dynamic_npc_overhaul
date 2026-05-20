@@ -1,9 +1,9 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise à jour : 19 mai 2026 | Version 1.0.0 | Dernier commit : `434c700`
+> Mise à jour : 20 mai 2026 | Version 1.0.0 | Dernier commit : `dffaae8`
 
 ---
 
-## État actuel (mai 2026)
+## État actuel (20 mai 2026)
 
 ### ✅ Terminé — Fondations
 
@@ -31,55 +31,65 @@
 | `NPC_Brain.lua` | FSM 7 états, boucle OnTick ~33 ms |
 | `Translate/EN/ + FR/` | Sandbox, UI, ContextMenu, IGUI |
 
-### 🔶 En cours — Squelette Corps
+### ✅ Terminé — AnimSets (animations humaines)
+
+| Fichier | Rôle |
+|---------|------|
+| `42/media/AnimSets/zombie/idle/PHNPC_Idle.xml` | `PHNPC_IsNPC=BOOL true` → `Bob_Idle` |
+| `42/media/AnimSets/zombie/walktoward/PHNPC_Walk.xml` | `PHNPC_IsNPC=BOOL true` + `zombieWalkType=STRING Walk` → `Bob_Walk` |
+| `42/media/AnimSets/zombie/walktoward/PHNPC_Run.xml` | `PHNPC_IsNPC=BOOL true` + `zombieWalkType=STRING Run` → `Bob_Run` |
+| `42/media/AnimSets/zombie/faceTarget/PHNPC_FaceTarget.xml` | `PHNPC_IsNPC=BOOL true` → face humaine |
+| `common/media/AnimSets/zombie/idle/PHNPC_Idle.xml` | Copie garantie (chargement cross-version) |
+| `common/media/AnimSets/zombie/walktoward/PHNPC_Walk.xml` | Copie garantie (chargement cross-version) |
+
+### ✅ Terminé — Corps Serveur (`server/`)
 
 | Fichier | État |
 |---------|------|
-| `server/00_Init.lua` | Créé (squelette) |
-| `server/NPC_SpawnManager.lua` | Créé (à compléter avec API B42) |
-| `client/00_Init.lua` | Créé (squelette) |
-| `client/NPC_FollowTick.lua` | Créé (à compléter) |
-| `client/NPC_InteractionClient.lua` | Créé (squelette clic-droit) |
-| `client/NPC_SpawnDebug.lua` | Créé (debug spawn) |
+| `server/00_Init.lua` | ✅ Opérationnel — enregistre le handler `PHNPC_SpawnRequest` |
+| `server/NPC_SpawnManager.lua` | ✅ Fonctionnel — `addZombiesInOutfit` B42, noms aléatoires, professions, génération NPC data |
+
+### ✅ Terminé — Corps Client (`client/`)
+
+| Fichier | État |
+|---------|------|
+| `client/00_Init.lua` | ✅ Opérationnel — handler `PHNPC_SpawnConfirm`, `disableTieredUpdates` |
+| `client/NPC_FollowTick.lua` | ✅ Fonctionnel — conversion zombie→NPC, visuals humains, suivi joueur, animations |
+| `client/NPC_SpawnDebug.lua` | ✅ Fonctionnel — menu clic-droit spawn (visible avec `-debug` flag) |
+| `client/NPC_InteractionClient.lua` | 🔶 Stub — détecte le NPC (contour bleu), log interaction, **dialogue non implémenté** |
 
 ---
 
 ## Prochaines étapes
 
-### Étape 1 — Spawn d'un PNJ jouable *(priorité haute)*
+### ✅ Étape 1 — Spawn d'un PNJ jouable *(TERMINÉ)*
 
-Objectif : faire spawner un PNJ visible en jeu, capable de marcher.
+- [x] `server/NPC_SpawnManager.lua` : spawn via `addZombiesInOutfit` (API B42 validée)
+- [x] Noms générés : `NPC_Professions` + noms aléatoires Lua
+- [x] Marquage cross-VM : `zombie:setVariable("PHNPC_IsNPC", true)` (Java, cross-VM)
+- [x] `client/NPC_FollowTick.lua` : détection triple méthode (var Java / ModData / position pending)
+- [x] Conversion zombie → NPC : `convertToNPC` (pattern Banditize B42)
+- [x] Visuals humains : skin texture, hair model, hair color, nettoyage sang/saleté
+- [x] AnimSets : `Bob_Idle` et `Bob_Walk` activés via variables AnimEngine
+- [x] Menu spawn : visible en mode `-debug` (`isDebugEnabled()` B42)
 
-- [ ] Compléter `server/NPC_SpawnManager.lua` :
-  - Étudier l'API de `NPC_Helper_Mod` et `Bandits` (mods exemples)
-  - Utiliser `SurvivorFactory.CreateSurvivor()` + `dressInNamedOutfit()`
-  - Marquer comme NPC : `iso:setNPC(true)`
-  - Mouvement : `iso:pathToLocationF(x, y, z)` (**pas** `pathToCharacter` → ClassCastException)
-- [ ] Valider en jeu : spawner une coquille vide, vérifier déplacement sans crash
+### 🔶 Étape 2 — Interactions joueur *(en cours)*
 
-### Étape 2 — Greffe du Cerveau
+Objectif : le joueur peut interagir avec le PNJ via une vraie fenêtre de dialogue.
 
-Objectif : connecter `NPC_Brain.lua` à l'entité spawnable.
+- [x] Détection clic-droit sur NPC → option "Parler à [Nom]" (contour bleu OK)
+- [ ] `client/NPC_InteractionClient.lua` : implémenter la fenêtre de dialogue (`ISModalRichTextPanel`)
+- [ ] `client/UI/SpeechBubbles.lua` : bulles de dialogue 3D au-dessus du PNJ
+- [ ] `client/UI/NPC_UI.lua` : fiche info PNJ (nom, métier, santé, humeur)
 
-- [ ] Associer un `NPC_DataModel` à chaque IsoPlayer NPC via `modData`
-- [ ] Brancher la boucle FSM sur `Events.OnTick` (serveur)
-- [ ] Tester les 7 états : idle → wander → work → trade → defend → flee → guard
+### Étape 3 — Commerce et FSM
 
-### Étape 3 — Interactions client
+- [ ] Connecter `NPC_Brain.lua` à l'entité : boucle FSM states sur `Events.OnTick`
+- [ ] `client/UI/TradeWindow.lua` : fenêtre d'échange d'objets
+- [ ] Compléter `server/NPC_NetworkServer.lua` : handlers client→serveur pour trade
+- [ ] Tester les 7 états FSM : idle → wander → work → trade → defend → flee → guard
 
-Objectif : le joueur peut interagir avec le PNJ.
-
-- [ ] Compléter `client/NPC_InteractionClient.lua` : menu clic-droit (`OnFillWorldObjectContextMenu`)
-- [ ] Créer `client/UI/NPC_UI.lua` : fiche info PNJ (ISPanel)
-- [ ] Créer `client/UI/SpeechBubbles.lua` : bulles de dialogue 3D
-
-### Étape 4 — Commerce et dialogues
-
-- [ ] Créer `client/UI/TradeWindow.lua` : fenêtre d'échange d'objets
-- [ ] Compléter `server/NPC_NetworkServer.lua` : handlers commandes client→serveur
-- [ ] Valider synchronisation Solo et Multijoueur
-
-### Étape 5 — Systèmes avancés
+### Étape 4 — Systèmes avancés
 
 - [ ] `server/OllamaBridge.lua` : bridge HTTP → Ollama (`HTTPRequest` B42 async)
 - [ ] `client/UI/OllamaChatUI.lua` : fenêtre chat IA
@@ -87,7 +97,7 @@ Objectif : le joueur peut interagir avec le PNJ.
 - [ ] `server/NPC_ObservationLearning.lua` : XP passif par observation du joueur
 - [ ] `client/UI/QuestJournalUI.lua` : journal de quêtes (touche J)
 
-### Étape 6 — Finitions et déploiement
+### Étape 5 — Finitions et déploiement
 
 - [ ] `server/AdminCommands.lua` : `/phnpc list/spawn/kill/debug/reload`
 - [ ] Tests multijoueur (serveur dédié)
@@ -106,6 +116,22 @@ Objectif : le joueur peut interagir avec le PNJ.
 
 > **`versionMin`** doit être au format `build.major` (ex : `42.0`).  
 > Valeur `42` seule (sans `.0`) n'est **pas reconnue**. Absent = comportement indéfini.
+
+> **AnimEngine B42** : Les fichiers XML AnimSet lisent les variables via `zombie:getVariableBoolean()`,  
+> **pas** le ModData Lua. Toujours passer par `zombie:setVariable(name, value)` hors pcall.
+
+> **`zombieWalkType`** : La condition `STRING Walk` dans PHNPC_Walk.xml exige que la variable  
+> `zombieWalkType` soit envoyée à chaque déplacement via `zombie:setVariable("zombieWalkType", "Walk")`.
+
+> **`zombie:setMaxHealth()` / `setHealth()`** : Ces méthodes n'existent pas sur `IsoZombie` en B42.  
+> Un appel dans un `pcall()` Kahlua cause `Object tried to call nil in pcall` qui remonte et  
+> crash la fonction parente à chaque tick si `_convertedNPCs[zombie]` n'est pas marqué avant.
+
+> **`pcall` Kahlua** : Ne jamais mettre des appels critiques (`setVariable` AnimEngine) dans un pcall.  
+> En solo B42, `pcall` peut avaler silencieusement une erreur sans que la variable soit écrite.
+
+> **`getWorld():getGameMode()`** retourne `"Multiplayer"` même en solo B42.  
+> Pour détecter le solo, utiliser `not isMultiplayer()` ou vérifier `isServer()` côté serveur.
 
 ```
 PH_DynamicNPCOverhaul/
