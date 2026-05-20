@@ -1,0 +1,20 @@
+{
+    "PHNPC_Menu_SpawnNPC":        "[PHNPC] Spawn a survivor",
+    "PHNPC_Menu_StayHere":        "Stay here",
+    "PHNPC_Menu_FollowMe":        "Follow me",
+    "PHNPC_Menu_StopCombat":      "Stop fighting",
+    "PHNPC_Menu_StartCombat":     "Combat mode (kill zombies)",
+    "PHNPC_Menu_OpenInventory":   "Open inventory",
+    "PHNPC_Menu_ShowStats":       "Show stats",
+    "PHNPC_Menu_Dismiss":         "Dismiss",
+
+    "PHNPC_Anger_M_1":            "Hey! Watch where you're going!",
+    "PHNPC_Anger_M_2":            "Stop pushing me!",
+    "PHNPC_Anger_M_3":            "You're really starting to annoy me!",
+    "PHNPC_Anger_M_4":            "That's enough! You'll regret this!",
+
+    "PHNPC_Anger_F_1":            "Hey! Watch it!",
+    "PHNPC_Anger_F_2":            "Are you looking for trouble?",
+    "PHNPC_Anger_F_3":            "One more time and you'll regret it!",
+    "PHNPC_Anger_F_4":            "This means war!"
+}

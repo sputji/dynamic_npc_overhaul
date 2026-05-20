@@ -21,18 +21,18 @@ local OUTFITS = {
     "Ranger", "Chef", "Survivor",
 }
 
--- Dialogues selon le niveau de colere
-local ANGER_M = {
-    [1] = "He ! Fais attention ou tu marches !",
-    [2] = "Arrete de me bousculer !",
-    [3] = "Tu commences vraiment a m'enerver !",
-    [4] = "Ca suffit ! Tu vas le regretter !",
+-- Dialogues selon le niveau de colere (via Translate/XX/PHNPC.json)
+local ANGER_KEYS_M = {
+    [1] = "PHNPC_Anger_M_1",
+    [2] = "PHNPC_Anger_M_2",
+    [3] = "PHNPC_Anger_M_3",
+    [4] = "PHNPC_Anger_M_4",
 }
-local ANGER_F = {
-    [1] = "He ! Fais gaffe !",
-    [2] = "Tu me cherches la !",
-    [3] = "Encore une fois et tu le regretteras !",
-    [4] = "C'est la guerre !",
+local ANGER_KEYS_F = {
+    [1] = "PHNPC_Anger_F_1",
+    [2] = "PHNPC_Anger_F_2",
+    [3] = "PHNPC_Anger_F_3",
+    [4] = "PHNPC_Anger_F_4",
 }
 -- Couleurs de texte selon la colere (r, g, b)
 local ANGER_COLORS = {
@@ -94,8 +94,8 @@ local function handleAnger(npc, data)
     data.angerTimer = ANGER_DECAY
 
     local level = math.min(data.angerLevel, 4)
-    local msgs  = data.isFemale and ANGER_F or ANGER_M
-    local msg   = msgs[level] or msgs[4]
+    local keys  = data.isFemale and ANGER_KEYS_F or ANGER_KEYS_M
+    local msg   = getText(keys[level] or keys[4])
     local col   = ANGER_COLORS[level] or ANGER_COLORS[4]
 
     -- Dialogue flottant au-dessus du NPC
@@ -332,22 +332,22 @@ local function onContextMenu(playerIndex, context, worldobjects, test)
         context:addSubMenu(option, subMenu)
 
         if d and d.followMode then
-            subMenu:addOption("Reste ici", clickedNPC, stopFollow)
+            subMenu:addOption(getText("PHNPC_Menu_StayHere"),    clickedNPC, stopFollow)
         else
-            subMenu:addOption("Suis-moi", clickedNPC, startFollow)
+            subMenu:addOption(getText("PHNPC_Menu_FollowMe"),    clickedNPC, startFollow)
         end
 
         if d and d.attackMode then
-            subMenu:addOption("Arreter le combat", clickedNPC, stopAttackMode)
+            subMenu:addOption(getText("PHNPC_Menu_StopCombat"),  clickedNPC, stopAttackMode)
         else
-            subMenu:addOption("Mode combat (tuer zombies)", clickedNPC, startAttackMode)
+            subMenu:addOption(getText("PHNPC_Menu_StartCombat"), clickedNPC, startAttackMode)
         end
 
-        subMenu:addOption("Voir l'inventaire", clickedNPC, openNPCInventory)
-        subMenu:addOption("Voir les stats",     clickedNPC, showNPCStats)
-        subMenu:addOption("Renvoyer",           clickedNPC, removeNPC)
+        subMenu:addOption(getText("PHNPC_Menu_OpenInventory"), clickedNPC, openNPCInventory)
+        subMenu:addOption(getText("PHNPC_Menu_ShowStats"),     clickedNPC, showNPCStats)
+        subMenu:addOption(getText("PHNPC_Menu_Dismiss"),       clickedNPC, removeNPC)
     else
-        context:addOption("[PHNPC] Faire apparaitre un PNJ", square,
+        context:addOption(getText("PHNPC_Menu_SpawnNPC"), square,
             function(sq, pi)
                 if not sq then return end
                 local count = 0
