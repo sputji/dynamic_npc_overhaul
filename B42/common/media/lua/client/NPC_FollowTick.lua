@@ -168,13 +168,12 @@ local function convertToNPC(zombie, isFemale)
     zombie:setVariable("PHNPC_IsNPC",    true)     -- BOOL  (condition XML : BOOL true)
     zombie:setVariable("PHNPC_IsFemale", isFemale)
 
-    -- 1b. Désactiver les mécaniques zombie (Bandits : lignes 164-204)
-    pcall(function() zombie:setNoTeeth(true) end)
-    pcall(function() zombie:setTarget(nil) end)
-    pcall(function() zombie:clearAggroList() end)
-    pcall(function() zombie:setEatBodyTarget(nil, false) end)
-    -- Forcer l'oubli de la présence joueur (sinon zombie reste en mode traque)
-    pcall(function() zombie:setTimeSinceSeenFlesh(1000000) end)
+    -- 1b. Désactiver les mécaniques zombie (safeCall = ignore si méthode absente en B42)
+    safeCall(zombie, "setNoTeeth",           true)
+    safeCall(zombie, "setTarget",            nil)
+    safeCall(zombie, "clearAggroList")
+    safeCall(zombie, "setEatBodyTarget",     nil, false)
+    safeCall(zombie, "setTimeSinceSeenFlesh", 1000000)
 
     -- 1c. Vider le contexte d'action courant → force l'AnimEngine à relire les XML
     pcall(function()
@@ -194,7 +193,10 @@ local function convertToNPC(zombie, isFemale)
     pcall(function() zombie:setVariable("GCWalkType", "Walk") end)
 
     -- 5. Silencier les sons zombie
-    pcall(function() zombie:getEmitter():stopAll() end)
+    pcall(function()
+        local emitter = zombie:getEmitter()
+        if emitter then emitter:stopAll() end
+    end)
 
     -- 6. Nettoyer les objets équipés du zombie source
     pcall(function() zombie:setPrimaryHandItem(nil) end)
@@ -284,36 +286,33 @@ end
 -- ============================================================
 
 local function enforceNPC(zombie)
-    -- Re-set uniquement si la variable a été perdue (chunk reload, reset moteur).
-    local alreadySet = false
-    pcall(function() alreadySet = zombie:getVariableBoolean("PHNPC_IsNPC") end)
-    if not alreadySet then
-        zombie:setVariable("PHNPC_IsNPC", true)
-    end
-    -- Comportement non-zombie (safeCall ignore silencieusement les méthodes absentes)
-    safeCall(zombie, "setNoTeeth",            true)
-    safeCall(zombie, "setTarget",             nil)
-    safeCall(zombie, "clearAggroList")
-    safeCall(zombie, "setTimeSinceSeenFlesh",  1000000)  -- absent en B42 → ignoré sans bruit
-    -- Flags Bandits : désactivent l'IA zombie native chaque tick
-    pcall(function() zombie:setVariable("Bandit",            true)       end)
-    pcall(function() zombie:setVariable("NoLungeAttack",     true)       end)
-    pcall(function() zombie:setVariable("ZombieHitReaction", "Chainsaw") end)
-    -- Silencer les sons zombie (guard nil sur l'émetteur)
+    if not zombie then return end
+    local dead = false
+    pcall(function() dead = zombie:isDead() end)
+    if dead then return end
+
+    -- Flags identité / anti-IA-zombie (setVariable = méthode la plus sûre et stable)
+    pcall(function() zombie:setVariable("PHNPC_IsNPC",        true)       end)
+    pcall(function() zombie:setVariable("Bandit",             true)       end)
+    pcall(function() zombie:setVariable("NoLungeAttack",      true)       end)
+    pcall(function() zombie:setVariable("ZombieHitReaction",  "Chainsaw") end)
+
+    -- Désactiver cible + posture humaine (nouvelles méthodes officielles B42.18)
+    safeCall(zombie, "setTarget",  nil)
+    safeCall(zombie, "setUpright", true)
+    safeCall(zombie, "setCanWalk", true)
+
+    -- Silencer tous les sons zombie d'un coup (stopAll > appels par nom)
     pcall(function()
         local emitter = zombie:getEmitter()
-        if not emitter then return end
-        safeCall(emitter, "stopSoundByName", "ZombieRoam")
-        safeCall(emitter, "stopSoundByName", "ZombieSurprised")
-        safeCall(emitter, "stopSoundByName", "ZombieHit")
+        if emitter then safeCall(emitter, "stopAll") end
     end)
-    -- Intercepter lunge/attack.
-    -- ZombieIdleState n'existe plus en B42 → getActionContext():clear() à la place.
+
+    -- Intercepter lunge/attack → vider le contexte d'action (ZombieIdleState absent B42)
     pcall(function()
         local asn = zombie:getActionStateName()
         if asn and (asn == "lunge" or asn == "attack") then
             if zombie:getActionContext() then zombie:getActionContext():clear() end
-            safeCall(zombie, "clearAggroList")
             safeCall(zombie, "setTarget", nil)
         end
     end)
@@ -324,44 +323,49 @@ end
 -- ============================================================
 
 local function doFollow(zombie, player)
-    -- Guards null-safe (Java null != nil Lua)
+    if not zombie or not player then return end
     if not instanceof(zombie, "IsoZombie") then return end
     if not instanceof(player, "IsoPlayer") then return end
 
-    local nx, ny = zombie:getX(), zombie:getY()
-    local px, py = player:getX(), player:getY()
-    local dx, dy = nx - px, ny - py
-    local dist = math.sqrt(dx * dx + dy * dy)
+    -- Distance via méthode Java native (évite le calcul manuel)
+    local dist = FOLLOW_RUN_DIST + 1
+    pcall(function() dist = zombie:DistTo(player) end)
 
     if dist <= FOLLOW_MIN_DIST then
-        -- Assez proche : arrêter + zombieWalkType vide → PHNPC_Idle.xml prend le relais
+        -- Assez proche : arrêter et faire face au joueur
         pcall(function()
-            zombie:setPath2(nil)
-            zombie:setVariable("zombieWalkType", "")
+            if zombie.setPath2  then zombie:setPath2(nil)   end
+            if zombie.setMoving then zombie:setMoving(false) end
             zombie:faceThisObject(player)
-            -- Fix glissement physique B42 : l'inertie du moteur peut faire "glisser" le modèle
-            -- quelques frames après l'arrêt. Aligner la direction sur le joueur annule l'inertie.
             local fwd = player:getForwardDirection()
             if fwd then zombie:setForwardDirection(fwd) end
         end)
         return
     end
 
-    -- Vitesse selon distance + écriture zombieWalkType pour PHNPC_Walk/Run.xml
-    local speed = (dist > FOLLOW_RUN_DIST) and "Run" or "Walk"
-    zombie:setVariable("zombieWalkType", speed)
-    -- NOTE : setWalkType() pose zombiewalktype en read-only → WARN console.
-    -- L'AnimEngine lit uniquement setVariable("zombieWalkType", ...) → supprimé.
-
-    -- Cible : légèrement derrière le joueur (évite de le bloquer)
-    local len = math.max(dist, 0.01)
-    local targetX = px + (dx / len) * FOLLOW_OFFSET
-    local targetY = py + (dy / len) * FOLLOW_OFFSET
-    local targetZ = player:getZ()
-
-    -- Pathfinding B42 : WalkTo direct + fallback pathFindBehavior2
+    -- Nouvelle API vitesse B42.18 : doSprinter / doFastShambler
+    -- Remplace zombieWalkType + setWalkType (read-only / absent en B42.18)
     pcall(function()
-        zombie:WalkTo(targetX, targetY, targetZ)
+        if dist > FOLLOW_RUN_DIST then
+            if zombie.doSprinter     then zombie:doSprinter()     end
+        else
+            if zombie.doFastShambler then zombie:doFastShambler() end
+        end
+    end)
+
+    -- Pathfinding : pathToLocationF (stable B42) avec fallback WalkTo
+    pcall(function()
+        local px, py, pz = player:getX(), player:getY(), player:getZ()
+        local dx = zombie:getX() - px
+        local dy = zombie:getY() - py
+        local len = math.max(dist, 0.01)
+        local targetX = px + (dx / len) * FOLLOW_OFFSET
+        local targetY = py + (dy / len) * FOLLOW_OFFSET
+        if zombie.pathToLocationF then
+            zombie:pathToLocationF(targetX, targetY, pz)
+        elseif zombie.WalkTo then
+            zombie:WalkTo(targetX, targetY, pz)
+        end
     end)
 end
 
@@ -394,8 +398,17 @@ local function doWander(zombie)
         local tx = zx + ox
         local ty = zy + oy
         _wanderTargets[zombie] = { x = tx, y = ty, z = zombie:getZ(), setAt = _wanderTick }
-        zombie:setVariable("zombieWalkType", "Walk")
-        pcall(function() zombie:WalkTo(tx, ty, zombie:getZ()) end)
+        -- Nouvelle API vitesse B42.18 : doFakeShambler = marche naturelle
+        pcall(function() if zombie.doFakeShambler then zombie:doFakeShambler() end end)
+        -- Pathfinding : pathToLocationF (stable B42) avec fallback WalkTo
+        pcall(function()
+            local tz = zombie:getZ()
+            if zombie.pathToLocationF then
+                zombie:pathToLocationF(tx, ty, tz)
+            elseif zombie.WalkTo then
+                zombie:WalkTo(tx, ty, tz)
+            end
+        end)
     end
 end
 
@@ -464,8 +477,17 @@ local function doBrainAction(zombie, npcData)
             local len    = math.max(math.sqrt(dx * dx + dy * dy), 0.01)
             local destX  = nx + (dx / len) * 12
             local destY  = ny + (dy / len) * 12
-            zombie:setVariable("zombieWalkType", "Run")
-            pcall(function() zombie:WalkTo(destX, destY, zombie:getZ()) end)
+            -- Nouvelle API vitesse B42.18
+            pcall(function() if zombie.doSprinter then zombie:doSprinter() end end)
+            -- Pathfinding : pathToLocationF avec fallback WalkTo
+            pcall(function()
+                local tz = zombie:getZ()
+                if zombie.pathToLocationF then
+                    zombie:pathToLocationF(destX, destY, tz)
+                elseif zombie.WalkTo then
+                    zombie:WalkTo(destX, destY, tz)
+                end
+            end)
         end
 
     elseif state == "guard" or state == "defend" or state == "trade" then
