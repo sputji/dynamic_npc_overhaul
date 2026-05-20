@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- PHNPC: override ZSIdle avec Bob_Idle quand PHNPC_IsNPC = true.
-     Vanilla ZSIdle (sans condition) reste en fallback pour les zombies normaux.
-     Pattern: NPC_Helper_Mod / Bandits -->
 <animNode>
 	<m_Name>ZSIdle</m_Name>
 	<m_AnimName>Bob_Idle</m_AnimName>

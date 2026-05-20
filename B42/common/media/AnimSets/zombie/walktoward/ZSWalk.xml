@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<animNode>
+<animNode x_extends="ZSWalkAll.xml">
 	<m_Name>ZSWalk</m_Name>
 	<m_AnimName>Bob_Walk</m_AnimName>
-	<m_SpeedScale>1.0</m_SpeedScale>
-	<m_BlendTime>0.20</m_BlendTime>
 	<m_Conditions>
 		<m_Name>zombieWalkType</m_Name>
 		<m_Type>STRING</m_Type>

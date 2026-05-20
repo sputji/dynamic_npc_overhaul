@@ -151,6 +151,10 @@ local function createNPC(square)
         -- Bump initial pour sortir de l'etat zombie idle
         npc:setBumpType("Shrug")
 
+        -- Voix humaine (supprime les sons zombie dans B42)
+        local descNPC = npc:getDescriptor()
+        if descNPC then descNPC:setVoicePrefix("NotAZombie") end
+
         -- Effacer toute cible existante (CRUCIAL: empeche attaque immediate)
         npc:setTarget(nil)
         npc:clearAggroList()
@@ -286,6 +290,10 @@ local function enforceNPC(zombie)
 
     local data = PHNPC.npcs[zombie]
 
+    -- CRITIQUE: setUseless(false) EN TOUT PREMIER (avant tout check d'etat)
+    -- PZ met useless=true apres un hit → NPC gele si on ne le remet pas ici
+    pcall(function() zombie:setUseless(false) end)
+
     -- Toujours vivant: health geree par nous, pas par PZ
     pcall(function() zombie:setHealth(10000) end)
 
@@ -309,8 +317,10 @@ local function enforceNPC(zombie)
         return
     end
 
-    -- CAS 2: zombie en train d'attaquer / lunger / manger -> forcer reset vers idle
-    if asn == "attack" or asn == "lunge" or asn == "eatBody" then
+    -- CAS 2: zombie lunge / manger un corps -> forcer reset vers idle
+    -- NOTE: "attack" est VOLONTAIREMENT omis → le NPC peut riposter en se defendant
+    --       setNoTeeth(true) empeche la morsure; seul le lunge zombie est bloque
+    if asn == "lunge" or asn == "eatBody" then
         pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
         pcall(function() zombie:setTarget(nil) end)
         pcall(function() zombie:clearAggroList() end)
