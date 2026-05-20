@@ -399,18 +399,60 @@ local function doBrainAction(zombie, npcData)
         doWander(zombie)
 
     elseif state == "flee" then
-        -- Fuir : courir dans la direction opposée au joueur
-        local player = getPlayer()
-        if player then
-            local nx, ny = zombie:getX(), zombie:getY()
-            local px, py = player:getX(), player:getY()
-            local dx, dy = nx - px, ny - py
+        -- Fuir en sens opposé de la MENACE, pas forcément du joueur.
+        -- Priorité décroissante :
+        --   1. npcData.fsmTarget  — position stockée par NPC_Brain.evaluateThreat
+        --   2. Zombie hostile le plus proche (scan léger, cap 60 entités, rayon 12 cases)
+        --   3. Joueur (fallback si aucune menace physique détectée)
+        local nx, ny = zombie:getX(), zombie:getY()
+        local tx, ty  -- coordonnées de la source de menace
+
+        -- 1. Menace explicite stockée par NPC_Brain
+        local ft = npcData and npcData.fsmTarget
+        if ft and type(ft) == "table" and ft.x then
+            tx, ty = ft.x, ft.y
+        end
+
+        -- 2. Zombie hostile le plus proche (pas un NPC)
+        if not tx then
+            pcall(function()
+                local cell = zombie:getCell()
+                if not cell then return end
+                local zList = cell:getZombieList()
+                if not zList then return end
+                local best, bestD = nil, 999
+                for i = 0, math.min(zList:size() - 1, 60) do
+                    local z = zList:get(i)
+                    if z and z ~= zombie then
+                        local isNPC = false
+                        pcall(function() isNPC = z:getVariableBoolean("PHNPC_IsNPC") end)
+                        if not isNPC then
+                            local ddx, ddy = z:getX() - nx, z:getY() - ny
+                            local d = ddx * ddx + ddy * ddy
+                            if d < bestD and d < 144 then  -- rayon 12 cases
+                                best, bestD = z, d
+                            end
+                        end
+                    end
+                end
+                if best then tx, ty = best:getX(), best:getY() end
+            end)
+        end
+
+        -- 3. Fallback : fuir en sens opposé du joueur
+        if not tx then
+            local player = getPlayer()
+            if player then tx, ty = player:getX(), player:getY() end
+        end
+
+        if tx then
+            local dx, dy = nx - tx, ny - ty
             local len    = math.max(math.sqrt(dx * dx + dy * dy), 0.01)
-            local tx     = nx + (dx / len) * 12   -- 12 cases à l'opposé du joueur
-            local ty     = ny + (dy / len) * 12
+            local destX  = nx + (dx / len) * 12
+            local destY  = ny + (dy / len) * 12
             zombie:setVariable("zombieWalkType", "Run")
             pcall(function() zombie:setWalkType("Run") end)
-            pcall(function() zombie:WalkTo(tx, ty, zombie:getZ()) end)
+            pcall(function() zombie:WalkTo(destX, destY, zombie:getZ()) end)
         end
 
     elseif state == "guard" or state == "defend" or state == "trade" then

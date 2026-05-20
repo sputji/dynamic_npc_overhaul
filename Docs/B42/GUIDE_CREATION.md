@@ -549,7 +549,10 @@ RELOAD ──► Zombie rechargé depuis disque
 - [x] `NPCDataModel.followMode = false` — NPC autonome par défaut
 - [x] `NPC_Brain.register(npcData)` dans `attachDataModel` — cerveau branché à chaque NPC
 - [x] `doBrainAction(zombie, npcData)` — lit `fsmState` et dispatche les actions physiques
-- [x] FSM → physique : `wander`/`work` → `doWander`, `flee` → course opposée joueur, `guard`/`trade`/`defend` → sur place
+- [x] `NPC_Brain.evaluateThreat` : scan zombie hostile proche (rayon 15 cases, cap 60) → stocke `npcData.fsmTarget`
+- [x] FSM → physique : `wander`/`work` → `doWander`, `flee` → course opposée menace réelle, `guard`/`trade`/`defend` → sur place
+- [x] `doBrainAction` flee : priorité `fsmTarget` > zombie hostile proche > joueur (fallback)
+- [x] `NPC_Brain.unregister(id)` appelé au nettoyage des entités mortes
 
 ### Phase 4 — Fonctionnalités avancées
 - [ ] `server/NPC_BiteManagement.lua` — morsure → zombie
@@ -598,6 +601,8 @@ Dans `sandbox-options.txt`, `DebugMode = true` active les logs `TRACE/DEBUG`.
 | `ClassCastException IsoPlayer/IsoZombie` | `pathToCharacter()` sur IsoPlayer NPC | Utiliser `pathToLocationF(x, y, z)` |
 | Fichier Translate ignoré | Mauvais nom (`SandboxVars_EN.txt`) | Utiliser `Sandbox_EN.txt` |
 | Option Sandbox absente | `type = enum` dans sandbox-options.txt | Utiliser `type = integer` |
+| **`getCell()` nil sur serveur dédié** | Sans joueur local, `getCell()` peut renvoyer `nil` | Toujours `local cell = getCell(); if not cell then return end` avant `getZombieList()` |
+| **NPC fuit le joueur au lieu des zombies** | `flee` utilisait le joueur comme source | Utiliser `npcData.fsmTarget` (stocké par `evaluateThreat`) — voir `doBrainAction` |
 | Commentaires `--` ignorés/plantent | Parseur PZ sandbox ne lit pas Lua | Supprimer tous les `--` du sandbox |
 | Mod non chargé | `pzversion` au lieu de `targetVersion` | Corriger mod.info |
 | **Mod rouge — dépendance manquante** | `require=` avec valeur vide dans mod.info | Supprimer la ligne `require=` si aucune dépendance |

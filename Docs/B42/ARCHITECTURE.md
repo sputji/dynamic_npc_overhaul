@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Architecture B42
 > Version 1.0.0 | Project Zomboid Build 42.18.0 | Auteur : sputji  
-> **État actuel : Fondations ✅ — Cerveau ✅ — Corps Serveur ✅ — Corps Client ✅ — AnimSets ✅ — UI ⚠️ à créer**
+> **État actuel : Fondations ✅ — Cerveau ✅ — Corps Serveur ✅ — Corps Client ✅ — AnimSets ✅ — UI ✅ (dialogue + speech bubbles)**
 
 ---
 
@@ -18,9 +18,9 @@ Chaque module s'enregistre via `PHNPC.registerModule(name, tbl)` et se retrouve 
 |--------|------|------|
 | **Cerveau** (`shared/`) | Logique pure, données, IA, réseau abstrait | ✅ Implémenté |
 | **Corps serveur** (`server/`) | Spawn, réseau serveur, commandes admin | ✅ Fonctionnel + réstauration reload |
-| **Corps client** (`client/`) | Menu clic-droit, FollowTick, debug spawn | ✅ Fonctionnel |
+| **Corps client** (`client/`) | Menu clic-droit, FollowTick, debug spawn, **NPC_Brain branché** | ✅ Fonctionnel |
 | **AnimSets** (`42/media/AnimSets/`) | Animations humaines Bob_Idle / Bob_Walk | ✅ Actif |
-| **UI** (`client/UI/`) | Fenêtres ISPanel (commerce, chat, quêtes) | ❌ À créer |
+| **UI** (`client/UI/`) | Fenêtres ISPanel (dialogue, speech bubbles) | ✅ Actif |
 | **Wiki PZ modding B42** | [Référence API](https://pzwiki.net/wiki/Build_42) |
 
 ---
@@ -93,11 +93,12 @@ D:\PZ Mods\Dynamic_NPC_Overhaul\
                 └── client\          ✅ CORPS CLIENT — Fonctionnel
                     ├── 00_Init.lua              # Point d'entrée client, handler PHNPC_SpawnConfirm
                     ├── NPC_FollowTick.lua        # Conversion, enforce, doFollow, doWander (autonome), FSM save
-                    ├── NPC_InteractionClient.lua # Menu clic-droit + ouverture NPC_DialogueWindow
+                    ├── NPC_InteractionClient.lua # Menu clic-droit + Suivre moi/Rester ici + NPC_DialogueWindow
                     ├── NPC_SpawnDebug.lua        # Commandes debug spawn (mode -debug)
                     └── UI\
                         ├── NPC_DialogueWindow.lua   # ✅ ISPanel dialogue (Phase 3)
-                        ── (À créer) TradeWindow.lua, SpeechBubbles.lua, OllamaChatUI.lua
+                        ├── NPC_SpeechBubble.lua     # ✅ Toast bas-écran + API native PZ
+                        ── (À créer) TradeWindow.lua, OllamaChatUI.lua
 ```
 
 ---
@@ -280,9 +281,19 @@ FSM 7 états, boucle `OnTick` toutes les ~33 ms :
 | `wander` | idle, defend, flee | Aucune priorité |
 | `work` | idle, trade | `fsm_priorities` métier |
 | `trade` | idle, work | Joueur à portée |
-| `defend` | flee, idle | Trauma ≥ 80 |
-| `flee` | idle, wander | Zombies proches |
+| `defend` | flee, idle | Trauma ≥ 80, moral ≥ seuil |
+| `flee` | idle, wander | Trauma ≥ 80, moral < seuil |
 | `guard` | defend, idle | Point fixe assigné |
+
+**Connexion physique** (`NPC_FollowTick.doBrainAction`) :
+- `wander`/`work` → `doWander()` — point aléatoire voisin
+- `flee` → course à l'opposé de la menace (priorité : `fsmTarget` > zombie hostile proche > joueur)
+- `guard`/`trade`/`defend` → immobile (`setPath2(nil)`)
+- `idle` → `doWander()` (errance légère)
+
+**Localisation de la menace** : lors de `flee`, `evaluateThreat` scanne les 60 zombies les plus
+proches (rayon 15 cases) et stocke le plus proche dans `npcData.fsmTarget = {x, y}`.
+`doBrainAction` utilise cette position comme source de fuite.
 
 ---
 
@@ -347,3 +358,5 @@ end
 | **État FSM perdu au reload** | `fsmState` / `health` jamais écrits en ModData pendant le jeu | Client : `Events.OnTick` écrit `md.PHNPC_FsmState` et `md.PHNPC_Health` toutes les ~4 secondes |
 | **Glissement du modèle à l'arrêt** | Inertie physique B42 non réinitialisée après `setPath2(nil)` | `zombie:setForwardDirection(player:getForwardDirection())` dans `doFollow` au moment de l'arrêt |
 | **Spam setVariable (perf)** | `enforceNPC` écrit `PHNPC_IsNPC` à chaque tick même si déjà défini | Guard `if not zombie:getVariableBoolean("PHNPC_IsNPC")` avant l'écriture |
+| **`getCell()` nil en multijoueur** | Sur serveur dédié sans joueur local, `getCell()` peut renvoyer `nil` | Toujours `local cell = getCell() ; if not cell then return end` avant `getZombieList()` — **guard déjà en place** dans `NPC_SpawnManager` |
+| **NPC fuit le joueur au lieu de la menace** | État `flee` calculait la direction depuis le joueur comme source | **Corrigé** : `evaluateThreat` stocke la position du zombie hostile dans `npcData.fsmTarget`; `doBrainAction` fuit cette position (fallback : zombie hostile proche, puis joueur) |

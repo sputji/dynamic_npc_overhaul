@@ -3,6 +3,20 @@
 
 ---
 
+> ### ⚠️ Points de vigilance (test en jeu)
+>
+> **1. `getCell()` sur le serveur** — En multijoueur, `getCell()` peut renvoyer `nil` sur
+> un serveur dédié sans joueur local. Le guard `if not cell then return end` est **déjà en place**
+> dans `NPC_SpawnManager.lua` avant chaque appel à `getZombieList()`. L'`enforceNPC` côté
+> client (`OnZombieUpdate`) rattrape de toute façon si le serveur rate un tick.
+>
+> **2. Logique de fuite FSM** — L'état `flee` fuyait initialement en sens opposé du joueur.
+> **Corrigé** : `NPC_Brain.evaluateThreat` scanne les zombies hostiles proches (rayon 15 cases,
+> cap 60 entités) et stocke la position dans `npcData.fsmTarget`. `doBrainAction` fuit
+> cette position (priorité : `fsmTarget` > zombie hostile proche > joueur en fallback).
+
+---
+
 ## État actuel (20 mai 2026)
 
 ### ✅ Terminé — Fondations
@@ -91,7 +105,9 @@ Objectif : le joueur peut interagir avec le PNJ via une vraie fenêtre de dialog
 - [x] `NPCDataModel.followMode` : NPC **autonome par défaut** — suit le joueur uniquement sur demande
 - [x] `NPC_Brain.register(npcData)` appelé dans `attachDataModel` → le cerveau pilote chaque NPC
 - [x] `NPC_Brain.unregister(id)` appelé au nettoyage des entités mortes
-- [x] FSM states → physique : `wander`/`work` → `doWander`, `flee` → course à l'opposé, `guard`/`trade`/`defend` → sur place
+- [x] FSM states → physique : `wander`/`work` → `doWander`, `flee` → course à l'opposé de la menace, `guard`/`trade`/`defend` → sur place
+- [x] `NPC_Brain.evaluateThreat` : scan zombie hostile proche (rayon 15 cases, cap 60) → stocke `npcData.fsmTarget`
+- [x] `doBrainAction` flee : priorité `fsmTarget` > zombie hostile proche > joueur (fallback)
 
 ### 🔷 Étape 4 — Commerce et réseau
 

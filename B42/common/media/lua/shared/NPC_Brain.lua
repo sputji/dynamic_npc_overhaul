@@ -140,6 +140,36 @@ local function evaluateThreat(ctx)
     -- PTSD / trauma
     if d.trauma >= 80 then
         if d.morale < NPC_Brain.cowardThreshold then
+            -- Localiser le zombie hostile le plus proche pour stocker la source de menace.
+            -- doBrainAction utilisera d.fsmTarget pour fuir dans la BONNE direction.
+            if d.isoObject and instanceof(d.isoObject, "IsoZombie") then
+                pcall(function()
+                    local iso   = d.isoObject
+                    local cell  = iso:getCell()
+                    if not cell then return end
+                    local zList = cell:getZombieList()
+                    if not zList then return end
+                    local bx, by      = iso:getX(), iso:getY()
+                    local best, bestD = nil, 999
+                    for i = 0, math.min(zList:size() - 1, 60) do
+                        local z = zList:get(i)
+                        if z and z ~= iso then
+                            local isNPC = false
+                            pcall(function() isNPC = z:getVariableBoolean("PHNPC_IsNPC") end)
+                            if not isNPC then
+                                local ddx, ddy = z:getX() - bx, z:getY() - by
+                                local dist = ddx * ddx + ddy * ddy
+                                if dist < bestD and dist < 225 then  -- 15 cases
+                                    best, bestD = z, dist
+                                end
+                            end
+                        end
+                    end
+                    if best then
+                        d.fsmTarget = { x = best:getX(), y = best:getY() }
+                    end
+                end)
+            end
             setState(ctx, "flee")
             ctx.fleeTick = NPC_Brain._tickCount
             return true
