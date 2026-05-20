@@ -23,10 +23,12 @@ local PHNPC_SpawnDebug = {}
 
 --- Retourne true si le joueur est autorisé à utiliser le menu de debug.
 -- Pattern Bandits BanditMenu.lua : isAdmin() + isDebugEnabled() (global PZ API)
--- isAdmin() retourne true pour le joueur hôte en solo B42.
--- player:isAccessLevel("admin") et getDebug() NE fonctionnent PAS en solo B42.
+-- En solo B42, isAdmin()=false ET isDebugEnabled()=false sans flag -debug.
+-- On ajoute un check solo pur : si on n'est pas en multi, le menu est toujours visible.
 local function isAdminOrDebug(player)
     local ok, result = pcall(function()
+        -- Solo pur (GameMode différent de "Multiplayer") → toujours autorisé
+        if getWorld() and getWorld():getGameMode() ~= "Multiplayer" then return true end
         return isAdmin() or isDebugEnabled()
     end)
     return ok and (result == true)

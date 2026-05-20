@@ -36,34 +36,50 @@ local FOLLOW_OFFSET   = 2.0
 -- ============================================================
 
 local function applyHumanVisuals(zombie, isFemale)
+    -- DIAGNOSTIC: confirme le début de la fonction
+    print("[PHNPC][VISUALS] applyHumanVisuals START isFemale=" .. tostring(isFemale))
+
     local humanVisual = nil
     local ok, err = pcall(function() humanVisual = zombie:getHumanVisual() end)
     if not ok or not humanVisual then
-        local Log = PHNPC.getModule("NPC_Logger")
-        if Log then Log.warn("FollowTick", "getHumanVisual() échoué", { err = tostring(err) }) end
+        print("[PHNPC][VISUALS] ERREUR getHumanVisual: " .. tostring(err))
         return
     end
+    print("[PHNPC][VISUALS] getHumanVisual OK")
 
-    -- Nettoyer le sang et la saleté du zombie source
+    -- 1. Nettoyer sang/saleté du corps — boucle complète (pattern GCCoreVisuals)
     pcall(function()
         humanVisual:removeDirt()
         humanVisual:removeBlood()
+        local maxIdx = BloodBodyPartType.MAX:index()
+        for i = 0, maxIdx - 1 do
+            local part = BloodBodyPartType.FromIndex(i)
+            humanVisual:setBlood(part, 0)
+            humanVisual:setDirt(part, 0)
+        end
     end)
+    print("[PHNPC][VISUALS] blood/dirt body OK")
 
-    -- Nettoyer le sang sur les vêtements
+    -- 2. Nettoyer sang/saleté/trous sur les vêtements — boucle complète (pattern GCCoreVisuals)
     pcall(function()
         local itemVisuals = zombie:getItemVisuals()
         if not itemVisuals then return end
+        local maxIdx = BloodBodyPartType.MAX:index()
         for i = 0, itemVisuals:size() - 1 do
             local iv = itemVisuals:get(i)
             if iv then
-                iv:setBlood(BloodBodyPartType.Neck, 0)
-                iv:setDirt(BloodBodyPartType.Neck, 0)
+                for j = 0, maxIdx - 1 do
+                    local part = BloodBodyPartType.FromIndex(j)
+                    iv:removeHole(j)
+                    iv:setBlood(part, 0)
+                    iv:setDirt(part, 0)
+                end
             end
         end
     end)
+    print("[PHNPC][VISUALS] itemVisuals clean OK")
 
-    -- Retirer les body visuals de zombie (ZedDmg_* = cicatrices zombie)
+    -- 3. Retirer body visuals zombie : ZedDmg_* ET Base.M_Beard_Stubble (pattern GCCoreVisuals)
     pcall(function()
         local bodyVisuals = humanVisual:getBodyVisuals()
         if not bodyVisuals then return end
@@ -72,7 +88,7 @@ local function applyHumanVisuals(zombie, isFemale)
             local bv = bodyVisuals:get(i)
             if bv then
                 local itemType = bv:getItemType()
-                if itemType and itemType:find("ZedDmg_") then
+                if itemType and (itemType:find("ZedDmg_") or itemType == "Base.M_Beard_Stubble") then
                     toRemove[#toRemove + 1] = itemType
                 end
             end
@@ -81,50 +97,50 @@ local function applyHumanVisuals(zombie, isFemale)
             humanVisual:removeBodyVisualFromItemType(it)
         end
     end)
+    print("[PHNPC][VISUALS] bodyVisuals cleanup OK")
 
-    -- Texture de peau humaine
-    pcall(function()
+    -- 4. Texture de peau humaine (pattern GCCoreVisuals : ZombRand natif B42)
+    local skinOk = pcall(function()
         if isFemale then
             local skins = { "FemaleBody01", "FemaleBody02", "FemaleBody03", "FemaleBody04" }
-            humanVisual:setSkinTextureName(skins[PHNPC.randInt(1, #skins)])
+            humanVisual:setSkinTextureName(skins[ZombRand(#skins) + 1])
         else
             local skins = { "MaleBody01a", "MaleBody02a", "MaleBody03a", "MaleBody04a" }
-            humanVisual:setSkinTextureName(skins[PHNPC.randInt(1, #skins)])
+            humanVisual:setSkinTextureName(skins[ZombRand(#skins) + 1])
         end
     end)
+    print("[PHNPC][VISUALS] setSkinTextureName ok=" .. tostring(skinOk))
 
-    -- Modèle de cheveux
-    pcall(function()
+    -- 5. Modèle de cheveux
+    local hairOk = pcall(function()
         if isFemale then
             local hairs = { "Long", "Long2", "Ponytail", "BunCurly" }
-            humanVisual:setHairModel(hairs[PHNPC.randInt(1, #hairs)])
+            humanVisual:setHairModel(hairs[ZombRand(#hairs) + 1])
         else
             local hairs = { "OverEye", "Messy", "Short", "Fauxhawk" }
-            humanVisual:setHairModel(hairs[PHNPC.randInt(1, #hairs)])
-            -- Barbe aléatoire pour les hommes
+            humanVisual:setHairModel(hairs[ZombRand(#hairs) + 1])
             local beards = { "", "GoatBeard", "Full", "Chops" }
-            local beard = beards[PHNPC.randInt(1, #beards)]
-            if beard ~= "" then
-                pcall(function() humanVisual:setBeardModel(beard) end)
-            end
+            local beard = beards[ZombRand(#beards) + 1]
+            if beard ~= "" then humanVisual:setBeardModel(beard) end
         end
     end)
+    print("[PHNPC][VISUALS] setHairModel ok=" .. tostring(hairOk))
 
-    -- Couleur de cheveux cohérente
+    -- 6. Couleur de cheveux
     pcall(function()
         local r = 0.2 + ZombRandFloat(0, 0.6)
         local g = r * (0.6 + ZombRandFloat(0, 0.3))
         local b = g * (0.4 + ZombRandFloat(0, 0.3))
         local hairColor = ImmutableColor.new(r, g, b)
         humanVisual:setHairColor(hairColor)
-        if not isFemale then
-            pcall(function() humanVisual:setBeardColor(hairColor) end)
-        end
+        if not isFemale then humanVisual:setBeardColor(hairColor) end
     end)
 
-    -- Forcer le recalcul du modèle 3D
+    -- 7. Forcer le recalcul du modèle 3D
     pcall(function() zombie:resetModelNextFrame() end)
     pcall(function() zombie:resetModel() end)
+
+    print("[PHNPC][VISUALS] applyHumanVisuals DONE")
 end
 
 -- ============================================================
@@ -136,7 +152,15 @@ local function convertToNPC(zombie, isFemale)
     local Log = PHNPC.getModule("NPC_Logger")
     isFemale = isFemale or false
 
-    -- 1. Désactiver les mécaniques zombie (Bandits : lignes 164-204)
+    -- 1a. Activer le flag NPC DÈS LE DÉBUT (condition AnimSet PHNPC_Idle/Walk activée,
+    --     resetModel() dans applyHumanVisuals trouvera déjà PHNPC_IsNPC=true)
+    --     Pattern GCCoreConvert : GCCompanion = true en step 3, avant applyHumanVisuals.
+    pcall(function()
+        zombie:setVariable("PHNPC_IsNPC",    true)
+        zombie:setVariable("PHNPC_IsFemale", isFemale)
+    end)
+
+    -- 1b. Désactiver les mécaniques zombie (Bandits : lignes 164-204)
     pcall(function() zombie:setNoTeeth(true) end)
     pcall(function() zombie:setTarget(nil) end)
     pcall(function() zombie:clearAggroList() end)
@@ -188,11 +212,8 @@ local function convertToNPC(zombie, isFemale)
     -- 11. Empêcher le moteur de re-vêtir l'entité automatiquement
     pcall(function() zombie:setDressInRandomOutfit(false) end)
 
-    -- 12. Marquer côté Java AVANT l'animation de sortie (condition AnimSet déjà vraie lors de la transition)
-    pcall(function()
-        zombie:setVariable("PHNPC_IsNPC",    true)
-        zombie:setVariable("PHNPC_IsFemale", isFemale)
-    end)
+    -- 12. Empêcher le moteur de re-vêtir l'entité automatiquement
+    pcall(function() zombie:setDressInRandomOutfit(false) end)
 
     -- 13. Animation initiale pour sortir de Zombie_Idle (PHNPC_IsNPC déjà positionné → Bob_Idle actif)
     pcall(function() zombie:setBumpType("Shrug") end)

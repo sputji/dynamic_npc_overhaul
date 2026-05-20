@@ -82,10 +82,17 @@ local function onClientCommand(module, command, player, args)
         .. " isDebugEnabled=" .. tostring(isDebugEnabled()))
 
     -- ---- Validation admin ----
-    -- Pattern Bandits BanditServerSpawner.lua : isAdmin() + isDebugEnabled()
-    -- isAdmin() retourne true pour le joueur hôte en solo B42.
-    -- player:isAccessLevel("admin") et getDebug() NE fonctionnent PAS en solo B42.
-    if not isAdmin() and not isDebugEnabled() then
+    -- En solo B42, isAdmin()=false et isDebugEnabled()=false sans flag -debug.
+    -- On accepte aussi le solo pur (GameMode != Multiplayer).
+    local canSpawn = false
+    pcall(function()
+        if getWorld() and getWorld():getGameMode() ~= "Multiplayer" then
+            canSpawn = true
+        else
+            canSpawn = isAdmin() or isDebugEnabled()
+        end
+    end)
+    if not canSpawn then
         if Log then
             Log.warn("Server/SpawnManager", "Spawn refusé — joueur non admin",
                 { player = tostring(player:getUsername()) })
