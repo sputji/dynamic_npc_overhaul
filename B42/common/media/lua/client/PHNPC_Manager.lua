@@ -1,34 +1,32 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
--- client/PHNPC_Manager.lua
--- Spawn: addZombiesInOutfit() + Banditize pattern (NPC_Helper_Mod / Bandits).
--- Movement: zombie:pathToLocationF + setBumpType transitions.
--- AnimSets: declenches par variable PHNPC_IsNPC = true.
+-- client/PHNPC_Manager.lua  v2.0
+-- Spawn / Mouvement / IA de base / Ordres / Inventaire / Combat / Peur zombies
+-- Necessite: PHNPC_Core.lua (shared), PHNPC_Stats.lua (shared)
 -- NO BOM. ASCII only.
 
 -- ============================================================
 -- CONFIG
 -- ============================================================
-local STOP_DIST  = 3    -- tiles: arreter le suivi quand assez proche
-local RETARGET   = 15   -- ticks entre deux pathToLocationF
-local CLEANUP    = 300  -- ticks entre deux passes de nettoyage
-local MAX_NPCS   = 10   -- nombre max de NPC simultanes
+local STOP_DIST       = 3    -- tiles: arreter le suivi
+local RETARGET        = 15   -- ticks entre deux pathToLocationF
+local CLEANUP         = 300  -- ticks entre deux passes de nettoyage
+local MAX_NPCS        = 10   -- nombre max de NPC simultanes
+local FEAR_CHECK_RATE = 30   -- ticks entre deux checks de peur
+local COMBAT_RANGE    = 5    -- tiles: distance pour engager le combat
 
--- Outfits disponibles (addZombiesInOutfit accepte ces noms B42)
 local OUTFITS = {
     "Farmer", "Police", "Fireman", "Doctor",
     "Ranger", "Chef", "Survivor",
 }
 
--- Noms des NPC
-local NPC_NAMES = {
-    "Alex", "Jordan", "Sam", "Casey", "Riley",
-    "Morgan", "Taylor", "Quinn", "Blake", "Drew",
-    "Charlie", "Avery", "Reese", "Dakota", "Skyler",
-}
-
 -- ============================================================
 -- STATE
--- PHNPC.npcs[IsoZombie] = { id, name, isFemale, followMode, retarget, moving }
+-- PHNPC.npcs[IsoZombie] = {
+--   id, name, isFemale, outfit, stats,
+--   followMode, attackMode, fleeMode,
+--   retarget, moving, bumpTicks, fearTicks,
+--   target
+-- }
 -- ============================================================
 local _ticks = 0
 
@@ -43,9 +41,6 @@ end
 
 -- ============================================================
 -- MOUVEMENT
--- Pattern: GCCore.startMoving / stopMoving (NPC_Helper_Mod GCCoreActions.lua)
---   start : setUseless(false) + setBumpType("IdleToWalk") + pathToLocationF
---   stop  : setBumpType("WalkToIdle")
 -- ============================================================
 local function npcStartMoving(npc, x, y, z)
     local data = PHNPC.npcs[npc]
@@ -75,11 +70,6 @@ end
 
 -- ============================================================
 -- CREATION NPC
--- Pattern: GCCoreSpawn.spawnCompanionNPC (NPC_Helper_Mod)
---       + Banditize (BanditUpdate.lua lignes 158-206)
--- 1. addZombiesInOutfit() -> IsoZombie avec tenue humaine
--- 2. Banditize: variables + walktype + sons + dents
--- 3. setVariable("PHNPC_IsNPC", true) -> active AnimSets custom
 -- ============================================================
 local function createNPC(square)
     local x = square:getX()
@@ -89,10 +79,11 @@ local function createNPC(square)
     local isFemale     = (ZombRand(2) == 1)
     local femaleChance = isFemale and 100 or 0
     local outfit       = OUTFITS[ZombRand(#OUTFITS) + 1]
-    local npcName      = NPC_NAMES[ZombRand(#NPC_NAMES) + 1]
+    local npcName      = PHNPC.generateName(isFemale)
     local npcId        = "PHNPC_" .. npcName .. "_" .. tostring(getTimestampMs())
+    local stats        = PHNPC.generateStats(outfit)
 
-    -- 1. Spawn via addZombiesInOutfit (approche prouvee NPC_Helper_Mod / Bandits)
+    -- 1. Spawn via addZombiesInOutfit
     local zombieList = nil
     local ok1, err1 = pcall(function()
         zombieList = addZombiesInOutfit(x, y, z, 1, outfit, femaleChance)
@@ -113,66 +104,36 @@ local function createNPC(square)
     end
 
     -- 2. Banditize: transformer zombie en NPC humain
-    -- (copie exacte du pattern Bandits BanditUpdate.lua + GCCoreConvert.lua)
     pcall(function()
-        -- Pas de dents zombie
         npc:setNoTeeth(true)
-
-        -- Activer mes AnimSets XML (PHNPC_Idle.xml, PHNPC_Walk.xml)
-        -- condition: PHNPC_IsNPC = true
         npc:setVariable("PHNPC_IsNPC", true)
-
-        -- Marche humaine (doit correspondre a zombieWalkType dans PHNPC_Walk.xml)
         npc:setWalkType("Walk")
         npc:setVariable("zombieWalkType", "Walk")
-
-        -- Evite crash dans testDefense (important, copie Bandits)
         npc:setVariable("ZombieHitReaction", "Chainsaw")
-
-        -- Pas de lunge attack
         npc:setVariable("NoLungeTarget", true)
-
-        -- Vitesses humaines
         npc:setVariable("LimpSpeed", 0.80)
         npc:setVariable("WalkSpeed", 1.04)
-        npc:setVariable("RunSpeed", 0.75)
+        npc:setVariable("RunSpeed", 1.10)
         npc:setSpeedMod(1.0)
-
-        -- Silence bruits zombie
         npc:getEmitter():stopAll()
-
-        -- Supprimer armes et accessoires zombie
         npc:setPrimaryHandItem(nil)
         npc:setSecondaryHandItem(nil)
         npc:resetEquippedHandsModels()
         npc:clearAttachedItems()
-
-        -- Pas de re-habillage automatique par le moteur
         npc:setDressInRandomOutfit(false)
-
-        -- setTurnAlertedValues: debloquer apres spawn (Bandits)
         npc:setTurnAlertedValues(-5, 5)
-
-        -- Bump initial pour sortir de l'etat zombie idle
         npc:setBumpType("Shrug")
-
-        -- Voix humaine (supprime les sons zombie dans B42)
         local descNPC = npc:getDescriptor()
         if descNPC then descNPC:setVoicePrefix("NotAZombie") end
-
-        -- Effacer toute cible existante (CRUCIAL: empeche attaque immediate)
         npc:setTarget(nil)
         npc:clearAggroList()
         npc:setHealth(10000)
     end)
 
-    -- 3. Nettoyer les visuels zombie (sang, salet, degats)
+    -- 3. Visuels propres
     pcall(function()
         local hv = npc:getHumanVisual()
-        if hv then
-            hv:removeDirt()
-            hv:removeBlood()
-        end
+        if hv then hv:removeDirt() ; hv:removeBlood() end
     end)
 
     -- 4. ModData
@@ -180,47 +141,41 @@ local function createNPC(square)
     md.PHNPC_ID     = npcId
     md.PHNPC_Name   = npcName
     md.PHNPC_Female = isFemale
+    md.PHNPC_Outfit = outfit
+    md.PHNPC_Stats  = stats
 
     -- 5. Enregistrer dans PHNPC.npcs
     PHNPC.npcs[npc] = {
         id         = npcId,
         name       = npcName,
         isFemale   = isFemale,
+        outfit     = outfit,
+        stats      = stats,
         followMode = true,
+        attackMode = false,
+        fleeMode   = false,
         retarget   = 0,
         moving     = false,
         bumpTicks  = 0,
+        fearTicks  = 0,
+        target     = nil,
     }
 
     print("[PHNPC] NPC spawne: " .. npcName
         .. " (" .. (isFemale and "F" or "M") .. ")"
         .. " outfit=" .. outfit
+        .. " courage=" .. stats.courage
         .. " @ " .. x .. "," .. y)
 end
 
 -- ============================================================
--- SPAWN MENU ACTION
--- ============================================================
-local function spawnNPC(square, playerIndex)
-    if not square then return end
-
-    local count = 0
-    for _ in pairs(PHNPC.npcs) do count = count + 1 end
-    if count >= MAX_NPCS then
-        print("[PHNPC] Limite de PNJ atteint (" .. MAX_NPCS .. ")")
-        return
-    end
-
-    createNPC(square)
-end
-
--- ============================================================
--- CONTEXT MENU ACTIONS (NPCs existants)
+-- ORDRES
 -- ============================================================
 local function startFollow(npc)
     local d = PHNPC.npcs[npc]
     if not d then return end
     d.followMode = true
+    d.fleeMode   = false
     d.retarget   = 0
     print("[PHNPC] " .. d.name .. " : suit le joueur")
 end
@@ -231,6 +186,23 @@ local function stopFollow(npc)
     d.followMode = false
     npcStopMoving(npc)
     print("[PHNPC] " .. d.name .. " : reste ici")
+end
+
+local function startAttackMode(npc)
+    local d = PHNPC.npcs[npc]
+    if not d then return end
+    d.attackMode = true
+    print("[PHNPC] " .. d.name .. " : mode combat actif")
+end
+
+local function stopAttackMode(npc)
+    local d = PHNPC.npcs[npc]
+    if not d then return end
+    d.attackMode = false
+    d.target     = nil
+    npcStopMoving(npc)
+    pcall(function() npc:setTarget(nil) npc:clearAggroList() end)
+    print("[PHNPC] " .. d.name .. " : mode combat desactive")
 end
 
 local function removeNPC(npc)
@@ -245,9 +217,37 @@ local function removeNPC(npc)
 end
 
 -- ============================================================
+-- INVENTAIRE
+-- ============================================================
+local function openNPCInventory(npc)
+    local d = PHNPC.npcs[npc]
+    if not d then return end
+    local player = getSpecificPlayer(0)
+    if not player then return end
+    pcall(function()
+        ISInventoryTransferUI.transferBetween(player, npc)
+    end)
+end
+
+-- ============================================================
+-- STATS AFFICHAGE
+-- ============================================================
+local function showNPCStats(npc)
+    local d = PHNPC.npcs[npc]
+    if not d then return end
+    local statsStr = PHNPC.statsToString(d.stats)
+    local genre = d.isFemale and "F" or "M"
+    print("[PHNPC] " .. d.name .. " (" .. genre .. ") - " .. d.outfit .. " | " .. statsStr)
+    local player = getSpecificPlayer(0)
+    if player then
+        HaloTextHelper.addText(player,
+            d.name .. ": " .. PHNPC.statsToString(d.stats),
+            1, 1, 1, 1)
+    end
+end
+
+-- ============================================================
 -- CONTEXT MENU
--- Pattern: Events.OnPreFillWorldObjectContextMenu
--- square via ISWorldObjectContextMenu.fetchVars.clickedSquare (B42)
 -- ============================================================
 local function onContextMenu(playerIndex, context, worldobjects, test)
     if test then return end
@@ -255,13 +255,13 @@ local function onContextMenu(playerIndex, context, worldobjects, test)
     local square = ISWorldObjectContextMenu.fetchVars.clickedSquare
     if not square then return end
 
-    -- Detecter un NPC pres du carre clique (rayon 2 tiles)
+    -- Detecter NPC pres du carre clique (rayon ~2 tiles)
     local clickedNPC = nil
     for npc, _ in pairs(PHNPC.npcs) do
         if npcValid(npc) then
             local dx = npc:getX() - square:getX()
             local dy = npc:getY() - square:getY()
-            if (dx * dx + dy * dy) <= 2.0 then
+            if (dx * dx + dy * dy) <= 4.0 then
                 clickedNPC = npc
                 break
             end
@@ -269,25 +269,143 @@ local function onContextMenu(playerIndex, context, worldobjects, test)
     end
 
     if clickedNPC then
-        local d    = PHNPC.npcs[clickedNPC]
-        local name = (d and d.name) or "PNJ"
+        local d     = PHNPC.npcs[clickedNPC]
+        local name  = (d and d.name) or "PNJ"
+        local genre = (d and d.isFemale) and "F" or "M"
+        local title = "[PHNPC] " .. name .. " (" .. genre .. ")"
+
+        local option  = context:addOption(title, clickedNPC, nil)
+        local subMenu = context:addSubMenu(option, title)
+
         if d and d.followMode then
-            context:addOption("[PHNPC] " .. name .. " : Reste ici", clickedNPC, stopFollow)
+            context:addOptionOnSubmenu(subMenu, "Reste ici", clickedNPC, stopFollow)
         else
-            context:addOption("[PHNPC] " .. name .. " : Suis-moi", clickedNPC, startFollow)
+            context:addOptionOnSubmenu(subMenu, "Suis-moi", clickedNPC, startFollow)
         end
-        context:addOption("[PHNPC] Supprimer " .. name, clickedNPC, removeNPC)
+
+        if d and d.attackMode then
+            context:addOptionOnSubmenu(subMenu, "Arreter le combat", clickedNPC, stopAttackMode)
+        else
+            context:addOptionOnSubmenu(subMenu, "Mode combat (tuer zombies)", clickedNPC, startAttackMode)
+        end
+
+        context:addOptionOnSubmenu(subMenu, "Voir l'inventaire", clickedNPC, openNPCInventory)
+        context:addOptionOnSubmenu(subMenu, "Voir les stats",     clickedNPC, showNPCStats)
+        context:addOptionOnSubmenu(subMenu, "Renvoyer",           clickedNPC, removeNPC)
     else
-        -- Option spawn sur le sol vide
-        context:addOption("[PHNPC] Faire apparaitre un PNJ", square, spawnNPC, playerIndex)
+        context:addOption("[PHNPC] Faire apparaitre un PNJ", square,
+            function(sq, pi)
+                if not sq then return end
+                local count = 0
+                for _ in pairs(PHNPC.npcs) do count = count + 1 end
+                if count >= MAX_NPCS then
+                    print("[PHNPC] Limite atteinte (" .. MAX_NPCS .. ")")
+                    return
+                end
+                createNPC(sq)
+            end, playerIndex)
     end
 end
 
 -- ============================================================
--- ENFORCE NPC (appele par OnZombieUpdate — une fois par entite par frame)
--- Pattern: GCCoreEnforce.lua + GCCoreEnforceMain.lua (NPC_Helper_Mod)
--- CRITIQUE: empeche le zombie AI de reprendre la main apres un hit/push
---   setTarget(nil) annule le pathfinding — NE PAS l'appeler quand asn=="pathfind"
+-- PEUR DES ZOMBIES (check periodique)
+-- ============================================================
+local function checkFear(npc, data)
+    if not data or data.attackMode then
+        data.fleeMode = false
+        return false
+    end
+    local stats = data.stats
+    if not stats or stats.courage >= PHNPC.FEAR_COURAGE_THRESHOLD then
+        data.fleeMode = false
+        return false
+    end
+    local npcX = npc:getX()
+    local npcY = npc:getY()
+    local npcZ = npc:getZ()
+    local nearestDist = 9999
+    local nearestZombie = nil
+    local cell = getCell()
+    if not cell then return false end
+    local zombList = cell:getZombieList()
+    if not zombList then return false end
+    for i = 0, zombList:size() - 1 do
+        local z = zombList:get(i)
+        if z and z ~= npc and not PHNPC.npcs[z] then
+            local ok, r = pcall(function()
+                local dx = z:getX() - npcX
+                local dy = z:getY() - npcY
+                return math.sqrt(dx * dx + dy * dy)
+            end)
+            if ok and r < nearestDist then
+                nearestDist = r
+                nearestZombie = z
+            end
+        end
+    end
+    if nearestZombie and nearestDist < PHNPC.FEAR_ZOMBIE_DIST then
+        local zx = nearestZombie:getX()
+        local zy = nearestZombie:getY()
+        local dx = npcX - zx
+        local dy = npcY - zy
+        local len = math.sqrt(dx * dx + dy * dy)
+        if len > 0 then dx = dx / len ; dy = dy / len end
+        local fleeX = npcX + dx * 15
+        local fleeY = npcY + dy * 15
+        data.fleeMode = true
+        npcStartMoving(npc, fleeX, fleeY, npcZ)
+        return true
+    end
+    data.fleeMode = false
+    return false
+end
+
+-- ============================================================
+-- COMBAT AUTO
+-- ============================================================
+local function checkCombat(npc, data)
+    if not data or not data.attackMode then return false end
+    local npcX = npc:getX()
+    local npcY = npc:getY()
+    local cell = getCell()
+    if not cell then return false end
+    local zombList = cell:getZombieList()
+    if not zombList then return false end
+    local nearestDist = 9999
+    local nearestZombie = nil
+    for i = 0, zombList:size() - 1 do
+        local z = zombList:get(i)
+        if z and z ~= npc and not PHNPC.npcs[z] then
+            local ok, r = pcall(function()
+                local dx = z:getX() - npcX
+                local dy = z:getY() - npcY
+                return math.sqrt(dx * dx + dy * dy)
+            end)
+            if ok and r < nearestDist then
+                nearestDist = r
+                nearestZombie = z
+            end
+        end
+    end
+    if nearestZombie and nearestDist < COMBAT_RANGE * 3 then
+        data.target = nearestZombie
+        if nearestDist < COMBAT_RANGE then
+            pcall(function()
+                npc:setUseless(false)
+                npc:setTarget(nearestZombie)
+                npc:NPCSetAttack(nearestZombie)
+            end)
+        else
+            npcStartMoving(npc, nearestZombie:getX(), nearestZombie:getY(), nearestZombie:getZ())
+        end
+        return true
+    end
+    data.target = nil
+    return false
+end
+
+-- ============================================================
+-- ENFORCE NPC (OnZombieUpdate)
 -- ============================================================
 local function enforceNPC(zombie)
     local md = zombie:getModData()
@@ -295,18 +413,13 @@ local function enforceNPC(zombie)
 
     local data = PHNPC.npcs[zombie]
 
-    -- CRITIQUE: setUseless(false) EN TOUT PREMIER (avant tout check d'etat)
-    -- PZ met useless=true apres un hit → NPC gele si on ne le remet pas ici
+    -- setUseless(false) EN TOUT PREMIER
     pcall(function() zombie:setUseless(false) end)
-
-    -- Toujours vivant: health geree par nous, pas par PZ
     pcall(function() zombie:setHealth(10000) end)
-
-    -- Jamais de morsure zombie
     pcall(function() zombie:setNoTeeth(true) end)
     pcall(function() zombie:setEatBodyTarget(nil, false) end)
 
-    -- Variables AnimSet toujours actives (AnimSets re-evalues chaque frame)
+    -- Variables AnimSet
     pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
     pcall(function() zombie:setVariable("NoLungeTarget", true) end)
     pcall(function() zombie:setVariable("zombieWalkType", "Walk") end)
@@ -314,19 +427,27 @@ local function enforceNPC(zombie)
     pcall(function() zombie:setSpeedMod(1.0) end)
     pcall(function() zombie:setAnimatingBackwards(false) end)
 
-    -- Lire l'etat action courant
     local asn = ""
     pcall(function() asn = tostring(zombie:getActionStateName()) end)
 
-    -- CAS 1: pathfind actif -> ne PAS appeler setTarget (annulerait le pathfinding)
-    if asn == "pathfind" then
+    -- Etats a ne pas interrompre
+    if asn == "pathfind" or asn == "thump" then
         pcall(function() zombie:setUseless(false) end)
         return
     end
 
-    -- CAS 2: zombie lunge / manger un corps -> forcer reset vers idle
-    -- NOTE: "attack" est VOLONTAIREMENT omis → le NPC peut riposter en se defendant
-    --       setNoTeeth(true) empeche la morsure; seul le lunge zombie est bloque
+    if asn == "attack" then
+        if data and data.attackMode then
+            pcall(function() zombie:setUseless(false) end)
+            return
+        end
+        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+        pcall(function() zombie:setTarget(nil) end)
+        pcall(function() zombie:clearAggroList() end)
+        if data then data.moving = false end
+        return
+    end
+
     if asn == "lunge" or asn == "eatBody" then
         pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
         pcall(function() zombie:setTarget(nil) end)
@@ -336,7 +457,6 @@ local function enforceNPC(zombie)
         return
     end
 
-    -- CAS 3: turnalerted -> reset vers idle (empeche le zombie de pivoter vers player)
     if asn == "turnalerted" then
         pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
         pcall(function() zombie:setTarget(nil) end)
@@ -345,7 +465,6 @@ local function enforceNPC(zombie)
         return
     end
 
-    -- CAS 4: bumped prolonge -> reset (animations Shove/Pain — laisser jouer 30 frames)
     if asn == "bumped" then
         if data then
             data.bumpTicks = (data.bumpTicks or 0) + 1
@@ -353,23 +472,23 @@ local function enforceNPC(zombie)
                 pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
                 pcall(function() zombie:setBumpType("Shrug") end)
                 data.bumpTicks = 0
-                data.moving = false
+                data.moving    = false
             end
         end
         return
     end
 
-    -- CAS normal: effacer cible et agression
-    pcall(function() zombie:setTarget(nil) end)
-    pcall(function() zombie:clearAggroList() end)
+    -- Normal
+    if not (data and data.attackMode) then
+        pcall(function() zombie:setTarget(nil) end)
+        pcall(function() zombie:clearAggroList() end)
+    end
     pcall(function() zombie:setUseless(false) end)
     if data then data.bumpTicks = 0 end
 end
 
 -- ============================================================
 -- ONZOMBIEUPDATE
--- Declenche pour chaque IsoZombie a chaque mise a jour engine
--- C'est ici que l'enforce s'execute, pas dans OnTick
 -- ============================================================
 Events.OnZombieUpdate.Add(function(zombie)
     if not zombie then return end
@@ -380,52 +499,63 @@ end)
 
 -- ============================================================
 -- MAIN TICK
--- Suivi + retarget + cleanup
 -- ============================================================
 Events.OnTick.Add(function()
     _ticks = _ticks + 1
 
     local player    = getSpecificPlayer(0)
     local doCleanup = (_ticks % CLEANUP == 0)
+    local doFear    = (_ticks % FEAR_CHECK_RATE == 0)
 
-    -- Cleanup: retirer les NPC morts
+    -- Cleanup NPC morts
     if doCleanup then
         local dead = {}
         for npc in pairs(PHNPC.npcs) do
-            if not npcValid(npc) then
-                dead[#dead + 1] = npc
-            end
+            if not npcValid(npc) then dead[#dead + 1] = npc end
         end
         for i = 1, #dead do
             local d = PHNPC.npcs[dead[i]]
-            print("[PHNPC] Cleanup NPC mort: " .. (d and d.name or "?"))
+            print("[PHNPC] Cleanup: " .. (d and d.name or "?"))
             PHNPC.npcs[dead[i]] = nil
         end
     end
 
-    -- Mouvement
     if not player then return end
     local px = player:getX()
     local py = player:getY()
     local pz = player:getZ()
 
     for npc, data in pairs(PHNPC.npcs) do
-        if npcValid(npc) and data.followMode then
-            local dx   = npc:getX() - px
-            local dy   = npc:getY() - py
-            local dist = math.sqrt(dx * dx + dy * dy)
+        if npcValid(npc) then
 
-            if dist > STOP_DIST then
-                -- Emettre un nouveau pathToLocationF periodiquement
-                data.retarget = data.retarget - 1
-                if data.retarget <= 0 then
-                    data.retarget = RETARGET
-                    npcStartMoving(npc, px, py, pz)
+            -- Check peur
+            if doFear then checkFear(npc, data) end
+
+            -- Check combat
+            if data.attackMode and (_ticks % 10 == 0) then
+                if not checkCombat(npc, data) and data.followMode then
+                    pcall(function() npc:setTarget(nil) end)
+                    pcall(function() npc:clearAggroList() end)
                 end
-            else
-                -- Assez proche: arreter
-                npcStopMoving(npc)
-                data.retarget = RETARGET
+            end
+
+            -- Suivi joueur
+            if data.followMode and not data.fleeMode
+               and not (data.attackMode and data.target) then
+                local dx   = npc:getX() - px
+                local dy   = npc:getY() - py
+                local dist = math.sqrt(dx * dx + dy * dy)
+
+                if dist > STOP_DIST then
+                    data.retarget = data.retarget - 1
+                    if data.retarget <= 0 then
+                        data.retarget = RETARGET
+                        npcStartMoving(npc, px, py, pz)
+                    end
+                else
+                    npcStopMoving(npc)
+                    data.retarget = RETARGET
+                end
             end
         end
     end
@@ -437,8 +567,8 @@ end)
 Events.OnGameStart.Add(function()
     PHNPC.npcs = {}
     _ticks = 0
-    print("[PHNPC] PHNPC_Manager v1.1 pret (OnGameStart)")
+    print("[PHNPC] PHNPC_Manager v2.0 pret (OnGameStart)")
 end)
 
 Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
-print("[PHNPC] PHNPC_Manager v1.1 loaded")
+print("[PHNPC] PHNPC_Manager v2.0 loaded")
