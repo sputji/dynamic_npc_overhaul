@@ -256,6 +256,16 @@ local function enforceNPC(zombie)
     pcall(function() zombie:setUseless(false) end)
     -- Garder la marche humaine
     pcall(function() zombie:setWalkType("Walk") end)
+    -- Intercepter l'état lunge : le zombie essaie d'attaquer une cible.
+    -- Pattern Bandits ManageActionState : changer vers idle + clearAggroList.
+    pcall(function()
+        local asn = zombie:getActionStateName()
+        if asn == "lunge" or asn == "attack" then
+            zombie:changeState(ZombieIdleState.instance())
+            zombie:clearAggroList()
+            zombie:setTarget(nil)
+        end
+    end)
 end
 
 -- ============================================================
@@ -263,13 +273,20 @@ end
 -- ============================================================
 
 local function doFollow(zombie, player)
+    -- Guards null-safe (Java null != nil Lua)
+    if not instanceof(zombie, "IsoZombie") then return end
+    if not instanceof(player, "IsoPlayer") then return end
+
     local nx, ny = zombie:getX(), zombie:getY()
     local px, py = player:getX(), player:getY()
     local dx, dy = nx - px, ny - py
     local dist = math.sqrt(dx * dx + dy * dy)
 
     if dist <= FOLLOW_MIN_DIST then
-        -- Assez proche : arrêt du pathfinding (on ne change pas l'état du moteur)
+        -- Assez proche : arrêter le pathfinding B42
+        pcall(function()
+            zombie:getPathFindBehavior2():cancel()
+        end)
         return
     end
 
@@ -284,11 +301,15 @@ local function doFollow(zombie, player)
     local len = math.max(dist, 0.01)
     local targetX = px + (dx / len) * FOLLOW_OFFSET
     local targetY = py + (dy / len) * FOLLOW_OFFSET
+    local targetZ = player:getZ()
 
-    -- Utilise pathToLocation plutôt que pathToCharacter
-    -- (évite ClassCastException sur certains types d'entités proches de véhicules)
+    -- API B42 correcte : getPathFindBehavior2():pathToLocation() + update()
+    -- (zombie:pathToLocation direct n'existe pas en B42 → crash "non-table: null")
+    -- Source : ZAMove.lua de Bandits 42.18
     pcall(function()
-        zombie:pathToLocation(targetX, targetY, player:getZ())
+        local pfb = zombie:getPathFindBehavior2()
+        pfb:pathToLocation(targetX, targetY, targetZ)
+        pfb:update()
     end)
 end
 
@@ -306,6 +327,9 @@ Events.EveryOneMinute.Add(_disableTiered)
 
 local function onZombieUpdate(zombie)
     if not zombie then return end
+    -- Guard null Java : un zombie Java null n'est pas nil en Kahlua,
+    -- instanceof retourne false et évite le crash "non-table: null".
+    if not instanceof(zombie, "IsoZombie") then return end
 
     -- DEBUG : confirme que l'event fire (imprime au 1er appel puis toutes les 200 calls)
     PHNPC_FollowTick._dbgCount = (PHNPC_FollowTick._dbgCount or 0) + 1
