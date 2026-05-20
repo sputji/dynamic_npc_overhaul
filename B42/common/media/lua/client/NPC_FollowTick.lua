@@ -1,94 +1,71 @@
-﻿--[[
-    Project Humain : Dynamic NPC Overhaul — B42
-    client/NPC_FollowTick.lua  — RÉÉCRITURE COMPLÈTE v2.0
-
-    Architecture IsoPlayer (pattern "7-Custom NPC" B42 + Bandits B42.18)
-    ─────────────────────────────────────────────────────────────────────
-    AVANT (cassé) : IsoZombie converti → animations zombie permanentes
-    MAINTENANT    : IsoPlayer.new() + SurvivorFactory → animations Bob/Kate
-                    natives, sons humains, pathfinding réel
-
-    Fonctionnalités :
-      • Clic droit → "Faire apparaître un PNJ" sur n'importe quelle case
-      • Genre aléatoire (50/50), nom + prénom PZ natifs
-      • Profession + vêtements correspondants
-      • Sons Bob (homme) ou Kate (femme) automatiques via IsoPlayer
-      • Carte d'identité + inventaire de départ
-      • Suivi du joueur via getPathFindBehavior2():pathToLocation()
-      • Nettoyage automatique des entités mortes/invalides
-
-    Compatibilité solo uniquement (IsoPlayer.new côté client).
-    Multijoueur : étape future via commandes serveur.
-]]
+-- Project Humain: Dynamic NPC Overhaul - B42
+-- client/NPC_FollowTick.lua v2.1
+-- NPC spawn (IsoPlayer), follow, and context menu
+-- Solo mode. No BOM. ASCII only in code and comments.
 
 -- ============================================================
--- CONFIGURATION
+-- CONFIG
 -- ============================================================
 
-local CFG = {
-    FOLLOW_STOP  = 3.0,   -- (cases) distance d'arrêt
-    FOLLOW_RUN   = 10.0,  -- (cases) distance à partir de laquelle le NPC court
-    FOLLOW_MAX   = 80.0,  -- (cases) au-delà : NPC perdu, on annule le chemin
-    RETARGET     = 8,     -- (ticks) fréquence de recalcul de la destination
-    CLEANUP      = 300,   -- (ticks) fréquence du nettoyage des entités mortes
-}
+local STOP_DIST  = 3.0    -- stop following when closer than X tiles
+local FOLLOW_MAX = 80.0   -- abandon follow when farther than X tiles
+local RETARGET   = 10     -- recalculate path every N ticks
+local CLEANUP    = 200    -- check for dead NPCs every N ticks
 
 -- ============================================================
--- REGISTRE
+-- STATE
 -- ============================================================
 
--- _npcs[IsoPlayer] = { followMode, isFemale, forename, surname, fullname }
-local _npcs  = {}
-local _ticks = 0   -- compteur global OnTick
+-- NPC registry: { [IsoPlayer] = { forename, surname, fullname, followMode, isFemale } }
+PHNPC.npcs = PHNPC.npcs or {}
+local _ticks = 0
 
 -- ============================================================
 -- VALIDATION
 -- ============================================================
 
-local function isValidNPC(npc)
+local function npcValid(npc)
     if not npc then return false end
     if not instanceof(npc, "IsoPlayer") then return false end
-    local dead = false
-    pcall(function() dead = npc:isDead() end)
-    return not dead
+    local ok, dead = pcall(function() return npc:isDead() end)
+    return ok and not dead
 end
 
--- ============================================================
--- INVENTAIRE DE DÉPART
--- ============================================================
-
-local ITEMS_BASE  = {"Base.WaterBottleFull", "Base.Bandage", "Base.BandageDirty"}
-local ITEMS_EXTRA = {"Base.Chips", "Base.Crackers", "Base.TunaCan", "Base.Sardines"}
-local ITEMS_TOOL  = {"Base.Flashlight", "Base.Knife", "Base.Screwdriver"}
-
-local function giveStartingInventory(npc)
+local function stopNPC(npc)
     pcall(function()
-        local inv = npc:getInventory()
-        for _, it in ipairs(ITEMS_BASE) do inv:AddItem(it) end
-        inv:AddItem(ITEMS_EXTRA[ZombRand(#ITEMS_EXTRA) + 1])
-        if ZombRand(3) > 0 then
-            inv:AddItem(ITEMS_TOOL[ZombRand(#ITEMS_TOOL) + 1])
-        end
+        npc:getPathFindBehavior2():cancel()
+        npc:setPath2(nil)
     end)
 end
 
 -- ============================================================
--- CARTE D'IDENTITÉ
+-- INVENTORY
 -- ============================================================
 
-local function giveIDCard(npc, forename, surname)
+local function setupInventory(npc)
+    pcall(function()
+        local inv = npc:getInventory()
+        inv:AddItem("Base.WaterBottleFull")
+        inv:AddItem("Base.Bandage")
+        local foodList = { "Base.Chips", "Base.Crackers", "Base.TunaCan" }
+        inv:AddItem(foodList[ZombRand(3) + 1])
+        if ZombRand(2) == 0 then inv:AddItem("Base.Knife") end
+        if ZombRand(3) == 0 then inv:AddItem("Base.Flashlight") end
+    end)
+end
+
+local function setupIDCard(npc, forename, surname)
     pcall(function()
         local inv  = npc:getInventory()
         local card = inv:AddItem("Base.IDCard")
         if card then
             card:setName(forename .. " " .. surname)
-            if card.setCustomName then card:setCustomName(forename .. " " .. surname) end
         end
     end)
 end
 
 -- ============================================================
--- CRÉATION DE L'ISOPlayer NPC
+-- SPAWN
 -- ============================================================
 
 local function spawnNPC(square, playerIndex)
@@ -96,39 +73,60 @@ local function spawnNPC(square, playerIndex)
 
     local cell = getWorld():getCell()
     if not cell then
-        print("[PHNPC] Erreur spawnNPC : getCell() nil")
+        print("[PHNPC] ERROR spawnNPC: getCell() is nil")
         return
     end
 
+    -- NPC limit check
+    local count = 0
+    for _ in pairs(PHNPC.npcs) do count = count + 1 end
+    local cfg     = PHNPC.getModule("NPC_Config")
+    local maxNPCs = (cfg and cfg.get("maxNPCs")) or 5
+    if count >= maxNPCs then
+        print("[PHNPC] NPC limit reached (" .. maxNPCs .. ")")
+        return
+    end
+
+    -- Random gender + name
     local isFemale = (ZombRand(2) == 1)
     local forename = SurvivorFactory.getRandomForename(isFemale)
     local surname  = SurvivorFactory.getRandomSurname()
 
-    -- Descripteur humain : peau, cheveux, visage, corps, vêtements de profession
+    -- Build human visual descriptor
     local desc = SurvivorFactory.CreateSurvivor(nil, isFemale)
+    if not desc then
+        print("[PHNPC] ERROR spawnNPC: SurvivorFactory.CreateSurvivor returned nil")
+        return
+    end
     desc:setForename(forename)
     desc:setSurname(surname)
 
+    -- Random profession
     pcall(function()
-        local profList = ProfessionFactory.getProfessions()
-        if profList and profList:size() > 0 then
-            local prof = profList:get(ZombRand(profList:size()))
+        local plist = ProfessionFactory.getProfessions()
+        if plist and plist:size() > 0 then
+            local prof = plist:get(ZombRand(plist:size()))
             desc:setProfession(prof:getType())
             desc:setProfessionSkills(prof)
         end
     end)
 
-    -- Z-level plancher
+    -- Floor level
     local z = 0
-    if square:isSolidFloor() then z = square:getZ() end
+    pcall(function()
+        if square:isSolidFloor() then
+            z = square:getZ()
+        end
+    end)
 
-    -- IsoPlayer.new() → animations Bob/Kate, sons humains, pathfinding natif
+    -- Create IsoPlayer entity (Bob/Kate animations, human sounds)
     local npc = IsoPlayer.new(cell, desc, square:getX(), square:getY(), z)
     if not npc then
-        print("[PHNPC] Erreur spawnNPC : IsoPlayer.new() a retourné nil")
+        print("[PHNPC] ERROR spawnNPC: IsoPlayer.new returned nil")
         return
     end
 
+    -- Configure NPC identity
     npc:setNPC(true)
     npc:setForname(forename)
     npc:setSurname(surname)
@@ -137,108 +135,162 @@ local function spawnNPC(square, playerIndex)
     npc:setDir(IsoDirections.SE)
     pcall(function() npc:setDressInRandomOutfit(false) end)
 
-    giveIDCard(npc, forename, surname)
-    giveStartingInventory(npc)
+    -- Give starting items
+    setupIDCard(npc, forename, surname)
+    setupInventory(npc)
 
-    _npcs[npc] = {
-        followMode = true,
+    -- Register NPC in global registry
+    PHNPC.npcs[npc] = {
         isFemale   = isFemale,
         forename   = forename,
         surname    = surname,
         fullname   = forename .. " " .. surname,
+        followMode = true,
     }
 
-    print(string.format("[PHNPC] NPC spawné : %s (%s) @ %d,%d,%d",
-        forename .. " " .. surname,
-        isFemale and "F" or "H",
-        math.floor(square:getX()),
-        math.floor(square:getY()),
-        z))
+    print("[PHNPC] NPC spawned: " .. forename .. " " .. surname
+        .. " (" .. (isFemale and "F" or "M") .. ")"
+        .. " @ " .. math.floor(square:getX()) .. "," .. math.floor(square:getY()))
 end
 
 -- ============================================================
--- MENU CONTEXTUEL (clic droit)
+-- NPC ACTIONS (called from context menu callbacks)
+-- ============================================================
+
+local function npcStartFollow(npc)
+    local data = PHNPC.npcs[npc]
+    if data then data.followMode = true end
+end
+
+local function npcStopFollow(npc)
+    local data = PHNPC.npcs[npc]
+    if data then
+        data.followMode = false
+        stopNPC(npc)
+    end
+end
+
+local function npcOpenDialogue(npc)
+    local data = PHNPC.npcs[npc]
+    if not data then return end
+    if NPC_DialogueWindow and NPC_DialogueWindow.open then
+        NPC_DialogueWindow.open(npc, data)
+    else
+        print("[PHNPC] Talk: " .. (data.fullname or "NPC"))
+    end
+end
+
+-- ============================================================
+-- CONTEXT MENU
 -- ============================================================
 
 local function onContextMenu(playerIndex, context, worldobjects, test)
+    if test then return end
+
     local square = ISWorldObjectContextMenu.fetchVars.clickedSquare
     if not square then return end
-    context:addOption(
-        "[PHNPC] Faire apparaitre un PNJ",
-        square,
-        spawnNPC,
-        playerIndex
-    )
+
+    -- Find NPC near the clicked square
+    local clickedNPC = nil
+    for npc, _ in pairs(PHNPC.npcs) do
+        if npcValid(npc) then
+            local dx = npc:getX() - square:getX()
+            local dy = npc:getY() - square:getY()
+            if (dx * dx + dy * dy) <= 2.5 then
+                clickedNPC = npc
+                break
+            end
+        end
+    end
+
+    if clickedNPC then
+        -- Options for the NPC
+        local data  = PHNPC.npcs[clickedNPC]
+        local pName = (data and data.fullname) or "NPC"
+        context:addOption("Parler a " .. pName, clickedNPC, npcOpenDialogue)
+        if data and data.followMode then
+            context:addOption("[PHNPC] Reste ici", clickedNPC, npcStopFollow)
+        else
+            context:addOption("[PHNPC] Suis-moi", clickedNPC, npcStartFollow)
+        end
+    else
+        -- Spawn option when no NPC nearby
+        context:addOption("[PHNPC] Faire apparaitre un PNJ", square, spawnNPC, playerIndex)
+    end
 end
 
 -- ============================================================
--- BOUCLE DE SUIVI (OnTick)
+-- FOLLOW TICK
 -- ============================================================
---  • Chaque tick       : getPathFindBehavior2():update() maintient le mouvement
---  • Toutes les N ticks: recalcul de la destination cible
 
 Events.OnTick.Add(function()
     _ticks = _ticks + 1
 
-    local player    = getSpecificPlayer(0)
-    local doRetarget = (_ticks % CFG.RETARGET == 0)
-    local doCleanup  = (_ticks % CFG.CLEANUP  == 0)
+    local player     = getSpecificPlayer(0)
+    local doRetarget = (_ticks % RETARGET == 0)
+    local doCleanup  = (_ticks % CLEANUP  == 0)
 
-    for npc, data in pairs(_npcs) do
+    -- Cleanup dead/invalid NPCs (collect first, remove after iteration)
+    if doCleanup then
+        local dead = {}
+        for npc in pairs(PHNPC.npcs) do
+            if not npcValid(npc) then
+                dead[#dead + 1] = npc
+            end
+        end
+        for i = 1, #dead do
+            print("[PHNPC] Cleanup: removing dead/invalid NPC")
+            PHNPC.npcs[dead[i]] = nil
+        end
+    end
 
-        if doCleanup and not isValidNPC(npc) then
-            _npcs[npc] = nil
+    -- Update follow behavior for each NPC
+    for npc, data in pairs(PHNPC.npcs) do
+        if data.followMode and player then
 
-        elseif data.followMode and player then
-
-            -- Maintenir le mouvement chaque tick
+            -- Keep pathfinding active every tick
             pcall(function()
                 npc:getPathFindBehavior2():update()
             end)
 
-            -- Recalculer la destination toutes les N ticks
+            -- Recalculate destination every RETARGET ticks
             if doRetarget then
                 pcall(function()
                     local dx   = npc:getX() - player:getX()
                     local dy   = npc:getY() - player:getY()
                     local dist = math.sqrt(dx * dx + dy * dy)
 
-                    if dist <= CFG.FOLLOW_STOP then
-                        -- Arrêt et regard vers le joueur
-                        npc:getPathFindBehavior2():cancel()
-                        npc:setPath2(nil)
-                        npc:faceThisObject(player)
-                    elseif dist <= CFG.FOLLOW_MAX then
-                        -- Viser 2.5 cases derrière le joueur (pas de chevauchement)
+                    if dist <= STOP_DIST then
+                        stopNPC(npc)
+                        pcall(function() npc:faceThisObject(player) end)
+                    elseif dist <= FOLLOW_MAX then
                         local len = math.max(dist, 0.01)
-                        local tx = player:getX() + (dx / len) * 2.5
-                        local ty = player:getY() + (dy / len) * 2.5
+                        local tx  = player:getX() + (dx / len) * 2.5
+                        local ty  = player:getY() + (dy / len) * 2.5
                         npc:getPathFindBehavior2():pathToLocation(tx, ty, player:getZ())
                     else
-                        -- Trop loin : annuler
-                        npc:getPathFindBehavior2():cancel()
-                        npc:setPath2(nil)
+                        stopNPC(npc)
                     end
                 end)
             end
+
         end
     end
 end)
 
 -- ============================================================
--- RESET SUR CHARGEMENT DE PARTIE
+-- RESET ON GAME START
 -- ============================================================
 
 Events.OnGameStart.Add(function()
-    _npcs  = {}
-    _ticks = 0
-    print("[PHNPC] NPC_FollowTick reinitialise (OnGameStart)")
+    PHNPC.npcs = {}
+    _ticks     = 0
+    print("[PHNPC] NPC_FollowTick reset (OnGameStart)")
 end)
 
 -- ============================================================
--- ENREGISTREMENT
+-- REGISTER CONTEXT MENU EVENT
 -- ============================================================
 
 Events.OnFillWorldObjectContextMenu.Add(onContextMenu)
-
-print("[PHNPC] NPC_FollowTick v2.0 charge — moteur IsoPlayer B42")
+print("[PHNPC] NPC_FollowTick v2.1 loaded - IsoPlayer B42")

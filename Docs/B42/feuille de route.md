@@ -1,5 +1,5 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise à jour : 21 mai 2026 | Version **1.0.2** | Dernier commit : à venir
+> Mise à jour : 20 mai 2026 | Version **2.1.0** | Dernier commit : refactor IsoPlayer v2.1
 
 ---
 
@@ -60,19 +60,19 @@
 
 | Fichier | État |
 |---------|------|
-| `server/00_Init.lua` | ✅ Opérationnel — enregistre le handler `PHNPC_SpawnRequest` |
-| `server/NPC_SpawnManager.lua` | ✅ Fonctionnel — `addZombiesInOutfit` B42, noms aléatoires, professions, génération NPC data, **`EveryOneMinute` re-scan post-reload** |
+| `server/00_Init.lua` | ✅ Minimal — log démarrage serveur |
+| `server/NPC_SpawnManager.lua` | ⛔ **DÉSACTIVÉ** — Utilisait `addZombiesInOutfit` (zombies). Remplacé par IsoPlayer côté client. |
 
-### ✅ Terminé — Corps Client (`client/`)
+### ✅ Terminé — Corps Client (`client/`) — **v2.1.0 IsoPlayer**
 
 | Fichier | État |
 |---------|------|
-| `client/00_Init.lua` | ✅ Opérationnel — handler `PHNPC_SpawnConfirm`, `disableTieredUpdates` |
-| `client/NPC_FollowTick.lua` | ✅ Fonctionnel — conversion zombie→NPC, visuals, suivi joueur, **errance autonome (doWander)**, animations, FSM state save, `Events.OnGameStart` reset |
-| `client/NPC_SpawnDebug.lua` | ✅ Fonctionnel — menu clic-droit spawn (visible avec `-debug` flag) |
-| `client/NPC_InteractionClient.lua` | ✅ Fonctionnel — détecte NPC, ouvre `NPC_DialogueWindow` |
-| `client/UI/NPC_DialogueWindow.lua` | ✅ Fonctionnel — ISPanel : nom, profession, santé, dialogue NPC_Dialogue, **bouton Suivre\/Rester**, speech bubble intégrée |
-| `client/UI/NPC_SpeechBubble.lua` | ✅ Fonctionnel — toast bas-écran + tentative API native PZ (`setSpeakBubble`) |
+| `client/00_Init.lua` | ✅ Simplifié — `disableTieredZombieUpdates` uniquement |
+| `client/NPC_FollowTick.lua` | ✅ **REFONTE v2.1** — `IsoPlayer.new()` + `SurvivorFactory` — animations Bob/Kate natives — suivi `getPathFindBehavior2()` — menu clic-droit intégré — sans BOM — ASCII uniquement |
+| `client/NPC_SpawnDebug.lua` | ⛔ **DÉSACTIVÉ** — Utilisait `sendClientCommand` → zombies. |
+| `client/NPC_InteractionClient.lua` | ⛔ **DÉSACTIVÉ** — Scannait `getZombieList()` (IsoZombie). Interaction désormais dans `NPC_FollowTick.lua`. |
+| `client/UI/NPC_DialogueWindow.lua` | ✅ **REFONTE** — ISPanel propre, API `open(npc, npcData)` alignée avec PHNPC.npcs |
+| `client/UI/NPC_SpeechBubble.lua` | ⏸ En attente |
 
 ---
 
@@ -99,23 +99,22 @@ Objectif : le joueur peut interagir avec le PNJ via une vraie fenêtre de dialog
 - [x] `client/UI/NPC_SpeechBubble.lua` : toast bas-écran + tentative bulle native PZ
 - [x] `client/UI/NPC_DialogueWindow.lua` : bouton **Suivre\/Rester** + intégration speech bubble
 
-### ✅ Étape 3 — IA et comportement autonome *(TERMINÉ)*
+### ✅ Étape 3 — IsoPlayer NPC (REFONTE v2.1.0) *(TERMINÉ)*
 
-- [x] `NPC_Brain.lua` **branché** aux actions physiques : `doBrainAction` lit `fsmState` et dispatche (wander / flee / guard / idle)
-- [x] `NPCDataModel.followMode` : NPC **autonome par défaut** — suit le joueur uniquement sur demande
-- [x] `NPC_Brain.register(npcData)` appelé dans `attachDataModel` → le cerveau pilote chaque NPC
-- [x] `NPC_Brain.unregister(id)` appelé au nettoyage des entités mortes
-- [x] FSM states → physique : `wander`/`work` → `doWander`, `flee` → course opposée menace réelle, `guard`/`trade`/`defend` → sur place
-- [x] `NPC_Brain.evaluateThreat` : scan zombie hostile proche (rayon 15 cases, cap 60) → stocke `npcData.fsmTarget`
-- [x] `doBrainAction` flee : priorité `fsmTarget` > zombie hostile proche > joueur (fallback)
-- [x] **Bug fix** : `safeCall(obj, method, ...)` — helper B42 qui vérifie l'existence de la méthode avant d'appeler
-- [x] **Bug fix** : `setWalkType()` supprimé partout (variable read-only) → `doSprinter`/`doFastShambler`/`doFakeShambler` (API B42.18)
-- [x] **Bug fix** : `pathToLocationF` avec fallback `WalkTo` (stable B42.18)
-- [x] **Bug fix** : guard nil sur `getEmitter()` avant `stopAll`
-- [x] **Bug fix** : boutons UI ISButton : `backgroundColor` + `borderColor` ajoutés (fond transparent B42)
-- [x] **Bug fix Bandits pattern** : `getActionContext():clear()` supprimé partout → **erreur Kahlua** (`ActionContext` est un objet Java non-table). Remplacé par `setBumpType("Shrug")` dans `convertToNPC`.
-- [x] **Pattern Bandits B42.18** : `setUseless(true)` chaque tick dans `enforceNPC` → neutralise l'IA zombie sans bloquer `pathToLocationF`/`doSprinter`
-- [x] **Pattern Bandits** : `NoLungeTarget = true` (pas `NoLungeAttack`) + lunge state → `clearAggroList + setTarget(nil)` sans ActionContext
+**Problème de la v1.x** : `IsoZombie` converti via `addZombiesInOutfit` + `Banditize` ne permet pas les animations humaines Bob/Kate. Les zombies "convertis" restaient des zombies visuellement et attaquaient le joueur.
+
+**Problème UTF-8 BOM** : `NPC_FollowTick.lua` écrit avec `[System.Text.Encoding]::UTF8` PowerShell ajoutait un BOM (octets EF BB BF) — Kahlua retournait `SEVERE Error` et le fichier ne chargeait pas.
+
+**Solution v2.1.0** :
+- [x] `IsoPlayer.new(cell, desc, x, y, z)` — entité humaine native (Bob/Kate)
+- [x] `SurvivorFactory.CreateSurvivor(nil, isFemale)` — descripteur visuel complet
+- [x] `SurvivorFactory.getRandomForename() + getRandomSurname()` — noms PZ natifs
+- [x] `ProfessionFactory.getProfessions()` — profession aléatoire parmi les métiers du jeu
+- [x] `npc:setNPC(true)` — marque comme NPC (désactive input joueur)
+- [x] `getPathFindBehavior2():pathToLocation()` + `update()` — suivi joueur
+- [x] Menu clic-droit intégré dans `NPC_FollowTick.lua` (spawn + parler + suis-moi/reste ici)
+- [x] `NPC_SpawnManager.lua` et `NPC_SpawnDebug.lua` désactivés (stop spawn zombies)
+- [x] `NPC_FollowTick.lua` réécrit sans BOM, sans caractères Unicode dans le code
 
 ### 🔷 Étape 4 — Systèmes avancés
 

@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Architecture B42
-> Version 1.0.1 | Project Zomboid Build 42.18.0 | Auteur : sputji  
-> **État actuel : Fondations ✅ — Cerveau ✅ — Corps Serveur ✅ — Corps Client ✅ — AnimSets ✅ — UI ✅ — Dialogue ✅**
+> Version 2.1.0 | Project Zomboid Build 42.18.0 | Auteur : sputji  
+> **État actuel : Fondations ✅ — Cerveau ✅ — Corps Serveur ✅ — Corps Client v2.1 ✅ — IsoPlayer ✅ — UI ✅**
 
 ---
 
@@ -83,27 +83,91 @@ D:\PZ Mods\Dynamic_NPC_Overhaul\
                 │           ├── ContextMenu_FR.txt
                 │           └── IGUI_FR.txt
                 │
-                ├── server\          ✅ CORPS SERVEUR — Fonctionnel
-                │   ├── 00_Init.lua          # Point d'entrée serveur, handler PHNPC_SpawnRequest
-                │   └── NPC_SpawnManager.lua # Spawn addZombiesInOutfit + EveryOneMinute re-scan post-reload
-                │   ── (À créer) NPC_NetworkServer.lua, NPC_BiteManagement.lua
-                │   ── (À créer) NPC_ObservationLearning.lua, OllamaBridge.lua
-                │   ── (À créer) AdminCommands.lua
+                ├── server\          ✅ CORPS SERVEUR — Minimal (spawn via IsoPlayer côté client)
+                │   ├── 00_Init.lua          # Log démarrage serveur
+                │   └── NPC_SpawnManager.lua # DÉSACTIVÉ — addZombiesInOutfit remplacé par IsoPlayer.new()
                 │
-                └── client\          ✅ CORPS CLIENT — Fonctionnel
-                    ├── 00_Init.lua              # Point d'entrée client, handler PHNPC_SpawnConfirm
-                    ├── NPC_FollowTick.lua        # Conversion, enforce, doFollow, doWander (autonome), FSM save
-                    ├── NPC_InteractionClient.lua # Menu clic-droit + Suivre moi/Rester ici + NPC_DialogueWindow
-                    ├── NPC_SpawnDebug.lua        # Commandes debug spawn (mode -debug)
+                └── client\          ✅ CORPS CLIENT — v2.1.0 IsoPlayer
+                    ├── 00_Init.lua              # Bootstrap client : disableTieredZombieUpdates
+                    ├── NPC_FollowTick.lua        # IsoPlayer.new() + SurvivorFactory + menu clic-droit + follow
+                    ├── NPC_InteractionClient.lua # DÉSACTIVÉ — interaction intégrée dans NPC_FollowTick.lua
+                    ├── NPC_SpawnDebug.lua        # DÉSACTIVÉ — spawn zombies remplacé par IsoPlayer
                     └── UI\
-                        ├── NPC_DialogueWindow.lua   # ✅ ISPanel dialogue (Phase 3)
-                        ├── NPC_SpeechBubble.lua     # ✅ Toast bas-écran + API native PZ
-                        ── (À créer) TradeWindow.lua, OllamaChatUI.lua
+                        ├── NPC_DialogueWindow.lua   # ISPanel dialogue — API open(npc, npcData)
+                        ├── NPC_SpeechBubble.lua     # Toast bas-écran (en attente refonte)
+                        └── (à créer) TradeWindow.lua, OllamaChatUI.lua
 ```
 
 ---
 
-## AnimSets B42 — Animations humaines
+## Architecture IsoPlayer v2.1.0 (approche actuelle)
+
+> **Principe** : Les NPCs sont des `IsoPlayer` natifs, pas des `IsoZombie` convertis.  
+> `IsoPlayer.new()` donne automatiquement les animations Bob/Kate, les sons humains et le pathfinding réel.
+
+### Pattern de création NPC (NPC_FollowTick.lua)
+
+```lua
+-- 1. Descripteur visuel complet (apparence + outfit + profession)
+local isFemale = (ZombRand(2) == 1)
+local forename = SurvivorFactory.getRandomForename(isFemale)
+local surname  = SurvivorFactory.getRandomSurname()
+local desc     = SurvivorFactory.CreateSurvivor(nil, isFemale)
+desc:setForename(forename)
+desc:setSurname(surname)
+
+-- 2. Création de l'entité IsoPlayer (animations Bob/Kate natives)
+local cell = getWorld():getCell()
+local npc  = IsoPlayer.new(cell, desc, x, y, z)
+
+-- 3. Configuration NPC
+npc:setNPC(true)               -- Désactive l'input joueur
+npc:setForname(forename)
+npc:setSurname(surname)
+npc:setUsername(forename .. " " .. surname)
+npc:setSceneCulled(false)
+npc:setDir(IsoDirections.SE)
+
+-- 4. Suivi joueur (dans Events.OnTick)
+npc:getPathFindBehavior2():update()                          -- chaque tick
+npc:getPathFindBehavior2():pathToLocation(tx, ty, tz)       -- recalcul périodique
+```
+
+### Registre global PHNPC.npcs
+
+```lua
+-- PHNPC.npcs[IsoPlayer] = { forename, surname, fullname, followMode, isFemale }
+PHNPC.npcs[npc] = { followMode = true, fullname = "Bob Martin", ... }
+```
+
+---
+
+## Pièges UTF-8 et Kahlua
+
+### ⛔ BOM UTF-8 — Cause #1 de SEVERE error au chargement
+
+`[System.Text.Encoding]::UTF8` en PowerShell ajoute un BOM (octets `EF BB BF` = `239 187 191`).  
+Kahlua lit ces 3 octets au début du fichier → parse error → `SEVERE: Error in LUA file`.
+
+**Vérification** :
+```powershell
+$b = [System.IO.File]::ReadAllBytes($path)
+"Has BOM: $(($b[0] -eq 239 -and $b[1] -eq 187 -and $b[2] -eq 191))"
+```
+
+**Solution** : Toujours écrire les fichiers Lua avec :
+```powershell
+$enc = [System.Text.UTF8Encoding]::new($false)  # false = NO BOM
+[System.IO.File]::WriteAllText($path, $content, $enc)
+```
+
+### ⛔ Caractères Unicode dans les commentaires Lua
+
+Les caractères de dessin de boîte Unicode (─ U+2500, • U+2022, etc.) dans les commentaires `--[[ ... ]]` peuvent causer des erreurs de parse dans certains contextes Kahlua. Utiliser uniquement des caractères ASCII (0-127) dans les fichiers Lua.
+
+---
+
+## Pattern de déclenchement Lua (validé B42.18)
 
 Les animations humaines sont activées via des fichiers XML placés dans `42/media/AnimSets/zombie/`.  
 PZ charge les XML **par ordre alphabétique** dans chaque sous-dossier ; les fichiers préfixés `PHNPC_` overrident les animations zombie natives.

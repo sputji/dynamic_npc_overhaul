@@ -1,210 +1,126 @@
---[[
-    Project Humain : Dynamic NPC Overhaul — B42
-    client/UI/NPC_DialogueWindow.lua
+-- Project Humain: Dynamic NPC Overhaul - B42
+-- client/UI/NPC_DialogueWindow.lua
+-- Simple NPC dialogue ISPanel.
+-- Called from NPC_FollowTick.lua: NPC_DialogueWindow.open(npc, npcData)
+-- npc = IsoPlayer entity, npcData = { forename, surname, fullname, followMode, ... }
 
-    Fenêtre de dialogue ISPanel — Phase 3.
+NPC_DialogueWindow = NPC_DialogueWindow or {}
 
-    Ouverte par NPC_InteractionClient.onTalkClicked.
-    Affiche nom / profession / santé du PNJ + une ligne de dialogue
-    tirée de NPC_Dialogue (banque FR/EN).
+-- ============================================================
+-- DIALOGUE LINES (ASCII only)
+-- ============================================================
 
-    Boutons :
-      [Parler encore] → cycle à travers les contextes de dialogue
-      [Commerce]      → ligne "trade" (placeholder Phase 4)
-      [Au revoir]     → ligne "trade_refuse" puis fermeture
-
-    N'utilise PAS de réseau : tout est local client (DataModel déjà en mémoire).
-]]
-
-NPC_DialogueWindow = ISPanel:derive("NPC_DialogueWindow")
-
-local PANEL_W = 440
-local PANEL_H = 210
-
--- Cycle de contextes parcouru par "Parler encore"
-local TALK_CYCLE = {
-    "greeting", "idle", "help_request", "idle", "quest_give", "idle", "bitten_deny"
+local LINES = {
+    "Je suis heureux d'etre en vie.",
+    "Restez pres de moi, s'il vous plait.",
+    "Je peux vous aider a survivre.",
+    "Merci de m'avoir trouve.",
+    "On est plus forts ensemble.",
+    "Avez-vous vu d'autres survivants ?",
+    "Je cherche de la nourriture.",
+    "Il faut rester prudent.",
+    "Je connais un abri pas loin d'ici.",
+    "Vous savez manier une arme ?",
 }
 
 -- ============================================================
--- Point d'entrée statique
+-- WINDOW CLASS
 -- ============================================================
 
---- Ouvre (ou remplace) la fenêtre de dialogue pour un PNJ.
--- @param npcData  NPCDataModel (ou table partielle {fullName, ...})
--- @param zombie   IsoZombie associé
-function NPC_DialogueWindow.open(npcData, zombie)
+local DlgWin = ISPanel:derive("PHNPC_DlgWin")
+
+local PANEL_W = 320
+local PANEL_H = 130
+
+function DlgWin:new(npc, npcData)
+    local sx = math.floor(getCore():getScreenWidth()  / 2 - PANEL_W / 2)
+    local sy = math.floor(getCore():getScreenHeight() * 0.60)
+    local o  = ISPanel.new(self, sx, sy, PANEL_W, PANEL_H)
+    setmetatable(o, self)
+    self.__index    = self
+    o.npc           = npc
+    o.npcData       = npcData or {}
+    o.dialogueLine  = LINES[ZombRand(#LINES) + 1]
+    o.moveWithMouse = true
+    return o
+end
+
+function DlgWin:initialise()
+    ISPanel.initialise(self)
+    self:createChildren()
+end
+
+function DlgWin:createChildren()
+    local name = self.npcData.fullname or "NPC"
+
+    -- NPC name (title)
+    local lblName = ISLabel:new(10, 8, 20, name, 1, 0.85, 0.2, 1, UIFont.Medium, false)
+    lblName:initialise()
+    self:addChild(lblName)
+
+    -- Dialogue line
+    local line = '"' .. self.dialogueLine .. '"'
+    local lblLine = ISLabel:new(10, 35, 20, line, 0.85, 0.85, 0.85, 1, UIFont.Small, false)
+    lblLine:initialise()
+    self:addChild(lblLine)
+
+    -- [Suis-moi] button
+    local btnFollow = ISButton:new(10, 90, 90, 25, "Suis-moi", self, DlgWin.onFollow)
+    btnFollow:initialise()
+    self:addChild(btnFollow)
+
+    -- [Reste ici] button
+    local btnStay = ISButton:new(110, 90, 90, 25, "Reste ici", self, DlgWin.onStay)
+    btnStay:initialise()
+    self:addChild(btnStay)
+
+    -- [Fermer] button
+    local btnClose = ISButton:new(220, 90, 80, 25, "Fermer", self, DlgWin.close)
+    btnClose:initialise()
+    self:addChild(btnClose)
+end
+
+function DlgWin:onFollow(btn)
+    if self.npcData then
+        self.npcData.followMode = true
+    end
+    self:close()
+end
+
+function DlgWin:onStay(btn)
+    if self.npcData then
+        self.npcData.followMode = false
+        if self.npc then
+            pcall(function()
+                self.npc:getPathFindBehavior2():cancel()
+                self.npc:setPath2(nil)
+            end)
+        end
+    end
+    self:close()
+end
+
+function DlgWin:close()
+    NPC_DialogueWindow._instance = nil
+    self:removeFromUIManager()
+end
+
+-- ============================================================
+-- PUBLIC API
+-- ============================================================
+
+--- Open dialogue window for an NPC.
+-- @param npc     IsoPlayer entity
+-- @param npcData table from PHNPC.npcs registry
+function NPC_DialogueWindow.open(npc, npcData)
+    -- Close existing window if open
     if NPC_DialogueWindow._instance then
         pcall(function() NPC_DialogueWindow._instance:close() end)
     end
-    local win = NPC_DialogueWindow:new(npcData, zombie)
+    local win = DlgWin:new(npc, npcData)
     win:initialise()
     win:addToUIManager()
     NPC_DialogueWindow._instance = win
 end
 
--- ============================================================
--- Constructeur
--- ============================================================
-
-function NPC_DialogueWindow:new(npcData, zombie)
-    local sx = math.floor(getCore():getScreenWidth()  / 2 - PANEL_W / 2)
-    local sy = math.floor(getCore():getScreenHeight() * 0.60)
-    local o  = ISPanel.new(self, sx, sy, PANEL_W, PANEL_H)
-    o.npcData       = npcData or {}
-    o.zombie        = zombie
-    o._ctxIdx       = 1
-    o._line         = "..."
-    o.moveWithMouse = true
-    return o
-end
-
--- ============================================================
--- Mise à jour de la ligne de dialogue
--- ============================================================
-
-function NPC_DialogueWindow:_refreshLine(ctxKey)
-    local Dlg = PHNPC.getModule("NPC_Dialogue")
-    if not Dlg then self._line = "..." return end
-    self._line = Dlg.get(ctxKey or "greeting", {
-        name       = self.npcData.firstName  or self.npcData.fullName or "?",
-        profession = self.npcData.professionId or "",
-    })
-    -- D\u00e9clencher la bulle de dialogue au-dessus du NPC
-    local Bubble = PHNPC.getModule("NPC_SpeechBubble")
-    if Bubble and self._line and self._line ~= "..." then
-        pcall(function() Bubble.show(self.npcData, self.zombie, self._line) end)
-    end
-end
-
--- ============================================================
--- Initialisation (boutons)
--- ============================================================
-
-function NPC_DialogueWindow:initialise()
-    ISPanel.initialise(self)
-    self:_refreshLine("greeting")
-
-    local bw  = 128
-    local bh  = 28
-    local by  = PANEL_H - bh - 10
-    local gap = 10
-
-    -- [Parler encore]
-    local b1 = ISButton:new(gap, by, bw, bh,
-        "Parler encore", self, NPC_DialogueWindow.onTalkAgain)
-    b1:initialise()
-    b1.backgroundColor = { r=0.05, g=0.05, b=0.08, a=0.92 }
-    b1.borderColor     = { r=0.65, g=0.50, b=0.25, a=0.80 }
-    self:addChild(b1)
-
-    -- [Suivre moi / Rester ici]
-    local followLabel = (self.npcData.followMode) and "Rester ici" or "Suivre moi"
-    local b2 = ISButton:new(gap + bw + gap, by, bw, bh,
-        followLabel, self, NPC_DialogueWindow.onFollowToggle)
-    b2:initialise()
-    b2.backgroundColor = { r=0.05, g=0.05, b=0.08, a=0.92 }
-    b2.borderColor     = { r=0.65, g=0.50, b=0.25, a=0.80 }
-    self:addChild(b2)
-    self._followBtn = b2
-
-    -- [Au revoir]
-    local b3 = ISButton:new(PANEL_W - bw - gap, by, bw, bh,
-        "Au revoir", self, NPC_DialogueWindow.onClose)
-    b3:initialise()
-    b3.backgroundColor = { r=0.05, g=0.05, b=0.08, a=0.92 }
-    b3.borderColor     = { r=0.65, g=0.50, b=0.25, a=0.80 }
-    self:addChild(b3)
-end
-
--- ============================================================
--- Callbacks boutons
--- ============================================================
-
-function NPC_DialogueWindow:onTalkAgain()
-    self._ctxIdx = (self._ctxIdx % #TALK_CYCLE) + 1
-    self:_refreshLine(TALK_CYCLE[self._ctxIdx])
-end
-
-function NPC_DialogueWindow:onFollowToggle()
-    local nd = self.npcData
-    -- Synchroniser aussi avec le registre actif (m\u00eame objet, mais s\u00e9curit\u00e9 double)
-    if self.zombie and PHNPC._activeNPCs then
-        local active = PHNPC._activeNPCs[self.zombie]
-        if active then nd = active end  -- priorit\u00e9 \u00e0 l'objet live
-    end
-    nd.followMode = not nd.followMode
-    self.npcData  = nd  -- pointer sur l'objet live
-    -- Mettre \u00e0 jour le label du bouton
-    if self._followBtn then
-        self._followBtn.title = nd.followMode and "Rester ici" or "Suivre moi"
-    end
-    -- Feedback : ligne de dialogue adapt\u00e9e
-    self:_refreshLine(nd.followMode and "greeting" or "idle")
-end
-
-function NPC_DialogueWindow:onTrade()
-    self:_refreshLine("trade")
-end
-
-function NPC_DialogueWindow:onClose()
-    self:_refreshLine("trade_refuse")
-    self:close()
-end
-
--- ============================================================
--- Rendu
--- ============================================================
-
-function NPC_DialogueWindow:render()
-    -- Fond sombre semi-opaque
-    self:drawRect(0, 0, PANEL_W, PANEL_H, 0.88, 0.04, 0.04, 0.04)
-
-    -- Bordure chaude (or/marron)
-    self:drawRect(0,          0,         PANEL_W, 2,       0.9, 0.65, 0.50, 0.25)
-    self:drawRect(0,          PANEL_H-2, PANEL_W, 2,       0.9, 0.65, 0.50, 0.25)
-    self:drawRect(0,          0,         2,       PANEL_H, 0.9, 0.65, 0.50, 0.25)
-    self:drawRect(PANEL_W-2,  0,         2,       PANEL_H, 0.9, 0.65, 0.50, 0.25)
-
-    -- En-tête : genre + nom + profession
-    local gLabel = self.npcData.isFemale and "[F] " or "[H] "
-    local name   = self.npcData.fullName    or "PNJ Inconnu"
-    local prof   = self.npcData.professionId or ""
-    self:drawText(gLabel .. name .. "  —  " .. prof, 12, 12, 1.0, 0.85, 0.40, 1.0, UIFont.Medium)
-
-    -- Indicateur santé (coin haut droit)
-    local hp = self.npcData.health or 100
-    local hr, hg, hb
-    if hp > 60 then hr, hg, hb = 0.30, 0.90, 0.30
-    elseif hp > 30 then hr, hg, hb = 0.90, 0.90, 0.30
-    else hr, hg, hb = 0.90, 0.30, 0.30 end
-    self:drawText("Santé : " .. math.floor(hp) .. "%",
-        PANEL_W - 110, 14, hr, hg, hb, 1.0, UIFont.Small)
-
-    -- Séparateur horizontal
-    self:drawRect(10, 40, PANEL_W - 20, 1, 0.7, 0.55, 0.45, 0.22)
-
-    -- Ligne de dialogue (entre guillemets)
-    local line = '"' .. (self._line or "...") .. '"'
-    self:drawText(line, 14, 54, 0.95, 0.95, 0.82, 1.0, UIFont.Small)
-
-    -- Appeler render enfants (boutons)
-    ISPanel.render(self)
-end
-
--- ============================================================
--- Fermeture
--- ============================================================
-
-function NPC_DialogueWindow:close()
-    self:setVisible(false)
-    pcall(function() self:removeFromUIManager() end)
-    NPC_DialogueWindow._instance = nil
-end
-
--- ============================================================
--- Enregistrement
--- ============================================================
-
-PHNPC.registerModule("NPC_DialogueWindow", NPC_DialogueWindow)
-return NPC_DialogueWindow
+print("[PHNPC] NPC_DialogueWindow loaded")
