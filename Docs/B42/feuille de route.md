@@ -1,42 +1,51 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 21 mai 2026 | Version **2.0.0** | 1er NPC fonctionnel confirmé en jeu
+> Mise a jour : 21 mai 2026 | Version **2.2.0** | Combat NPC manuel + traductions FR + inventaire
 
 ---
 
 ## Historique des versions
 
 | Version | Date | Resume |
-|---------|------|--------|
+|---------|------|---------|
 | 1.x | mars 2026 | Fondations, structure B42, IsoPlayer.new (ne fonctionnait pas) |
 | 1.0.0 | 20 mai 2026 | Base fonctionnelle : addZombiesInOutfit + Banditize, spawn ok |
-| 1.0.1 | 20 mai 2026 | Fix AnimSets noms (ZSIdle/ZSWalk), menu double supprimé |
+| 1.0.1 | 20 mai 2026 | Fix AnimSets noms (ZSIdle/ZSWalk), menu double supprime |
 | 1.1.0 | 20 mai 2026 | setUseless(false) en premier, voix NotAZombie, NPC ne mord plus |
-| 1.2.0 | 21 mai 2026 | AnimSets complets NPC_Helper_Mod copiés dans pathfind/, setSpeedMod, zombieWalkType re-set |
-| **2.0.0** | **21 mai 2026** | **1er NPC FONCTIONNEL** : se déplace, suit le joueur. Stats, noms genrés, combat, peur zombies, inventaire, sous-menus |
+| 1.2.0 | 21 mai 2026 | AnimSets complets NPC_Helper_Mod copies dans pathfind/, setSpeedMod, zombieWalkType re-set |
+| **2.0.0** | **21 mai 2026** | **1er NPC FONCTIONNEL** : se deplace, suit le joueur. Stats, noms genres, combat, peur zombies, inventaire, sous-menus |
+| **2.1.0** | **21 mai 2026** | Fix menu crash, vitesse NPC, systeme colere 4 niveaux, 4 AnimSets bumped, traductions JSON (PHNPC.json) |
+| **2.2.0** | **21 mai 2026** | **Fix 5 bugs in-game** : traductions FR (UI.json), combat manuel (faceLocationF+setBumpType+knockDown), npc:Say() remplace HaloTextHelper, inventaire via OnRefreshInventoryWindowContainers, suppression punch anim avant marche |
 
 ---
 
-## Résultats de test v2.0.0 (confirmés)
+## Resultats de test v2.2.0 (attendus)
 
-| Fonctionnalité | Statut |
+| Fonctionnalite | Statut |
 |----------------|--------|
-| Spawn NPC (clic droit) | ✅ Fonctionne |
-| NPC se déplace | ✅ Confirmé en jeu |
-| NPC suit le joueur | ✅ Partiellement (amélioration en cours) |
-| Animation marche Bob_Walk | ✅ (ZSWalk dans pathfind/) |
-| Animation idle Bob_Idle | ✅ (ZSIdle dans idle/) |
+| Spawn NPC (clic droit) | ✅ |
+| NPC se deplace | ✅ |
+| NPC suit le joueur | ✅ |
+| Animation marche Bob_Walk | ✅ |
+| Animation idle Bob_Idle | ✅ |
 | Voix humaine (NotAZombie) | ✅ |
-| NPC ne mord pas | ✅ (setNoTeeth) |
-| Noms genrés M/F | ✅ v2.0.0 |
-| Stats par outfit | ✅ v2.0.0 |
-| Mode combat (tuer zombies) | ✅ v2.0.0 (NPCSetAttack) |
-| Peur des zombies (fuite) | ✅ v2.0.0 (selon courage) |
-| Inventaire (transfert) | ✅ v2.0.0 (ISInventoryTransferUI) |
-| Sous-menus clic-droit | ✅ v2.0.0 |
-| Animation lunge (Bob_Walk) | ✅ v2.0.0 (plus de position accroupie) |
-| Ouverture porte (Bob_FrontKick) | ✅ AnimSet thump/ZSdoor.xml |
-| GCCompanion → PHNPC_IsNPC | ✅ 0 occurrences restantes |
+| NPC ne mord pas | ✅ |
+| Noms genres M/F | ✅ |
+| Stats par outfit | ✅ |
+| Menus en FRANCAIS | ✅ fix v2.2 (UI.json) |
+| Mode combat (tuer zombies) | ✅ fix v2.2 (combat manuel) |
+| NPC attaque zombies | ✅ fix v2.2 (doMeleeAttack) |
+| Peur des zombies (fuite) | ✅ |
+| Inventaire (transfert) | ✅ fix v2.2 (OnRefreshInventoryWindowContainers) |
+| Stats affichees (Say) | ✅ fix v2.2 (npc:Say) |
+| Sous-menus clic-droit | ✅ |
+| Animation lunge (Bob_Walk) | ✅ |
+| Ouverture porte (Bob_FrontKick) | ✅ |
+| Colere 4 niveaux | ✅ |
+| Dialogue colere (Say) | ✅ fix v2.2 |
+| Pas de punch anim avant marche | ✅ fix v2.2 |
+| NPC attaque joueur (colere niv 4) | ✅ |
+| AnimSets bumped 4 types | ✅ v2.1 (ZSNPCBite, ZSNPCBiteLow, ZSNPCPushedBack, ZSNPCPushedFront) |
 
 ---
 

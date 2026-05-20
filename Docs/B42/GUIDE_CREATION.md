@@ -1,7 +1,7 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 2.0.0_
+_Version 2.2.0_
 
-> Ce guide explique le fonctionnement complet du système NPC tel qu'implémenté en v2.0.0.
+> Ce guide explique le fonctionnement complet du systeme NPC tel qu'implemente en v2.2.0.
 
 ---
 
@@ -111,29 +111,36 @@ local desc = PHNPC.statsToString(stats)
 
 ## 4. Boucle de comportement
 
-### enforceNPC (appelé par OnZombieUpdate)
-C'est le "gardien" du NPC. Il est appelé à chaque update de l'IsoZombie.  
-Son rôle : **empêcher PZ de réactiver le comportement zombie**.
+### enforceNPC (appele par OnZombieUpdate)
+C'est le "gardien" du NPC. Il est appele a chaque update de l'IsoZombie.
+Son role : **empecher PZ de reactiver le comportement zombie**.
 
 ```lua
--- Ordre impératif des appels:
+-- Ordre imperatif des appels:
 npc:setUseless(false)          -- 1er TOUJOURS
 npc:setHealth(10000)
 npc:setNoTeeth(true)
 npc:setVariable("PHNPC_IsNPC", true)
 npc:setVariable("zombieWalkType", "Walk")
-npc:setSpeedMod(1.0)
+npc:setSpeedMod(0.8)
 
--- États autorisés (ne pas interrompre):
-if state == "pathfind" then return end   -- En déplacement
+-- TOUJOURS effacer la cible (sauf colere vs joueur)
+-- Raison: l'IA zombie native est incompatible avec nos variables
+npc:setTarget(nil)
+npc:clearAggroList()
+
+-- Etats autorises (ne pas interrompre):
+if state == "pathfind" then return end   -- En deplacement
 if state == "thump"    then return end   -- Ouvre une porte
-if state == "attack" and attackMode then return end  -- Combat actif
-if state == "bumped" and ticks < 30 then return end  -- Bump récent
 
--- États à reset:
-if state == "lunge" or state == "eatBody" or state == "turnalerted" then
+-- Etats a reset:
+if state == "eatBody" or state == "turnalerted" then
     npc:changeState(ZombieIdleState)
-    npc:setTarget(nil)
+end
+
+-- Poussee : gestion colere
+if state == "bumped" then
+    -- handleAnger() + compter 35 ticks puis reset
 end
 ```
 
@@ -159,32 +166,91 @@ if data.stats.courage < PHNPC.FEAR_COURAGE_THRESHOLD then
 end
 ```
 
-### Mode combat (checkCombat)
+### Mode combat (v2.2 — entierement manuel)
 ```lua
--- Toutes les 10 ticks si attackMode
--- Chercher zombie le plus proche (< 15 tiles)
-if dist < PHNPC.COMBAT_RANGE then
-    npc:NPCSetAttack(target)        -- Attaque corps à corps
+-- doMeleeAttack(npc, target) — JAMAIS setTarget/NPCSetAttack en B42
+npc:faceLocationF(target:getX(), target:getY())
+npc:setBumpType("Shove")         -- ou "FrontKick", "HighKick" (alternance)
+pcall(function() target:knockDown(true) end)  -- sur zombies uniquement
+data.attackCooldown = 60         -- ticks avant prochaine attaque
+
+-- checkCombat, toutes les 10 ticks si attackMode:
+if dist <= 1.8 then
+    doMeleeAttack(npc, zombie)
 else
-    npcStartMoving(npc, tx, ty, tz) -- S'approche
+    npcStartMoving(npc, zx, zy, zz)  -- approcher
 end
 ```
 
----
-
-## 5. Inventaire
-
-L'IsoZombie a un inventaire natif. L'accès se fait via :
-```lua
-ISInventoryTransferUI.transferBetween(player, npc)
+> **Pourquoi pas setTarget/NPCSetAttack ?**  
+> `NPCSetAttack()` n'existe pas en B42.  
+> `setTarget()` ignore nos overrides (`NoLungeTarget`, `setUseless`...).  
+> L'IA zombie native est completement desactivee pour nos NPCs.  
+> Pattern confirme depuis GCCombatActionsAttack.lua (NPC_Helper_Mod).
 ```
-Cela ouvre l'interface d'échange classique de PZ entre le joueur et le NPC.
-
-Le NPC peut porter des armes et équipements dans son inventaire. L'équipement automatique d'armes sera ajouté en phase future.
 
 ---
 
-## 6. Menu contextuel
+## 5. Inventaire (v2.2)
+
+En B42, `ISInventoryTransferUI.transferBetween()` crash (module ISInventoryTransferAction echoue a charger).
+On utilise a la place le hook `OnRefreshInventoryWindowContainers` (pattern NPC_Helper_Mod) :
+
+```lua
+local _openInvNPC = nil
+
+local function openNPCInventory(npc)
+    _openInvNPC = npc
+    local pdata = getPlayerData(0)
+    if pdata and pdata.lootInventory then
+        pdata.lootInventory:refreshBackpacks()  -- force l'ouverture de la fenetre
+    end
+end
+
+Events.OnRefreshInventoryWindowContainers.Add(function(page, step)
+    if step ~= "beforeFloor" then return end
+    if page.onCharacter then return end
+    if not _openInvNPC then return end
+    local loot = getPlayerLoot(page.player)
+    if loot then
+        loot:addContainerButton(npcInv, nil, npcName, npcName)
+    end
+end)
+```
+
+---
+
+## 6. Traductions (v2.2)
+
+**Nom obligatoire : `UI.json`** (PZ B42 ignore tout autre nom pour les langues non-EN)
+
+Chemin : `media/lua/shared/Translate/FR/UI.json` (et `/EN/UI.json`)
+
+```json
+{
+    "PHNPC_Menu_SpawnNPC": "[PHNPC] Faire apparaitre un PNJ",
+    "PHNPC_Menu_StayHere": "Reste ici",
+    "PHNPC_Anger_M_1":     "He ! Fais attention ou tu marches !"
+}
+```
+
+Acces en Lua : `getText("PHNPC_Menu_StayHere")`
+
+> Un nom comme `PHNPC.json` fonctionne UNIQUEMENT pour EN. Pour toutes les autres langues, PZ exige `UI.json`.
+> Confirme depuis ssr_quests mod (supporte EN/FR/RU/CN/ES/KO/PTBR avec UI.json dans chaque dossier).
+
+---
+
+## 7. Dialogue NPC (v2.2)
+
+Pour afficher du texte au-dessus du NPC :
+
+```lua
+-- Bulle de parole blanche au-dessus du NPC
+npc:Say("Mon message")
+
+-- NE PAS utiliser HaloTextHelper.addText() - n'existe pas en B42
+```
 
 Le menu apparaît :
 - Sur une tuile vide → option de spawn
@@ -202,7 +268,7 @@ end
 
 ---
 
-## 7. Ajout d'un nouveau NPC type (workflow)
+## 9. Ajout d'un nouveau NPC type (workflow)
 
 1. **Définir le profil stats** dans `PHNPC_Stats.lua` → `PHNPC.STAT_PROFILES["MonOutfit"] = {...}`
 2. **Vérifier l'outfit PZ** : doit exister dans les assets vanilla B42
@@ -212,14 +278,19 @@ end
 
 ---
 
-## 8. Débogage fréquent
+## 10. Debogage frequent
 
-| Symptôme | Cause probable | Fix |
+| Symptome | Cause probable | Fix |
 |----------|----------------|-----|
-| NPC ne bouge pas | `setSpeedMod` manquant | Ajouter `npc:setSpeedMod(1.0)` |
+| NPC ne bouge pas | `setSpeedMod` manquant | Ajouter `npc:setSpeedMod(0.8)` |
 | NPC marche accroupi | ZSlunge.xml avec `Bob_WalkSneak_Slow` | Remplacer par `Bob_Walk` |
-| NPC mord le joueur | `setNoTeeth` pas appelé ou pas en premier | Mettre `setNoTeeth(true)` après `setUseless(false)` |
+| NPC mord le joueur | `setNoTeeth` pas appele | Mettre `setNoTeeth(true)` apres `setUseless(false)` |
 | NPC n'ouvre pas les portes | "thump" interrompu par enforceNPC | Ajouter `if state=="thump" then return end` |
-| NPC attaque le joueur | `clearAggroList` + `setTarget(nil)` manquant | Appeler les deux au spawn ET dans enforceNPC |
-| AnimSet ignoré | Fichier dans `walktoward/` mais PZ utilise `pathfind/` | Copier dans les deux dossiers |
-| Stats nil au clic | `PHNPC_Stats.lua` non chargé avant Manager | Vérifier l'ordre dans `mod.info` ou `shared/` |
+| NPC attaque le joueur | `clearAggroList` + `setTarget(nil)` manquant | Appeler les deux dans enforceNPC |
+| AnimSet ignore | Fichier dans `walktoward/` mais PZ utilise `pathfind/` | Copier dans les deux dossiers |
+| Stats nil au clic | `PHNPC_Stats.lua` non charge avant Manager | Verifier l'ordre dans `mod.info` ou `shared/` |
+| Menus en anglais (langue FR) | Fichier traduction pas nomme `UI.json` | Renommer en `Translate/FR/UI.json` |
+| Dialogue NPC absent | Utilisation de `HaloTextHelper.addText()` | Remplacer par `npc:Say("texte")` |
+| Inventaire ne s'ouvre pas | `ISInventoryTransferUI.transferBetween()` crash | Utiliser hook `OnRefreshInventoryWindowContainers` |
+| NPC n'attaque pas | `NPCSetAttack()` n'existe pas en B42 | Utiliser `doMeleeAttack()` manuel (faceLocationF + setBumpType + knockDown) |
+| Punch anim avant marche | `setBumpType("IdleToWalk")` dans npcStartMoving | Supprimer cet appel |

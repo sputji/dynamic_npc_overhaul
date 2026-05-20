@@ -1,5 +1,15 @@
 # ARCHITECTURE — PH Dynamic NPC Overhaul B42
-_Version 2.0.0 — NPC fonctionnel confirmé en jeu : déplacement, suivi, stats, combat, peur_
+_Version 2.2.0 — Combat manuel NPC + traductions FR corrigees + inventaire + Say() dialogue_
+
+---
+
+## Changelog rapide
+
+| Version | Changements clés |
+|---------|------------------|
+| 2.0.0 | NPC fonctionnel : spawn, suivi, stats, combat (setTarget), peur, inventaire |
+| 2.1.0 | Fix menu crash, vitesse NPC, colere 4 niveaux, 4 AnimSets bumped, traductions JSON |
+| **2.2.0** | **Combat entierement manuel** (faceLocationF+setBumpType+knockDown), `npc:Say()` remplace HaloTextHelper, `UI.json` requis pour traductions FR, inventaire via `OnRefreshInventoryWindowContainers`, suppression `setBumpType("IdleToWalk")` |
 
 ---
 
@@ -119,16 +129,20 @@ OnZombieUpdate(zombie)          <- une fois par IsoZombie par frame
            "attack"   -> return si attackMode actif, sinon reset
            "lunge"/"eatBody" -> changeState(ZombieIdleState) + reset
            "turnalerted"     -> changeState(ZombieIdleState) + reset
-           "bumped"   -> compter 30 ticks puis reset
-           default    -> setTarget(nil) + clearAggroList si pas attackMode
+           "bumped"   -> compter 35 ticks, handleAnger, setBumpType niveau 4
+           TOUJOURS en debut: setTarget(nil) + clearAggroList (sauf colere joueur)
 
 OnTick()                        <- toutes les frames
   -> cleanup NPC morts (toutes les 300 ticks)
   -> pour chaque NPC:
+       colere vs joueur  (si playerAngerTicks > 0)
+         doMeleeAttack() si dist <= 1.8 tile, sinon approcher
        checkFear()     (toutes les 30 ticks)
          si courage < 50 ET zombie < 10 tiles -> fuite (oppose, 15 tiles)
        checkCombat()   (toutes les 10 ticks si attackMode)
-         trouver zombie le plus proche -> NPCSetAttack() si < 5 tiles
+         trouver zombie le plus proche < 15 tiles
+         si dist <= 1.8 tile -> doMeleeAttack(npc, zombie) + cooldown 60 ticks
+         si trop loin -> npcStartMoving() vers zombie
        suivre joueur   (si followMode + dist > 3 tiles + pas en fuite/combat)
          pathToLocationF(px, py, pz) toutes les 15 ticks
 ```
@@ -179,17 +193,61 @@ Clic sur un NPC (rayon 2 tiles):
   "[PHNPC] NomNPC (M/F)"
     -> "Suis-moi" / "Reste ici"
     -> "Mode combat (tuer zombies)" / "Arreter le combat"
-    -> "Voir l'inventaire"    (ISInventoryTransferUI.transferBetween)
-    -> "Voir les stats"       (HaloTextHelper.addText)
-    -> "Renvoyer"             (removeFromWorld)
+    -> "Voir l'inventaire"  (hook OnRefreshInventoryWindowContainers)
+    -> "Voir les stats"     (npc:Say() avec nom + stats)
+    -> "Renvoyer"           (removeFromWorld)
 ```
 
 ---
 
-## Notes importantes B42
+## Systeme de traductions (v2.2)
 
-- **`pathToLocationF(x,y,z)`** = pathfinding A* → état `pathfind` → lit `zombie/pathfind/`
-- **`setTarget(zombie)`** = poursuite directe → état `walktoward` → lit `zombie/walktoward/`
-- **`setBumpType()`** : `"IdleToWalk"` (transition démarrage), `"WalkToIdle"` (arrêt), `"Shrug"` (idle)
-- **`setUseless(false)`** doit être le PREMIER appel dans enforceNPC — PZ le remet à `true` après chaque hit
-- **GCCompanion** = variable de NPC_Helper_Mod remplacée par `PHNPC_IsNPC` dans tous nos AnimSets (0 occurrence)
+- Fichiers JSON dans `Translate/EN/UI.json` et `Translate/FR/UI.json`
+- **Nom obligatoire : `UI.json`** — tout autre nom (ex: `PHNPC.json`) est ignore pour les langues non-EN en B42
+- Acces : `getText("PHNPC_Menu_StayHere")` etc.
+- Cle exemple : `"PHNPC_Menu_SpawnNPC"`, `"PHNPC_Anger_M_1"`...
+- Pattern confirme depuis ssr_quests (supporte 7 langues)
+
+---
+
+## Dialogue NPC (v2.2)
+
+- `npc:Say("texte")` — bulle blanche au-dessus du NPC
+- Utilise pour : colere (handleAnger), stats (showNPCStats), salutation (createNPC)
+- **`HaloTextHelper.addText()` n'existe pas en B42** — ne pas utiliser
+
+---
+
+## Combat manuel (v2.2)
+
+```lua
+-- doMeleeAttack(npc, target)
+npc:faceLocationF(target:getX(), target:getY())
+npc:setBumpType("Shove")       -- ou "FrontKick", "HighKick" (en alternance)
+pcall(function() target:knockDown(true) end)  -- sur zombies seulement
+data.attackCooldown = 60       -- ticks avant prochaine attaque
+```
+
+> Confirme depuis GCCombatActionsAttack.lua (NPC_Helper_Mod)
+> `setTarget(nil)` + `clearAggroList()` TOUJOURS appeles dans enforceNPC
+> Le zombie AI natif est 100% desactive pour les NPCs
+
+---
+
+## Inventaire (v2.2)
+
+```lua
+-- Hook — ajoute le conteneur NPC a la fenetre de loot
+Events.OnRefreshInventoryWindowContainers.Add(function(page, step)
+    if step ~= "beforeFloor" then return end
+    if page.onCharacter then return end
+    if not _openInvNPC then return end
+    local loot = getPlayerLoot(page.player)
+    if loot then
+        loot:addContainerButton(npcInv, nil, npcName, npcName)
+    end
+end)
+```
+
+> `ISInventoryTransferUI.transferBetween()` crash en B42 (module ISInventoryTransferAction echoue)
+> Pattern confirme depuis GCMenuInventory.lua (NPC_Helper_Mod)
