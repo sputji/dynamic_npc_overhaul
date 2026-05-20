@@ -150,6 +150,11 @@ local function createNPC(square)
 
         -- Bump initial pour sortir de l'etat zombie idle
         npc:setBumpType("Shrug")
+
+        -- Effacer toute cible existante (CRUCIAL: empeche attaque immediate)
+        npc:setTarget(nil)
+        npc:clearAggroList()
+        npc:setHealth(10000)
     end)
 
     -- 3. Nettoyer les visuels zombie (sang, salet, degats)
@@ -175,6 +180,7 @@ local function createNPC(square)
         followMode = true,
         retarget   = 0,
         moving     = false,
+        bumpTicks  = 0,
     }
 
     print("[PHNPC] NPC spawne: " .. npcName
@@ -269,6 +275,93 @@ local function onContextMenu(playerIndex, context, worldobjects, test)
 end
 
 -- ============================================================
+-- ENFORCE NPC (appele par OnZombieUpdate — une fois par entite par frame)
+-- Pattern: GCCoreEnforce.lua + GCCoreEnforceMain.lua (NPC_Helper_Mod)
+-- CRITIQUE: empeche le zombie AI de reprendre la main apres un hit/push
+--   setTarget(nil) annule le pathfinding — NE PAS l'appeler quand asn=="pathfind"
+-- ============================================================
+local function enforceNPC(zombie)
+    local md = zombie:getModData()
+    if not md or not md.PHNPC_ID then return end
+
+    local data = PHNPC.npcs[zombie]
+
+    -- Toujours vivant: health geree par nous, pas par PZ
+    pcall(function() zombie:setHealth(10000) end)
+
+    -- Jamais de morsure zombie
+    pcall(function() zombie:setNoTeeth(true) end)
+    pcall(function() zombie:setEatBodyTarget(nil, false) end)
+
+    -- Variables AnimSet toujours actives (AnimSets re-evalues chaque frame)
+    pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
+    pcall(function() zombie:setVariable("NoLungeTarget", true) end)
+    pcall(function() zombie:setWalkType("Walk") end)
+    pcall(function() zombie:setAnimatingBackwards(false) end)
+
+    -- Lire l'etat action courant
+    local asn = ""
+    pcall(function() asn = tostring(zombie:getActionStateName()) end)
+
+    -- CAS 1: pathfind actif -> ne PAS appeler setTarget (annulerait le pathfinding)
+    if asn == "pathfind" then
+        pcall(function() zombie:setUseless(false) end)
+        return
+    end
+
+    -- CAS 2: zombie en train d'attaquer / lunger / manger -> forcer reset vers idle
+    if asn == "attack" or asn == "lunge" or asn == "eatBody" then
+        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+        pcall(function() zombie:setTarget(nil) end)
+        pcall(function() zombie:clearAggroList() end)
+        pcall(function() zombie:setUseless(false) end)
+        if data then data.moving = false end
+        return
+    end
+
+    -- CAS 3: turnalerted -> reset vers idle (empeche le zombie de pivoter vers player)
+    if asn == "turnalerted" then
+        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+        pcall(function() zombie:setTarget(nil) end)
+        pcall(function() zombie:clearAggroList() end)
+        pcall(function() zombie:setUseless(false) end)
+        return
+    end
+
+    -- CAS 4: bumped prolonge -> reset (animations Shove/Pain — laisser jouer 30 frames)
+    if asn == "bumped" then
+        if data then
+            data.bumpTicks = (data.bumpTicks or 0) + 1
+            if data.bumpTicks > 30 then
+                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+                pcall(function() zombie:setBumpType("Shrug") end)
+                data.bumpTicks = 0
+                data.moving = false
+            end
+        end
+        return
+    end
+
+    -- CAS normal: effacer cible et agression
+    pcall(function() zombie:setTarget(nil) end)
+    pcall(function() zombie:clearAggroList() end)
+    pcall(function() zombie:setUseless(false) end)
+    if data then data.bumpTicks = 0 end
+end
+
+-- ============================================================
+-- ONZOMBIEUPDATE
+-- Declenche pour chaque IsoZombie a chaque mise a jour engine
+-- C'est ici que l'enforce s'execute, pas dans OnTick
+-- ============================================================
+Events.OnZombieUpdate.Add(function(zombie)
+    if not zombie then return end
+    if not PHNPC or not PHNPC.npcs then return end
+    if not PHNPC.npcs[zombie] then return end
+    enforceNPC(zombie)
+end)
+
+-- ============================================================
 -- MAIN TICK
 -- Suivi + retarget + cleanup
 -- ============================================================
@@ -327,8 +420,8 @@ end)
 Events.OnGameStart.Add(function()
     PHNPC.npcs = {}
     _ticks = 0
-    print("[PHNPC] PHNPC_Manager v1.0 pret (OnGameStart)")
+    print("[PHNPC] PHNPC_Manager v1.1 pret (OnGameStart)")
 end)
 
 Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
-print("[PHNPC] PHNPC_Manager v1.0 loaded")
+print("[PHNPC] PHNPC_Manager v1.1 loaded")
