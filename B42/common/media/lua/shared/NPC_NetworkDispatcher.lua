@@ -24,22 +24,16 @@ local NPC_NetworkDispatcher = {
 -- ============================================================
 
 local function detectMode()
-    local ok, solo = pcall(function()
-        -- En B42, isCoopHost() indique un serveur hébergé par un joueur ;
-        -- getNumActivePlayers() > 1 serait multi.
-        if type(isCoopHost) == "function" and isCoopHost() then return false end
-        if type(getServerOptions) == "function" then
-            local opts = getServerOptions()
-            -- getOptionCount() peut ne pas exister selon le contexte B42
-            if opts and type(opts.getOptionCount) == "function" and opts:getOptionCount() > 0 then return false end
-        end
-        return true
+    -- getGameMode() returns "Survival"/"Sandbox"/"TimedActionTest" for solo,
+    -- and "Multiplayer" for multiplayer. getServerOptions() exists in ALL modes
+    -- (even solo sandbox) so it cannot be used as a solo/multi discriminator.
+    local ok, gm = pcall(function()
+        return getGameMode and getGameMode() or "Survival"
     end)
-    NPC_NetworkDispatcher._isSolo = (ok and solo == true) or false
-    if Log then
-        Log.info("NPC_NetworkDispatcher", "Mode détecté",
-            { mode = NPC_NetworkDispatcher._isSolo and "SOLO" or "MULTI" })
-    end
+    local gameMode = (ok and gm) or "Survival"
+    NPC_NetworkDispatcher._isSolo = (gameMode ~= "Multiplayer")
+    print("[PHNPC] NPC_NetworkDispatcher: gameMode=" .. tostring(gameMode)
+        .. " isSolo=" .. tostring(NPC_NetworkDispatcher._isSolo))
 end
 
 Events.OnGameStart.Add(detectMode)
