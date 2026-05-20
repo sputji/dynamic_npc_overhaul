@@ -1,5 +1,5 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise à jour : 20 mai 2026 | Version 1.0.0 | Dernier commit : `en cours`
+> Mise à jour : 20 mai 2026 | Version 1.0.0 | Dernier commit : `6dea81d`
 
 ---
 
@@ -109,9 +109,7 @@ Objectif : le joueur peut interagir avec le PNJ via une vraie fenêtre de dialog
 - [x] `NPC_Brain.evaluateThreat` : scan zombie hostile proche (rayon 15 cases, cap 60) → stocke `npcData.fsmTarget`
 - [x] `doBrainAction` flee : priorité `fsmTarget` > zombie hostile proche > joueur (fallback)
 
-### 🔷 Étape 4 — Commerce et réseau
-
-### Étape 4 — Systèmes avancés
+### 🔷 Étape 4 — Systèmes avancés
 
 - [ ] `server/OllamaBridge.lua` : bridge HTTP → Ollama (`HTTPRequest` B42 async)
 - [ ] `client/UI/OllamaChatUI.lua` : fenêtre chat IA

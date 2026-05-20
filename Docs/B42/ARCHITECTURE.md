@@ -245,7 +245,7 @@ Classe OO via métatable. Un PNJ contient :
 - **Identité** : id, firstName, lastName, isFemale, professionId
 - **Besoins** : hunger, thirst, fatigue, morale, stress (0–100)
 - **Santé** : health, bitten, biteTime, trauma, ptsdState
-- **IA** : fsmState, fsmTarget, stuckTicks
+- **IA & FSM** : fsmState, fsmTarget `{x,y}`, lastFsmTick, stuckTicks, followMode
 - **Économie** : observedSkills, inventory, gold
 - Méthodes : `isAlive()`, `setNeed()`, `serialize()`, `deserialize()`
 
