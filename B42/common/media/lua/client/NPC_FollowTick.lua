@@ -296,12 +296,20 @@ end
 -- Boucle principale
 -- ============================================================
 
+-- Désactive le tiered zombie updates (même logique que Bandits BanditZombie.flush())
+-- Appelé ici + dans 00_Init.lua:EveryOneMinute pour garantir le hook OnZombieUpdate
+local function _disableTiered()
+    pcall(function() getCore():setOptionTieredZombieUpdates(false) end)
+end
+
+Events.EveryOneMinute.Add(_disableTiered)
+
 local function onZombieUpdate(zombie)
     if not zombie then return end
 
-    -- DEBUG : confirme que l'event fire (imprime au 1er appel puis toutes les 500 calls)
+    -- DEBUG : confirme que l'event fire (imprime au 1er appel puis toutes les 200 calls)
     PHNPC_FollowTick._dbgCount = (PHNPC_FollowTick._dbgCount or 0) + 1
-    if PHNPC_FollowTick._dbgCount == 1 or PHNPC_FollowTick._dbgCount % 500 == 0 then
+    if PHNPC_FollowTick._dbgCount == 1 or PHNPC_FollowTick._dbgCount % 200 == 0 then
         print("[PHNPC DEBUG] onZombieUpdate appels=" .. PHNPC_FollowTick._dbgCount
             .. "  pendingNPCs=" .. tostring(PHNPC._pendingNPCs and #PHNPC._pendingNPCs or 0))
     end

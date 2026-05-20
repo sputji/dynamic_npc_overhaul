@@ -24,13 +24,30 @@ PHNPC._pendingNPCs = PHNPC._pendingNPCs or {}
 -- Démarrage
 -- ============================================================
 
+local function disableTieredUpdates()
+    -- CRITIQUE (cf. Bandits BanditZombie.lua) :
+    -- En B42, "tiered zombie updates" empêche Events.OnZombieUpdate de firer
+    -- pour les zombies hors de la zone d'attention du joueur.
+    -- On le désactive pour garantir que nos NPCs reçoivent le hook chaque tick.
+    local ok, err = pcall(function()
+        getCore():setOptionTieredZombieUpdates(false)
+    end)
+    if not ok then
+        print("[PHNPC][WARN] setOptionTieredZombieUpdates échoué : " .. tostring(err))
+    end
+end
+
 Events.OnGameStart.Add(function()
+    disableTieredUpdates()
     local Log = PHNPC.getModule("NPC_Logger")
     if Log then
         Log.info("Client/Init", "Corps client B42 prêt",
             { version = PHNPC.VERSION, env = PHNPC.env() })
     end
 end)
+
+-- Maintenir la désactivation toutes les minutes (le jeu peut la réactiver)
+Events.EveryOneMinute.Add(disableTieredUpdates)
 
 -- ============================================================
 -- Handler commande serveur → client : PHNPC_SpawnConfirm
