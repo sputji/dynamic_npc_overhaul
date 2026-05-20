@@ -205,17 +205,10 @@ local function convertToNPC(zombie, isFemale)
     pcall(function() zombie:setFemaleEtc(isFemale) end)
     applyHumanVisuals(zombie, isFemale)
 
-    -- 10b. Santé initiale raisonnable (appliquée une seule fois, pas en enforceNPC)
-    pcall(function() zombie:setMaxHealth(500) end)
-    pcall(function() zombie:setHealth(500) end)
-
     -- 11. Empêcher le moteur de re-vêtir l'entité automatiquement
     pcall(function() zombie:setDressInRandomOutfit(false) end)
 
-    -- 12. Empêcher le moteur de re-vêtir l'entité automatiquement
-    pcall(function() zombie:setDressInRandomOutfit(false) end)
-
-    -- 13. Animation initiale pour sortir de Zombie_Idle (PHNPC_IsNPC déjà positionné → Bob_Idle actif)
+    -- 12. Forcer une transition d'état pour déclencher la réévaluation des AnimSets
     pcall(function() zombie:setBumpType("Shrug") end)
 
     if Log then
@@ -418,9 +411,10 @@ local function onZombieUpdate(zombie)
     -- CONVERSION (une seule fois — table locale, pas ModData)
     -- ================================================================
     if not _convertedNPCs[zombie] then
+        -- Marquer AVANT pour éviter une boucle infinie si convertToNPC lève une erreur
+        _convertedNPCs[zombie] = true
         convertToNPC(zombie, isFemale)
         attachDataModel(zombie)
-        _convertedNPCs[zombie] = true
     end
 
     -- Enforce chaque tick

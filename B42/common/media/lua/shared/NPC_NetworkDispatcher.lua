@@ -30,7 +30,8 @@ local function detectMode()
         if type(isCoopHost) == "function" and isCoopHost() then return false end
         if type(getServerOptions) == "function" then
             local opts = getServerOptions()
-            if opts and opts:getOptionCount() > 0 then return false end
+            -- getOptionCount() peut ne pas exister selon le contexte B42
+            if opts and type(opts.getOptionCount) == "function" and opts:getOptionCount() > 0 then return false end
         end
         return true
     end)
