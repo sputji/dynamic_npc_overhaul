@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animNode>
+	<m_Name>ZSGCStepBack</m_Name>
+	<m_AnimName>Bob_WalkBwdAim1Hand</m_AnimName>
+	<m_SpeedScale>0.80</m_SpeedScale>
+	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
+	<m_Looped>true</m_Looped>
+	<m_BlendTime>0.30</m_BlendTime>
+	<m_SyncTrackingEnabled>false</m_SyncTrackingEnabled>
+	<m_Conditions>
+		<m_Name>BumpType</m_Name>
+		<m_Type>STRING</m_Type>
+		<m_StringValue>GCStepBack</m_StringValue>
+	</m_Conditions>
+	<m_SubStateBoneWeights>
+		<boneName>Dummy01</boneName>
+		<weight>1.0</weight>
+	</m_SubStateBoneWeights>
+</animNode>

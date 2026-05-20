@@ -51,6 +51,10 @@ local function npcStartMoving(npc, x, y, z)
     local data = PHNPC.npcs[npc]
     pcall(function()
         npc:setUseless(false)
+        npc:setVariable("PHNPC_IsNPC", true)
+        npc:setVariable("zombieWalkType", "Walk")
+        npc:setWalkType("Walk")
+        npc:setSpeedMod(1.0)
         if data and not data.moving then
             data.moving = true
             npc:setBumpType("IdleToWalk")
@@ -132,6 +136,7 @@ local function createNPC(square)
         npc:setVariable("LimpSpeed", 0.80)
         npc:setVariable("WalkSpeed", 1.04)
         npc:setVariable("RunSpeed", 0.75)
+        npc:setSpeedMod(1.0)
 
         -- Silence bruits zombie
         npc:getEmitter():stopAll()
@@ -304,7 +309,9 @@ local function enforceNPC(zombie)
     -- Variables AnimSet toujours actives (AnimSets re-evalues chaque frame)
     pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
     pcall(function() zombie:setVariable("NoLungeTarget", true) end)
+    pcall(function() zombie:setVariable("zombieWalkType", "Walk") end)
     pcall(function() zombie:setWalkType("Walk") end)
+    pcall(function() zombie:setSpeedMod(1.0) end)
     pcall(function() zombie:setAnimatingBackwards(false) end)
 
     -- Lire l'etat action courant
