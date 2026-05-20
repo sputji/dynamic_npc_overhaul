@@ -54,9 +54,10 @@
 | Fichier | État |
 |---------|------|
 | `client/00_Init.lua` | ✅ Opérationnel — handler `PHNPC_SpawnConfirm`, `disableTieredUpdates` |
-| `client/NPC_FollowTick.lua` | ✅ Fonctionnel — conversion zombie→NPC, visuals, suivi, animations, FSM state save, `Events.OnGameStart` reset |
+| `client/NPC_FollowTick.lua` | ✅ Fonctionnel — conversion zombie→NPC, visuals, suivi joueur, **errance autonome (doWander)**, animations, FSM state save, `Events.OnGameStart` reset |
 | `client/NPC_SpawnDebug.lua` | ✅ Fonctionnel — menu clic-droit spawn (visible avec `-debug` flag) |
-| `client/NPC_InteractionClient.lua` | 🔶 Stub — détecte le NPC (contour bleu), log interaction, **dialogue non implémenté** |
+| `client/NPC_InteractionClient.lua` | ✅ Fonctionnel — détecte NPC, ouvre `NPC_DialogueWindow` |
+| `client/UI/NPC_DialogueWindow.lua` | ✅ Fonctionnel — ISPanel : nom, profession, santé, dialogue NPC_Dialogue, cycle contextes |
 
 ---
 

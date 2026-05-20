@@ -29,6 +29,15 @@ local FOLLOW_MIN_DIST = 2.5
 local FOLLOW_RUN_DIST = 12.0
 -- Décalage de la cible par rapport au joueur (le PNJ vise légèrement derrière).
 local FOLLOW_OFFSET   = 2.0
+-- Distance au-delà de laquelle le PNJ erre de façon autonome (plus de suivi).
+local FOLLOW_DIST_MAX = 20.0
+-- Portée max du rôdage : cases max de déplacement par direction.
+local WANDER_RANGE    = 8
+-- Ticks minimum avant de choisir une nouvelle direction (~6 s à 30 fps).
+local WANDER_HOLD     = 180
+-- Table des cibles de rôdage { [zombie] = {x, y, z, setAt} }
+local _wanderTargets  = {}
+local _wanderTick     = 0  -- compteur incrémenté dans OnTick
 
 -- ============================================================
 -- Visuals humains (exécuté une seule fois par entité)
@@ -338,6 +347,41 @@ local function doFollow(zombie, player)
 end
 
 -- ============================================================
+-- Rôdage autonome (joueur loin ou hors de portée)
+-- Le NPC choisit un point aléatoire à WANDER_RANGE cases et s'y dirige.
+-- Une nouvelle cible est choisie à l'arrivée ou après WANDER_HOLD ticks.
+-- ============================================================
+local function doWander(zombie)
+    if not instanceof(zombie, "IsoZombie") then return end
+
+    local wt = _wanderTargets[zombie]
+    local zx, zy = zombie:getX(), zombie:getY()
+
+    -- Arrivé à destination ?
+    local arrived = false
+    if wt then
+        local ddx, ddy = zx - wt.x, zy - wt.y
+        arrived = (ddx * ddx + ddy * ddy) <= 4.0   -- ≤ 2 cases
+    end
+
+    local expired = wt and ((_wanderTick - wt.setAt) >= WANDER_HOLD)
+    if (not wt) or arrived or expired then
+        -- Décalage aléatoire dans [-WANDER_RANGE, +WANDER_RANGE]
+        local ox = ZombRand(WANDER_RANGE * 2 + 1) - WANDER_RANGE
+        local oy = ZombRand(WANDER_RANGE * 2 + 1) - WANDER_RANGE
+        -- Déplacement minimal pour éviter de tourner sur place
+        if ox == 0 then ox = 1 end
+        if oy == 0 then oy = 1 end
+        local tx = zx + ox
+        local ty = zy + oy
+        _wanderTargets[zombie] = { x = tx, y = ty, z = zombie:getZ(), setAt = _wanderTick }
+        zombie:setVariable("zombieWalkType", "Walk")
+        pcall(function() zombie:setWalkType("Walk") end)
+        pcall(function() zombie:WalkTo(tx, ty, zombie:getZ()) end)
+    end
+end
+
+-- ============================================================
 -- Boucle principale
 -- ============================================================
 
@@ -354,8 +398,10 @@ Events.EveryOneMinute.Add(_disableTiered)
 -- (gère aussi le cas "charger une sauvegarde sans quitter" en solo)
 -- ============================================================
 Events.OnGameStart.Add(function()
-    -- Vider la table de conversion (les objets Java sont différents après reload)
+    -- Vider toutes les tables locales (objets Java différents après reload)
     _convertedNPCs = {}
+    _wanderTargets  = {}
+    _wanderTick     = 0
     -- Vider le registre actif (sera reconstruit par OnZombieUpdate)
     if PHNPC._activeNPCs then
         for k in pairs(PHNPC._activeNPCs) do PHNPC._activeNPCs[k] = nil end
@@ -474,10 +520,21 @@ local function onZombieUpdate(zombie)
     -- Enforce chaque tick
     enforceNPC(zombie)
 
-    -- FSM minimal : toujours suivre le joueur
+    -- Dispatch comportemental :
+    --   dist ≤ FOLLOW_DIST_MAX → suivre le joueur (comportement actuel)
+    --   dist > FOLLOW_DIST_MAX → errance autonome (NPC vit sa vie)
     local player = getPlayer()
     if player then
-        doFollow(zombie, player)
+        local nx, ny = zombie:getX(), zombie:getY()
+        local px, py = player:getX(), player:getY()
+        local dx, dy = nx - px, ny - py
+        local dist   = math.sqrt(dx * dx + dy * dy)
+        if dist > FOLLOW_DIST_MAX then
+            doWander(zombie)
+        else
+            _wanderTargets[zombie] = nil  -- effacer la cible: le NPC reprend le suivi
+            doFollow(zombie, player)
+        end
     end
 end
 
@@ -486,11 +543,12 @@ end
 -- ============================================================
 
 Events.OnTick.Add(function()
+    _wanderTick = _wanderTick + 1   -- incrémenté chaque tick pour horodatage des cibles de rôdage
     PHNPC_FollowTick._cleanTick = (PHNPC_FollowTick._cleanTick or 0) + 1
     if PHNPC_FollowTick._cleanTick < 300 then return end
     PHNPC_FollowTick._cleanTick = 0
 
-    -- Nettoyer les entrées mortes/déchargées des deux tables
+    -- Nettoyer les entrées mortes/déchargées des trois tables
     local toRemove = {}
     for isoObj, _ in pairs(PHNPC._activeNPCs) do
         local ok, dead = pcall(function() return isoObj:isDead() end)
@@ -499,6 +557,7 @@ Events.OnTick.Add(function()
     for _, isoObj in ipairs(toRemove) do
         PHNPC._activeNPCs[isoObj]  = nil
         _convertedNPCs[isoObj]     = nil
+        _wanderTargets[isoObj]     = nil
     end
 end)
 

@@ -533,15 +533,17 @@ RELOAD ──► Zombie rechargé depuis disque
 
 ### Phase 2 — Spawn & Corps ✅ (TERMINÉ)
 - [x] `server/00_Init.lua` — point d'entrée serveur, handler PHNPC_SpawnRequest
-- [x] `server/NPC_SpawnManager.lua` — spawn via `addZombiesInOutfit` B42 ✅
+- [x] `server/NPC_SpawnManager.lua` — spawn via `addZombiesInOutfit` B42 + `EveryOneMinute` re-scan ✅
 - [x] `client/00_Init.lua` — point d'entrée client, handler PHNPC_SpawnConfirm
-- [x] `client/NPC_FollowTick.lua` — conversion zombie→NPC, visuals humains, animations ✅
+- [x] `client/NPC_FollowTick.lua` — conversion zombie→NPC, visuals humains, suivi joueur, errance autonome (`doWander`) ✅
 - [x] `client/NPC_SpawnDebug.lua` — menu debug spawn (visible avec `-debug` flag)
 - [ ] `42/media/AnimSets/zombie/` — AnimSets XML (Bob_Idle, Bob_Walk, Bob_Run), [Ne fonctionne toujours pas, à tester après correction du spawn ]
 
-### Phase 3 — Interactions client 🔶 (en cours)
-- [x] `client/NPC_InteractionClient.lua` — détecte le NPC, option "Parler" visible
-- [ ] `client/NPC_InteractionClient.lua` — implémenter la fenêtre de dialogue
+### Phase 3 — Interactions client ✅ (TERMINÉ)
+- [x] `client/NPC_InteractionClient.lua` — détecte le NPC, option « Parler » visible
+- [x] `client/UI/NPC_DialogueWindow.lua` — ISPanel : nom, profession, santé, ligne NPC_Dialogue, cycle Parler/Commerce/Au revoir
+- [x] `client/NPC_InteractionClient.lua` — branche sur NPC_DialogueWindow.open()
+- [ ] `client/UI/SpeechBubbles.lua` — bulles de dialogue au-dessus du NPC
 - [ ] `server/NPC_NetworkServer.lua` — handlers commandes clients→serveur
 
 ### Phase 4 — Fonctionnalités avancées

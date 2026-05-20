@@ -92,13 +92,12 @@ D:\PZ Mods\Dynamic_NPC_Overhaul\
                 │
                 └── client\          ✅ CORPS CLIENT — Fonctionnel
                     ├── 00_Init.lua              # Point d'entrée client, handler PHNPC_SpawnConfirm
-                    ├── NPC_FollowTick.lua        # Conversion, enforce (guard spam), doFollow (slide fix), FSM save
-                    ├── NPC_InteractionClient.lua # Menu clic-droit (détecte NPC, dialogue stub)
+                    ├── NPC_FollowTick.lua        # Conversion, enforce, doFollow, doWander (autonome), FSM save
+                    ├── NPC_InteractionClient.lua # Menu clic-droit + ouverture NPC_DialogueWindow
                     ├── NPC_SpawnDebug.lua        # Commandes debug spawn (mode -debug)
-                    └── UI\                       # ⚠️ À créer
-                        ── (À créer) NPC_UI.lua, SpeechBubbles.lua
-                        ── (À créer) TradeWindow.lua, OllamaChatUI.lua
-                        ── (À créer) QuestJournalUI.lua
+                    └── UI\
+                        ├── NPC_DialogueWindow.lua   # ✅ ISPanel dialogue (Phase 3)
+                        ── (À créer) TradeWindow.lua, SpeechBubbles.lua, OllamaChatUI.lua
 ```
 
 ---

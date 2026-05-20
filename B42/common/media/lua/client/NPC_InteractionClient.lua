@@ -76,29 +76,28 @@ end
 -- ============================================================
 
 function PHNPC_InteractionClient.onTalkClicked(zombie, player)
-    local Log = PHNPC.getModule("NPC_Logger")
-    if not Log then return end
+    local Log    = PHNPC.getModule("NPC_Logger")
+    local npcData = PHNPC._activeNPCs and PHNPC._activeNPCs[zombie]
+    local name    = (npcData and npcData.fullName) or "PNJ Inconnu"
 
-    -- Récupérer les données depuis le registre actif (DataModel en mémoire)
-    local npcData = PHNPC._activeNPCs[zombie]
+    if Log then
+        Log.info("InteractionClient", "Dialogue ouvert", {
+            npc = name,
+            pX  = math.floor(player:getX()),
+            pY  = math.floor(player:getY()),
+        })
+    end
 
-    local name       = (npcData and npcData.fullName)     or "PNJ Inconnu"
-    local profession = (npcData and npcData.professionId) or "inconnu"
-    local health     = (npcData and npcData.health)       or 100
-
-    Log.info("InteractionClient", "Interaction Parler déclenchée", {
-        npc        = name,
-        profession = profession,
-        health     = health,
-        pX         = math.floor(player:getX()),
-        pY         = math.floor(player:getY()),
-    })
-
-    -- Feedback console (sera remplacé par une bulle de dialogue / UI)
-    print(string.format(
-        '[PHNPC] %s vous regarde... "..." (dialogue non implémenté — Phase 3)',
-        name
-    ))
+    -- Ouvrir la fenêtre de dialogue (Phase 3)
+    local DialogueWindow = PHNPC.getModule("NPC_DialogueWindow")
+    if DialogueWindow then
+        DialogueWindow.open(npcData or { fullName = name }, zombie)
+    else
+        -- Fallback texte si la fenêtre n'est pas chargée
+        local Dlg  = PHNPC.getModule("NPC_Dialogue")
+        local line = Dlg and Dlg.get("greeting", { name = name }) or "..."
+        print(string.format('[PHNPC] %s : "%s"', name, line))
+    end
 end
 
 -- ============================================================
