@@ -151,7 +151,10 @@ local SYNC_EVERY  = 6   -- 10Hz at 60fps, ~3Hz at 20fps server
 Events.OnTick.Add(function()
     _serverTick = _serverTick + 1
     if _serverTick % SYNC_EVERY ~= 0 then return end
-    if not next(_serverNPCs) then return end
+    -- next() is nil in Kahlua; use pairs early-exit instead
+    local _hasNPCs = false
+    for _ in pairs(_serverNPCs) do _hasNPCs = true; break end
+    if not _hasNPCs then return end
 
     local players = getRealPlayers()
 

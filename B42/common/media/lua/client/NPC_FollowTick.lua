@@ -188,7 +188,8 @@ local function spawnNPC(square, playerIndex)
     local count = 0
     for _ in pairs(PHNPC.npcs) do count = count + 1 end
     local cfg     = PHNPC.getModule("NPC_Config")
-    local maxNPCs = (cfg and cfg.get("maxNPCs")) or 5
+    local cfgData = cfg and cfg.get()
+    local maxNPCs = (cfgData and cfgData.MaxActiveNPCs) or 5
     if count >= maxNPCs then
         print("[PHNPC] NPC limit reached (" .. maxNPCs .. ")")
         return
