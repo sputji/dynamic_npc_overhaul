@@ -132,19 +132,33 @@ PZ charge les XML **par ordre alphabétique** dans chaque sous-dossier ; les fic
    zombie:setVariable("zombieWalkType", "Walk")  -- ou "Run" selon la vitesse
    ```
 
-3. **`getActionContext():clear()`** doit être appelé dans `convertToNPC` pour forcer le re-scan des conditions XML.
+3. **`getActionContext():clear()`** — ⛔ **NE PAS APPELER depuis Kahlua**.  
+   `getActionContext()` retourne un objet Java (`zombie.characters.action.ActionContext`). Kahlua ne peut pas appeler `.clear()` dessus → erreur `attempted index: clear of non-table` loggée à chaque tick.  
+   **Solution Bandits** : `setBumpType("Shrug")` dans `convertToNPC` force la réévaluation AnimEngine sans toucher ActionContext.
 
-### Pattern de déclenchement Lua
+4. **`setUseless(true)` = désactivation totale de l'IA zombie (pattern Bandits)**  
+   Appeler `zombie:setUseless(true)` à chaque tick empêche le moteur PZ de déclencher ses propres actions (lunge, pathfind vers joueur, etc.). Les appels manuels à `pathToLocationF`, `doSprinter`, etc. continuent de fonctionner indépendamment.
+
+5. **`NoLungeTarget`** est le flag Bandits pour bloquer les attaques (pas `NoLungeAttack`).  
+   `NoLungeAttack` empêche le zombie de lancer une attaque en lunge ; `NoLungeTarget` empêche le zombie d'être la cible d'un lunge d'un autre zombie.
+
+### Pattern de déclenchement Lua (validé B42.18)
 
 ```lua
 -- convertToNPC : écriture garantie hors pcall
 zombie:setVariable("PHNPC_IsNPC",    "true")  -- STRING fallback (sûreté)
 zombie:setVariable("PHNPC_IsNPC",    true)     -- BOOL (condition XML)
 
--- doFollow : mise à jour chaque tick de déplacement
-local speed = (dist > FOLLOW_RUN_DIST) and "Run" or "Walk"
-zombie:setVariable("zombieWalkType", speed)   -- CRITIQUE : condition 2 de PHNPC_Walk.xml
-pcall(function() zombie:setWalkType(speed) end)
+-- enforceNPC : chaque tick — pattern Bandits B42.18
+safeCall(zombie, "setUseless", true)           -- Désactive l'IA moteur ; pathToLocationF fonctionne toujours
+safeCall(zombie, "setTarget",  nil)
+zombie:setVariable("NoLungeTarget", true)      -- Bandits utilise NoLungeTarget (pas NoLungeAttack)
+-- Lunge/turnalerted : clearAggroList + setTarget(nil) — PAS getActionContext().clear()
+local asn = zombie:getActionStateName()
+if asn == "lunge" or asn == "turnalerted" then
+    safeCall(zombie, "clearAggroList")
+    safeCall(zombie, "setTarget", nil)
+end
 ```
 
 ---

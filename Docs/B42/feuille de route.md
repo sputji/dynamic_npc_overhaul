@@ -1,5 +1,5 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise à jour : 20 mai 2026 | Version **1.0.1** | Dernier commit : `6b191c1`
+> Mise à jour : 21 mai 2026 | Version **1.0.2** | Dernier commit : à venir
 
 ---
 
@@ -109,10 +109,13 @@ Objectif : le joueur peut interagir avec le PNJ via une vraie fenêtre de dialog
 - [x] `NPC_Brain.evaluateThreat` : scan zombie hostile proche (rayon 15 cases, cap 60) → stocke `npcData.fsmTarget`
 - [x] `doBrainAction` flee : priorité `fsmTarget` > zombie hostile proche > joueur (fallback)
 - [x] **Bug fix** : `safeCall(obj, method, ...)` — helper B42 qui vérifie l'existence de la méthode avant d'appeler
-- [x] **Bug fix** : `ZombieIdleState` absent en B42 → remplacé par `getActionContext():clear()`
-- [x] **Bug fix** : `setWalkType()` supprimé partout (variable read-only) → `setVariable("zombieWalkType", ...)` uniquement
-- [x] **Bug fix** : guard nil sur `getEmitter()` avant `stopSoundByName`
+- [x] **Bug fix** : `setWalkType()` supprimé partout (variable read-only) → `doSprinter`/`doFastShambler`/`doFakeShambler` (API B42.18)
+- [x] **Bug fix** : `pathToLocationF` avec fallback `WalkTo` (stable B42.18)
+- [x] **Bug fix** : guard nil sur `getEmitter()` avant `stopAll`
 - [x] **Bug fix** : boutons UI ISButton : `backgroundColor` + `borderColor` ajoutés (fond transparent B42)
+- [x] **Bug fix Bandits pattern** : `getActionContext():clear()` supprimé partout → **erreur Kahlua** (`ActionContext` est un objet Java non-table). Remplacé par `setBumpType("Shrug")` dans `convertToNPC`.
+- [x] **Pattern Bandits B42.18** : `setUseless(true)` chaque tick dans `enforceNPC` → neutralise l'IA zombie sans bloquer `pathToLocationF`/`doSprinter`
+- [x] **Pattern Bandits** : `NoLungeTarget = true` (pas `NoLungeAttack`) + lunge state → `clearAggroList + setTarget(nil)` sans ActionContext
 
 ### 🔷 Étape 4 — Systèmes avancés
 

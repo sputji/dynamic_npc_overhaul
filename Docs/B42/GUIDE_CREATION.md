@@ -234,20 +234,21 @@ local function convertToNPC(zombie, isFemale)
     zombie:setVariable("PHNPC_IsNPC", true)     -- BOOL (condition XML PHNPC_Idle.xml)
     zombie:setVariable("PHNPC_IsFemale", isFemale)
 
-    -- Vider le contexte d'action → force AnimEngine à re-lire les XML
-    pcall(function()
-        if zombie:getActionContext() then zombie:getActionContext():clear() end
-    end)
+    -- ⛔ getActionContext():clear() INTERDIT — objet Java non exposé à Kahlua → erreur "non-table"
+    -- Pattern Bandits : setBumpType("Shrug") force la réévaluation AnimEngine proprement
 
-    -- Désactiver mécaniques zombie
-    pcall(function() zombie:setNoTeeth(true) end)
-    pcall(function() zombie:setTarget(nil) end)
-    pcall(function() zombie:clearAggroList() end)
-    pcall(function() zombie:setTimeSinceSeenFlesh(1000000) end)
+    -- Désactiver mécaniques zombie (safeCall = no-op si méthode absente)
+    safeCall(zombie, "setNoTeeth",           true)
+    safeCall(zombie, "setTarget",            nil)
+    safeCall(zombie, "clearAggroList")
+    safeCall(zombie, "setTimeSinceSeenFlesh", 1000000)
 
-    -- Type de marche humaine
-    pcall(function() zombie:setWalkType("Walk") end)
+    -- Type de marche humaine (setWalkType = read-only en B42 → variable uniquement)
     pcall(function() zombie:setVariable("GCWalkType", "Walk") end)
+    -- Vitesses B42.18 via : doSprinter() / doFastShambler() / doFakeShambler()
+
+    -- Valeurs Bandits pour débloquer l'entité après spawn
+    pcall(function() zombie:setTurnAlertedValues(-5, 5) end)
 
     -- Visuels humains
     applyHumanVisuals(zombie, isFemale)
@@ -258,14 +259,29 @@ end
 > **⚠️ `setMaxHealth`/`setHealth` n'existent PAS sur `IsoZombie` en B42.**  
 > Les appeler dans un pcall produit `Object tried to call nil in pcall` qui **remonte** et crashe la fonction.
 
-**`enforceNPC` — ré-appliqué à chaque tick :**
+**`enforceNPC` — ré-appliqué à chaque tick (pattern Bandits B42.18) :**
 ```lua
 local function enforceNPC(zombie)
-    zombie:setVariable("PHNPC_IsNPC", true)  -- hors pcall, garanti chaque tick
-    pcall(function() zombie:setNoTeeth(true) end)
-    pcall(function() zombie:setTarget(nil) end)
-    pcall(function() zombie:clearAggroList() end)
-    pcall(function() zombie:setTimeSinceSeenFlesh(1000000) end)
+    zombie:setVariable("PHNPC_IsNPC",       true)
+    zombie:setVariable("Bandit",            true)        -- désactive IA zombie native
+    zombie:setVariable("NoLungeTarget",     true)        -- Bandits utilise NoLungeTarget
+    zombie:setVariable("ZombieHitReaction", "Chainsaw")  -- évite crash testDefense
+
+    -- KEY : setUseless(true) neutralise l'IA chaque tick
+    -- pathToLocationF / doSprinter fonctionnent indépendamment (confirmé Bandits)
+    safeCall(zombie, "setUseless", true)
+    safeCall(zombie, "setTarget",  nil)
+    safeCall(zombie, "setUpright", true)
+    safeCall(zombie, "setCanWalk", true)
+
+    -- Lunge/turnalerted : pattern Bandits — PAS getActionContext().clear()
+    pcall(function()
+        local asn = zombie:getActionStateName()
+        if asn == "lunge" or asn == "turnalerted" then
+            safeCall(zombie, "clearAggroList")
+            safeCall(zombie, "setTarget", nil)
+        end
+    end)
 end
 ```
 
@@ -278,10 +294,18 @@ local function doFollow(zombie, player)
         pcall(function() zombie:faceThisObject(player) end)
         return
     end
-    local speed = (dist > FOLLOW_RUN_DIST) and "Run" or "Walk"
-    zombie:setVariable("zombieWalkType", speed)  -- ⚠️ CRITIQUE : condition 2 PHNPC_Walk.xml
-    pcall(function() zombie:setWalkType(speed) end)
-    pcall(function() zombie:WalkTo(targetX, targetY, targetZ) end)
+    -- Vitesse : API officielle B42.18 (setWalkType = read-only, supprimé)
+    if dist > FOLLOW_RUN_DIST then
+        if zombie.doSprinter     then zombie:doSprinter()     end
+    else
+        if zombie.doFastShambler then zombie:doFastShambler() end
+    end
+    -- Pathfinding : pathToLocationF (B42 stable) avec fallback WalkTo
+    if zombie.pathToLocationF then
+        zombie:pathToLocationF(targetX, targetY, targetZ)
+    elseif zombie.WalkTo then
+        zombie:WalkTo(targetX, targetY, targetZ)
+    end
 end
 ```
 
@@ -553,9 +577,10 @@ RELOAD ──► Zombie rechargé depuis disque
 - [x] FSM → physique : `wander`/`work` → `doWander`, `flee` → course opposée menace réelle, `guard`/`trade`/`defend` → sur place
 - [x] `doBrainAction` flee : priorité `fsmTarget` > zombie hostile proche > joueur (fallback)
 - [x] `NPC_Brain.unregister(id)` appelé au nettoyage des entités mortes
-- [x] **Bug fix** : `safeCall` helper + `ZombieIdleState` → `getActionContext():clear()` + guard emitter
-- [x] **Bug fix** : `setWalkType()` supprimé partout (read-only B42)
-- [x] **Bug fix** : boutons UI ISButton — `backgroundColor` + `borderColor` pour visibilité
+- [x] **Bug fix** : `safeCall` helper + guard emitter nil
+- [x] **Bug fix** : `setWalkType()` supprimé → `doSprinter`/`doFastShambler`/`doFakeShambler` (API B42.18)
+- [x] **Bug fix Bandits** : `getActionContext():clear()` supprimé → erreur Kahlua (objet Java non-table)
+- [x] **Pattern Bandits B42.18** : `setUseless(true)` chaque tick + `NoLungeTarget` + lunge state handler
 
 ### Phase 4 — Fonctionnalités avancées
 - [ ] `server/NPC_BiteManagement.lua` — morsure → zombie
@@ -606,9 +631,11 @@ Dans `sandbox-options.txt`, `DebugMode = true` active les logs `TRACE/DEBUG`.
 | Option Sandbox absente | `type = enum` dans sandbox-options.txt | Utiliser `type = integer` |
 | **`getCell()` nil sur serveur dédié** | Sans joueur local, `getCell()` peut renvoyer `nil` | Toujours `local cell = getCell(); if not cell then return end` avant `getZombieList()` |
 | **NPC fuit le joueur au lieu des zombies** | `flee` utilisait le joueur comme source | Utiliser `npcData.fsmTarget` (stocké par `evaluateThreat`) — voir `doBrainAction` |
-| **`Object tried to call nil in pcall`** | Méthode absente en B42 (`ZombieIdleState`, `setTimeSinceSeenFlesh`, `stopSoundByName`) | Helper `safeCall(obj, method, ...)` : vérifie `obj[method]` avant d'appeler ; remplacer `ZombieIdleState.instance()` par `getActionContext():clear()` ; guard nil sur `getEmitter()` |
-| **WARN `read-only variable "zombiewalktype"`** | `zombie:setWalkType()` (méthode Java) pose la variable en read-only | Supprimer tous les appels `setWalkType()` ; utiliser uniquement `zombie:setVariable("zombieWalkType", "Walk" \| "Run" \| "")` |
-| **Boutons UI transparents / illisibles** | B42 ne donne pas de fond automatique aux ISButton | Après `btn:initialise()` : `btn.backgroundColor = {r=0.05,g=0.05,b=0.08,a=0.92}` et `btn.borderColor = {r=0.65,g=0.50,b=0.25,a=0.80}` |
+| **`Object tried to call nil in pcall`** | Méthode absente en B42 (`ZombieIdleState`, `setTimeSinceSeenFlesh`, `stopSoundByName`) | Helper `safeCall(obj, method, ...)` ; guard nil sur `getEmitter()` |
+| **WARN `read-only variable "zombiewalktype"`** | `zombie:setWalkType()` pose la variable en read-only | Supprimer `setWalkType()` ; utiliser `doSprinter()` / `doFastShambler()` / `doFakeShambler()` (API B42.18) |
+| **`attempted index: clear of non-table: ActionContext@...`** | `getActionContext()` retourne un objet Java non-table — `.clear` inaccessible depuis Kahlua | ⛔ Ne jamais appeler `getActionContext():clear()`. Pattern Bandits : `setBumpType("Shrug")` dans `convertToNPC` |
+| **NPC continue de lunger/attaquer** | L'IA zombie native se réactive entre les ticks | `setUseless(true)` dans `enforceNPC` chaque tick (pattern Bandits B42.18) + `clearAggroList + setTarget(nil)` si `asn == "lunge"` |
+| **Boutons UI transparents / illisibles** | B42 ne donne pas de fond automatique aux ISButton | `btn.backgroundColor = {r=0.05,g=0.05,b=0.08,a=0.92}` et `btn.borderColor = {r=0.65,g=0.50,b=0.25,a=0.80}` |
 | Commentaires `--` ignorés/plantent | Parseur PZ sandbox ne lit pas Lua | Supprimer tous les `--` du sandbox |
 | Mod non chargé | `pzversion` au lieu de `targetVersion` | Corriger mod.info |
 | **Mod rouge — dépendance manquante** | `require=` avec valeur vide dans mod.info | Supprimer la ligne `require=` si aucune dépendance |

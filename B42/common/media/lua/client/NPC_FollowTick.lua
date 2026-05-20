@@ -175,10 +175,8 @@ local function convertToNPC(zombie, isFemale)
     safeCall(zombie, "setEatBodyTarget",     nil, false)
     safeCall(zombie, "setTimeSinceSeenFlesh", 1000000)
 
-    -- 1c. Vider le contexte d'action courant → force l'AnimEngine à relire les XML
-    pcall(function()
-        if zombie:getActionContext() then zombie:getActionContext():clear() end
-    end)
+    -- 1c. (Bandits pattern) setBumpType force la réévaluation AnimEngine sans toucher ActionContext
+    --     ActionContext.clear() n'est PAS exposé à Kahlua → erreur "non-table" à chaque appel.
 
     -- 2. Variables de vitesse
     pcall(function() zombie:setVariable("LimpSpeed", 0.80) end)
@@ -294,27 +292,33 @@ local function enforceNPC(zombie)
     -- Flags identité / anti-IA-zombie (setVariable = méthode la plus sûre et stable)
     pcall(function() zombie:setVariable("PHNPC_IsNPC",        true)       end)
     pcall(function() zombie:setVariable("Bandit",             true)       end)
-    pcall(function() zombie:setVariable("NoLungeAttack",      true)       end)
+    pcall(function() zombie:setVariable("NoLungeTarget",      true)       end)  -- Bandits : NoLungeTarget (pas NoLungeAttack)
     pcall(function() zombie:setVariable("ZombieHitReaction",  "Chainsaw") end)
+
+    -- KEY (pattern Bandits B42.18) : setUseless(true) neutralise l'IA zombie chaque tick.
+    -- Le moteur ne déclenche plus d'action propre ; nos appels pathToLocationF / doSprinter etc.
+    -- fonctionnent indépendamment de cet état et continuent de s'exécuter normalement.
+    safeCall(zombie, "setUseless", true)
 
     -- Désactiver cible + posture humaine (nouvelles méthodes officielles B42.18)
     safeCall(zombie, "setTarget",  nil)
     safeCall(zombie, "setUpright", true)
     safeCall(zombie, "setCanWalk", true)
 
+    -- Intercepter lunge/turnalerted : pattern Bandits (pas de getActionContext().clear())
+    pcall(function()
+        local asn = zombie:getActionStateName()
+        if asn == "lunge" or asn == "turnalerted" then
+            safeCall(zombie, "clearAggroList")
+            safeCall(zombie, "setTarget",    nil)
+            -- setUseless déjà appliqué ci-dessus → annule le lunge sans ActionContext
+        end
+    end)
+
     -- Silencer tous les sons zombie d'un coup (stopAll > appels par nom)
     pcall(function()
         local emitter = zombie:getEmitter()
         if emitter then safeCall(emitter, "stopAll") end
-    end)
-
-    -- Intercepter lunge/attack → vider le contexte d'action (ZombieIdleState absent B42)
-    pcall(function()
-        local asn = zombie:getActionStateName()
-        if asn and (asn == "lunge" or asn == "attack") then
-            if zombie:getActionContext() then zombie:getActionContext():clear() end
-            safeCall(zombie, "setTarget", nil)
-        end
     end)
 end
 
