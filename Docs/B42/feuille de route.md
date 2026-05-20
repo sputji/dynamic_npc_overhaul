@@ -1,4 +1,5 @@
 # Dynamic NPC Overhaul — Feuille de route B42
+
 > Mise a jour : 20 mai 2026 | Version **1.0.0** | Base NPC fonctionnelle from scratch
 
 ---
