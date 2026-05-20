@@ -12,7 +12,7 @@
 -- ============================================================
 PHNPC = PHNPC or {}
 
-PHNPC.VERSION       = "2.2.0"
+PHNPC.VERSION       = "2.3.0"
 PHNPC.BUILD         = "B42"
 PHNPC.MOD_ID        = "PH_DynamicNPCOverhaul"
 

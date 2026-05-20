@@ -1,5 +1,5 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise à jour : 20 mai 2026 | Version **2.1.0** | Dernier commit : refactor IsoPlayer v2.1
+> Mise à jour : 21 mai 2026 | Version **2.3.0** | Dernier commit : v2.3 server authority + spawn dedup
 
 ---
 
@@ -61,14 +61,15 @@
 | Fichier | État |
 |---------|------|
 | `server/00_Init.lua` | ✅ Minimal — log démarrage serveur |
-| `server/NPC_SpawnManager.lua` | ⛔ **DÉSACTIVÉ** — Utilisait `addZombiesInOutfit` (zombies). Remplacé par IsoPlayer côté client. |
+| `server/NPC_SpawnManager.lua` | ✅ **ACTIF v3.0** — Spawn autorité + tick 10Hz PHNPC_SyncTarget + PHNPC_SetFollowMode + PHNPC_RemoveNPC |
 
 ### ✅ Terminé — Corps Client (`client/`) — **v2.1.0 IsoPlayer**
 
 | Fichier | État |
 |---------|------|
 | `client/00_Init.lua` | ✅ Simplifié — `disableTieredZombieUpdates` uniquement |
-| `client/NPC_FollowTick.lua` | ✅ **REFONTE v2.1** — `IsoPlayer.new()` + `SurvivorFactory` — animations Bob/Kate natives — suivi `getPathFindBehavior2()` — menu clic-droit intégré — sans BOM — ASCII uniquement |
+| `client/NPC_FollowTick.lua` | ✅ **v2.3** — IsoPlayer.new() + server authority + spawn dedup + PHNPC_SyncTarget + PHNPC_SetFollowMode |
+| `client/NPC_Save.lua` | ✅ **v1.1** — Persistance ModData + getSaveDir() pcall-safe (solo + multi) |
 | `client/NPC_SpawnDebug.lua` | ⛔ **DÉSACTIVÉ** — Utilisait `sendClientCommand` → zombies. |
 | `client/NPC_InteractionClient.lua` | ⛔ **DÉSACTIVÉ** — Scannait `getZombieList()` (IsoZombie). Interaction désormais dans `NPC_FollowTick.lua`. |
 | `client/UI/NPC_DialogueWindow.lua` | ✅ **REFONTE** — ISPanel propre, API `open(npc, npcData)` alignée avec PHNPC.npcs |
@@ -116,7 +117,38 @@ Objectif : le joueur peut interagir avec le PNJ via une vraie fenêtre de dialog
 - [x] `NPC_SpawnManager.lua` et `NPC_SpawnDebug.lua` désactivés (stop spawn zombies)
 - [x] `NPC_FollowTick.lua` réécrit sans BOM, sans caractères Unicode dans le code
 
-### 🔷 Étape 4 — Systèmes avancés
+### ✅ Étape 4 — Persistance NPC *(TERMINÉ v2.2.0)*
+
+- [x] `client/NPC_Save.lua` : ModData registry + `npc:save()` / `npc:load()`
+- [x] Hooks : `Events.OnSave` + `Events.OnGameStart` (charg. différé 1 tick)
+- [x] `getSaveDir()` : `Core.getMyDocumentFolder()/Saves/<gameMode>/<world>/`
+- [x] 42 textures NPC UI (`42/media/textures/NPC_*.png`)
+
+### ✅ Étape 5 — FSM Brain + Réseau *(TERMINÉ v2.2.0)*
+
+- [x] `NPC_FollowTick v2.2` : FSM Brain branché (7 états), `NetworkDispatcher` intégré
+- [x] `NPC_SpawnManager v2.0` : Spawn server-side, identité unique horodatée
+- [x] Bascule follow/wander via menu clic-droit : `npcStartFollow` / `npcStopFollow`
+
+### ✅ Étape 6 — Server Authority + Corrections v2.3.0 *(TERMINÉ)*
+
+**Problème désync multijoueur** : `pathToLocation()` appelé côté client = chaque client calcule
+son propre pathfinding indépendamment → dérive de position en quelques minutes en multi.
+
+**Solution implémentée** :
+- [x] `NPC_SpawnManager v3.0` : registre `_serverNPCs`, tick `Events.OnTick` every 6 ticks
+  - Follow mode : target = position du joueur réel le plus proche (`getRealPlayers()`)
+  - Wander mode : target aléatoire dans rayon 8 tiles, renouvellement automatique
+  - Broadcast `PHNPC_SyncTarget {id, tx, ty, tz}` à tous les clients
+- [x] `NPC_FollowTick v2.3` : handler `PHNPC_SyncTarget` → stocke `data.server_tx/ty/tz`
+  - Tick : priorité server_tx > fallback local (follow/wander) > flee toujours client
+  - Notifie serveur via `PHNPC_SetFollowMode` au clic suis-moi / reste ici
+  - Notifie serveur via `PHNPC_RemoveNPC` au cleanup
+- [x] **Guard anti-doublon spawn** : `PHNPC.npcs_byId[data.id]` vérifié avant `IsoPlayer.new()`
+- [x] **`getSaveDir()` robuste** (v1.1) : `pcall` sur `getWorld():getGameMode()` et `getWorld():getWorld()`
+  - Retourne `nil` si le monde n'est pas chargé → save/load skippé sans crash
+
+### 🔷 Étape 7 — Systèmes avancés
 
 - [ ] `server/OllamaBridge.lua` : bridge HTTP → Ollama (`HTTPRequest` B42 async)
 - [ ] `client/UI/OllamaChatUI.lua` : fenêtre chat IA

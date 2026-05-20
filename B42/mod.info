@@ -4,5 +4,5 @@ author=sputji
 description=Autonomous NPCs with AI brain (FSM), Ollama dialogues, trading, hidden bites and passive learning. Compatible B42.
 poster=poster.png
 icon=icon.png
-version=2.2.0
+version=2.3.0
 versionMin=42.0

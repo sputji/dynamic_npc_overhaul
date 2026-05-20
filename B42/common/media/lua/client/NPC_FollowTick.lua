@@ -1,6 +1,8 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
--- client/NPC_FollowTick.lua v2.2
--- NPC spawn (via NetworkDispatcher), Brain FSM integration, follow/wander/flee behavior.
+-- client/NPC_FollowTick.lua v2.3
+-- NPC spawn (via NetworkDispatcher), Brain FSM integration, server authority movement.
+-- Server broadcasts PHNPC_SyncTarget every ~6 ticks; client uses it for pathToLocation.
+-- Fallback to local follow/wander when server target not yet received.
 -- NO BOM. ASCII only.
 
 -- ============================================================
@@ -21,9 +23,11 @@ local WANDER_R   = 8      -- wander radius in tiles
 --   id, forename, surname, fullname, isFemale,
 --   followMode, fsmState, squareX, squareY, squareZ,
 --   wander_target,
+--   server_tx, server_ty, server_tz,   (from PHNPC_SyncTarget)
 --   dataModel (reference to NPC_Brain model data)
 -- }
-PHNPC.npcs = PHNPC.npcs or {}
+PHNPC.npcs      = PHNPC.npcs      or {}
+PHNPC.npcs_byId = PHNPC.npcs_byId or {}  -- [npcId string] = IsoPlayer reference
 local _ticks = 0
 
 -- ============================================================
@@ -76,6 +80,11 @@ end
 
 local function createNPCFromData(data)
     if not data then return end
+    -- Anti-doublon: skip if an NPC with this ID already exists locally
+    if data.id and PHNPC.npcs_byId[data.id] then
+        print("[PHNPC] DoSpawn: NPC " .. data.id .. " already exists, skipping.")
+        return
+    end
     local cell = getWorld and getWorld():getCell()
     if not cell then
         print("[PHNPC] createNPCFromData: getCell() is nil")
@@ -161,7 +170,8 @@ local function createNPCFromData(data)
         npcData.dataModel = modelData
     end
 
-    PHNPC.npcs[npc] = npcData
+    PHNPC.npcs[npc]          = npcData
+    PHNPC.npcs_byId[data.id] = npc
     print("[PHNPC] NPC created: " .. forename .. " " .. surname
         .. " (" .. (isFemale and "F" or "M") .. ")"
         .. " @ " .. math.floor(data.x) .. "," .. math.floor(data.y))
@@ -222,12 +232,23 @@ local function registerNetworkHandlers()
     Dispatcher.on("PHNPC_DoSpawn", function(data)
         createNPCFromData(data)
     end)
-    print("[PHNPC] NPC_FollowTick: PHNPC_DoSpawn handler registered")
+    -- Server broadcasts destination every ~6 ticks; client uses it for pathToLocation
+    Dispatcher.on("PHNPC_SyncTarget", function(data)
+        if not data or not data.id then return end
+        local npc = PHNPC.npcs_byId[data.id]
+        if npc and PHNPC.npcs[npc] then
+            PHNPC.npcs[npc].server_tx = data.tx
+            PHNPC.npcs[npc].server_ty = data.ty
+            PHNPC.npcs[npc].server_tz = data.tz
+        end
+    end)
+    print("[PHNPC] NPC_FollowTick: PHNPC_DoSpawn + PHNPC_SyncTarget handlers registered")
 end
 
 -- Delay registration so shared modules are fully loaded
 Events.OnGameStart.Add(function()
-    PHNPC.npcs = {}
+    PHNPC.npcs      = {}
+    PHNPC.npcs_byId = {}
     _ticks = 0
     registerNetworkHandlers()
     print("[PHNPC] NPC_FollowTick reset (OnGameStart)")
@@ -242,6 +263,11 @@ local function npcStartFollow(npc)
     if not data then return end
     data.followMode = true
     if data.dataModel then data.dataModel.followMode = true end
+    -- Notify server: switch to follow-player target computation
+    local Disp = PHNPC.getModule("NPC_NetworkDispatcher")
+    if Disp and data.id then
+        Disp.send("server", "PHNPC_SetFollowMode", { id = data.id, followMode = true })
+    end
     print("[PHNPC] " .. (data.fullname or "NPC") .. " : follow mode ON")
 end
 
@@ -256,6 +282,11 @@ local function npcStopFollow(npc)
             data.dataModel.fsmState = "wander"
             data.fsmState = "wander"
         end
+    end
+    -- Notify server: switch to wander target computation
+    local Disp = PHNPC.getModule("NPC_NetworkDispatcher")
+    if Disp and data.id then
+        Disp.send("server", "PHNPC_SetFollowMode", { id = data.id, followMode = false })
     end
     stopNPC(npc)
     print("[PHNPC] " .. (data.fullname or "NPC") .. " : follow mode OFF (FSM wander)")
@@ -328,10 +359,13 @@ Events.OnTick.Add(function()
             end
         end
         local Brain = PHNPC.getModule("NPC_Brain")
+        local Disp  = PHNPC.getModule("NPC_NetworkDispatcher")
         for i = 1, #dead do
             local d = PHNPC.npcs[dead[i]]
-            if d and d.id and Brain then
-                Brain.unregister(d.id)
+            if d and d.id then
+                if Brain then Brain.unregister(d.id) end
+                if Disp  then Disp.send("server", "PHNPC_RemoveNPC", { id = d.id }) end
+                PHNPC.npcs_byId[d.id] = nil
             end
             PHNPC.npcs[dead[i]] = nil
             print("[PHNPC] Cleanup: removed dead NPC")
@@ -348,9 +382,65 @@ Events.OnTick.Add(function()
             fsmState = data.fsmState or "idle"
         end
 
-        if data.followMode then
+        if fsmState == "flee" then
             -- ------------------------------------------------
-            -- FOLLOW PLAYER (player-commanded override)
+            -- FLEE: always client-side (local threat detection)
+            -- ------------------------------------------------
+            pcall(function()
+                npc:getPathFindBehavior2():update()
+            end)
+            if doRetarget then
+                pcall(function()
+                    local nx, ny  = npc:getX(), npc:getY()
+                    local threat  = data.dataModel and data.dataModel.fsmTarget
+                    local tx, ty
+                    if threat then
+                        local dx   = nx - threat.x
+                        local dy   = ny - threat.y
+                        local dist = math.max(math.sqrt(dx * dx + dy * dy), 0.01)
+                        tx = nx + (dx / dist) * 15
+                        ty = ny + (dy / dist) * 15
+                    else
+                        tx = nx + ZombRand(20) - 10
+                        ty = ny + ZombRand(20) - 10
+                    end
+                    npc:getPathFindBehavior2():pathToLocation(tx, ty, npc:getZ())
+                end)
+            end
+
+        elseif data.server_tx then
+            -- ------------------------------------------------
+            -- SERVER AUTHORITY: destination from NPC_SpawnManager
+            -- Covers follow mode + wander (server computes destination).
+            -- Eliminates desync in multiplayer.
+            -- ------------------------------------------------
+            pcall(function()
+                npc:getPathFindBehavior2():update()
+            end)
+            if doRetarget then
+                pcall(function()
+                    -- Stop distance check when following player
+                    if data.followMode and player then
+                        local dx = npc:getX() - player:getX()
+                        local dy = npc:getY() - player:getY()
+                        if (dx * dx + dy * dy) <= STOP_DIST * STOP_DIST then
+                            stopNPC(npc)
+                            npc:faceThisObject(player)
+                            return
+                        end
+                    end
+                    npc:getPathFindBehavior2():pathToLocation(
+                        data.server_tx,
+                        data.server_ty,
+                        data.server_tz or npc:getZ()
+                    )
+                end)
+            end
+
+        elseif data.followMode then
+            -- ------------------------------------------------
+            -- LOCAL FALLBACK: no server_tx yet (first ticks)
+            -- Direct follow computation
             -- ------------------------------------------------
             pcall(function()
                 npc:getPathFindBehavior2():update()
@@ -376,14 +466,13 @@ Events.OnTick.Add(function()
 
         elseif fsmState == "wander" then
             -- ------------------------------------------------
-            -- WANDER: random walk within WANDER_R tiles
+            -- LOCAL FALLBACK: wander when no server target yet
             -- ------------------------------------------------
             pcall(function()
                 npc:getPathFindBehavior2():update()
             end)
             if doRetarget then
                 pcall(function()
-                    -- Check arrival at wander target
                     local wt = data.wander_target
                     if wt then
                         local dx = npc:getX() - wt.x
@@ -392,7 +481,6 @@ Events.OnTick.Add(function()
                             data.wander_target = nil
                         end
                     end
-                    -- Pick new target if none
                     if not data.wander_target then
                         data.wander_target = {
                             x = npc:getX() + ZombRand(WANDER_R * 2) - WANDER_R,
@@ -407,36 +495,9 @@ Events.OnTick.Add(function()
                 end)
             end
 
-        elseif fsmState == "flee" then
-            -- ------------------------------------------------
-            -- FLEE: move away from threat stored in dataModel.fsmTarget
-            -- ------------------------------------------------
-            pcall(function()
-                npc:getPathFindBehavior2():update()
-            end)
-            if doRetarget then
-                pcall(function()
-                    local nx, ny  = npc:getX(), npc:getY()
-                    local threat  = data.dataModel and data.dataModel.fsmTarget
-                    local tx, ty
-                    if threat then
-                        local dx   = nx - threat.x
-                        local dy   = ny - threat.y
-                        local dist = math.max(math.sqrt(dx * dx + dy * dy), 0.01)
-                        tx = nx + (dx / dist) * 15
-                        ty = ny + (dy / dist) * 15
-                    else
-                        tx = nx + ZombRand(20) - 10
-                        ty = ny + ZombRand(20) - 10
-                    end
-                    npc:getPathFindBehavior2():pathToLocation(tx, ty, npc:getZ())
-                end)
-            end
-
         else
             -- ------------------------------------------------
-            -- IDLE / WORK / TRADE / DEFEND / GUARD
-            -- Stand still; face player if nearby
+            -- IDLE: stand still, face player if nearby
             -- ------------------------------------------------
             if doRetarget and player then
                 pcall(function()
@@ -457,4 +518,4 @@ end)
 
 Events.OnFillWorldObjectContextMenu.Add(onContextMenu)
 
-print("[PHNPC] NPC_FollowTick v2.2 loaded - IsoPlayer + NPC_Brain + NetworkDispatcher")
+print("[PHNPC] NPC_FollowTick v2.3 loaded - server authority + spawn dedup")

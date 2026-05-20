@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Architecture B42
-> Version 2.1.0 | Project Zomboid Build 42.18.0 | Auteur : sputji  
-> **État actuel : Fondations ✅ — Cerveau ✅ — Corps Serveur ✅ — Corps Client v2.1 ✅ — IsoPlayer ✅ — UI ✅**
+> Version 2.3.0 | Project Zomboid Build 42.18.0 | Auteur : sputji  
+> **État actuel : Fondations ✅ — Cerveau ✅ — Serveur v3.0 ✅ — Client v2.3 ✅ — IsoPlayer ✅ — UI ✅ — Save ✅**
 
 ---
 
@@ -83,29 +83,71 @@ D:\PZ Mods\Dynamic_NPC_Overhaul\
                 │           ├── ContextMenu_FR.txt
                 │           └── IGUI_FR.txt
                 │
-                ├── server\          ✅ CORPS SERVEUR — Minimal (spawn via IsoPlayer côté client)
+                ├── server\ ✅ CORPS SERVEUR v3.0 — Spawn autorité + sync position 10Hz
                 │   ├── 00_Init.lua          # Log démarrage serveur
-                │   └── NPC_SpawnManager.lua # DÉSACTIVÉ — addZombiesInOutfit remplacé par IsoPlayer.new()
+                │   └── NPC_SpawnManager.lua # ACTIF v3.0 — Spawn, PHNPC_SyncTarget 10Hz, PHNPC_SetFollowMode
                 │
-                └── client\          ✅ CORPS CLIENT — v2.1.0 IsoPlayer
+                └── client\ ✅ CORPS CLIENT v2.3 — IsoPlayer + server authority
                     ├── 00_Init.lua              # Bootstrap client : disableTieredZombieUpdates
-                    ├── NPC_FollowTick.lua        # IsoPlayer.new() + SurvivorFactory + menu clic-droit + follow
-                    ├── NPC_InteractionClient.lua # DÉSACTIVÉ — interaction intégrée dans NPC_FollowTick.lua
-                    ├── NPC_SpawnDebug.lua        # DÉSACTIVÉ — spawn zombies remplacé par IsoPlayer
+                    ├── NPC_FollowTick.lua        # IsoPlayer.new() + spawn dedup + PHNPC_SyncTarget + menu clic-droit
+                    ├── NPC_Save.lua             # Persistance ModData + npc:save/load — getSaveDir() pcall-safe
+                    ├── NPC_InteractionClient.lua # DESACTIVE — interaction integree dans NPC_FollowTick.lua
+                    ├── NPC_SpawnDebug.lua        # DESACTIVE — spawn zombies remplace par IsoPlayer
                     └── UI\
                         ├── NPC_DialogueWindow.lua   # ISPanel dialogue — API open(npc, npcData)
-                        ├── NPC_SpeechBubble.lua     # Toast bas-écran (en attente refonte)
-                        └── (à créer) TradeWindow.lua, OllamaChatUI.lua
+                        ├── NPC_SpeechBubble.lua     # Toast bas-ecran (en attente refonte)
+                        └── (a creer) TradeWindow.lua, OllamaChatUI.lua
 ```
 
 ---
 
-## Architecture IsoPlayer v2.1.0 (approche actuelle)
+## Architecture IsoPlayer v2.3.0 — Server Authority
 
-> **Principe** : Les NPCs sont des `IsoPlayer` natifs, pas des `IsoZombie` convertis.  
-> `IsoPlayer.new()` donne automatiquement les animations Bob/Kate, les sons humains et le pathfinding réel.
+> **Principe** : Le SERVEUR calcule la destination de chaque NPC à ~10Hz et la broadcast aux clients.
+> Les clients utilisent cette destination pour `pathToLocation()` au lieu de calculer localement.
+> Cela elimine la desynchronisation multijoueur (chaque client calculait son propre pathfinding independamment).
 
-### Pattern de création NPC (NPC_FollowTick.lua)
+### Flux complet
+
+```
+[Client] clic-droit "Faire apparaitre un PNJ"
+    --> PHNPC_RequestSpawn {x, y, z}
+    --> [Serveur] NPC_SpawnManager.lua
+        - genere ID unique: PHNPC_<forename>_<surname>_<timestamp>
+        - enregistre _serverNPCs[id] = { x, y, z, followMode=true, ... }
+        --> PHNPC_DoSpawn {id, forename, surname, isFemale, x, y, z}
+    --> [Tous clients] createNPCFromData()
+        - verif anti-doublon: if PHNPC.npcs_byId[data.id] then return end
+        - IsoPlayer.new() + Brain.register()
+        - PHNPC.npcs[npc] = npcData
+        - PHNPC.npcs_byId[id] = npc
+
+[Serveur] Events.OnTick (chaque 6 ticks = ~10Hz)
+    Pour chaque _serverNPCs[id]:
+        - si followMode: target = position du joueur reel le plus proche
+        - si wander: target = point aleatoire dans rayon 8 tiles
+        --> PHNPC_SyncTarget {id, tx, ty, tz}
+    --> [Tous clients] PHNPC.npcs[npc].server_tx/ty/tz = tx/ty/tz
+
+[Client] Events.OnTick (chaque 10 ticks = RETARGET)
+    Si fsmState == "flee"  --> client-side (threat local)
+    Sinon si data.server_tx --> pathToLocation(server_tx, server_ty, server_tz)  [SERVER AUTHORITY]
+    Sinon si followMode    --> pathToLocation(player.x, player.y)                [FALLBACK LOCAL]
+    Sinon si wander        --> pathToLocation(wander_target.x, wander_target.y)  [FALLBACK LOCAL]
+    Sinon                  --> idle (faceThisObject)
+```
+
+### Commandes reseau
+
+| Commande | Direction | Emetteur | Description |
+|----------|-----------|----------|-------------|
+| `PHNPC_RequestSpawn` | client → server | NPC_FollowTick | Demande de spawn |
+| `PHNPC_DoSpawn` | server → all clients | NPC_SpawnManager | Creation NPC |
+| `PHNPC_SyncTarget` | server → all clients | NPC_SpawnManager | Destination 10Hz |
+| `PHNPC_SetFollowMode` | client → server | NPC_FollowTick | Bascule follow/wander |
+| `PHNPC_RemoveNPC` | client → server | NPC_FollowTick | NPC mort/despawn |
+
+### Pattern de creation NPC (NPC_FollowTick.lua)
 
 ```lua
 -- 1. Descripteur visuel complet (apparence + outfit + profession)

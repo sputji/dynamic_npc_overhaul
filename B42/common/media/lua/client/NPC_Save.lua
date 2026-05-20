@@ -1,6 +1,7 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
--- client/NPC_Save.lua v1.0
--- Persistence: ModData (registry) + soul:save/load (IsoPlayer full state)
+-- client/NPC_Save.lua v1.1
+-- Persistence: ModData (registry) + npc:save/load (IsoPlayer full state)
+-- getSaveDir() wrapped in pcall: handles nil world or unexpected gameMode.
 -- NO BOM. ASCII only. Solo and Multiplayer compatible.
 
 -- ============================================================
@@ -17,11 +18,21 @@ local NPC_Save = {}
 
 local function getSaveDir()
     local sep = getFileSeparator()
-    return Core.getMyDocumentFolder()
-        .. sep .. "Saves"
-        .. sep .. getWorld():getGameMode()
-        .. sep .. getWorld():getWorld()
-        .. sep
+    -- pcall guard: getGameMode() or getWorld() may throw if world not fully loaded
+    local ok, result = pcall(function()
+        local gameMode  = getWorld():getGameMode() or "Survival"
+        local worldName = getWorld():getWorld()     or "default"
+        return Core.getMyDocumentFolder()
+            .. sep .. "Saves"
+            .. sep .. gameMode
+            .. sep .. worldName
+            .. sep
+    end)
+    if not ok or not result then
+        print("[PHNPC] NPC_Save: getSaveDir failed - " .. tostring(result))
+        return nil
+    end
+    return result
 end
 
 -- ============================================================
