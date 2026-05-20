@@ -1,23 +1,35 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
 -- client/PHNPC_Manager.lua
--- NPC spawn, pathfinding tick, context menu.
--- Method: IsoPlayer.new() directly on client, no network dispatcher.
--- Pattern sourced from "7 - Custom NPC" (CnpcHuman.lua / ISHumanWalk.lua).
+-- Spawn: addZombiesInOutfit() + Banditize pattern (NPC_Helper_Mod / Bandits).
+-- Movement: zombie:pathToLocationF + setBumpType transitions.
+-- AnimSets: declenches par variable PHNPC_IsNPC = true.
 -- NO BOM. ASCII only.
 
 -- ============================================================
 -- CONFIG
 -- ============================================================
-local STOP_DIST   = 3   -- tiles: stop following when this close to player
-local RETARGET    = 15  -- ticks: re-issue pathToLocation every N ticks
-local CLEANUP     = 300 -- ticks: check dead NPCs every N ticks
-local MAX_NPCS    = 10  -- maximum simultaneous NPCs
+local STOP_DIST  = 3    -- tiles: arreter le suivi quand assez proche
+local RETARGET   = 15   -- ticks entre deux pathToLocationF
+local CLEANUP    = 300  -- ticks entre deux passes de nettoyage
+local MAX_NPCS   = 10   -- nombre max de NPC simultanes
+
+-- Outfits disponibles (addZombiesInOutfit accepte ces noms B42)
+local OUTFITS = {
+    "Farmer", "Police", "Fireman", "Doctor",
+    "Ranger", "Chef", "Survivor",
+}
+
+-- Noms des NPC
+local NPC_NAMES = {
+    "Alex", "Jordan", "Sam", "Casey", "Riley",
+    "Morgan", "Taylor", "Quinn", "Blake", "Drew",
+    "Charlie", "Avery", "Reese", "Dakota", "Skyler",
+}
 
 -- ============================================================
 -- STATE
+-- PHNPC.npcs[IsoZombie] = { id, name, isFemale, followMode, retarget, moving }
 -- ============================================================
--- PHNPC.npcs[IsoPlayer] = { id, forename, surname, fullname, isFemale, followMode }
--- Initialised on OnGameStart to clear previous session data.
 local _ticks = 0
 
 -- ============================================================
@@ -25,114 +37,150 @@ local _ticks = 0
 -- ============================================================
 local function npcValid(npc)
     if not npc then return false end
-    if not instanceof(npc, "IsoPlayer") then return false end
     local ok, dead = pcall(function() return npc:isDead() end)
     return ok and not dead
 end
 
 -- ============================================================
--- MOVEMENT HELPERS
--- Pattern: ISHumanWalk (Custom NPC mod)
---   start  : npc:getPathFindBehavior2():pathToLocation(x, y, z)
---   update : npc:getPathFindBehavior2():update()  (called every tick)
---   cancel : npc:getPathFindBehavior2():cancel() + npc:setPath2(nil)
+-- MOUVEMENT
+-- Pattern: GCCore.startMoving / stopMoving (NPC_Helper_Mod GCCoreActions.lua)
+--   start : setUseless(false) + setBumpType("IdleToWalk") + pathToLocationF
+--   stop  : setBumpType("WalkToIdle")
 -- ============================================================
-local function npcMoveTo(npc, x, y, z)
+local function npcStartMoving(npc, x, y, z)
+    local data = PHNPC.npcs[npc]
     pcall(function()
-        npc:getPathFindBehavior2():pathToLocation(x, y, z)
-    end)
-end
-
-local function npcUpdatePath(npc)
-    pcall(function()
-        npc:getPathFindBehavior2():update()
+        npc:setUseless(false)
+        if data and not data.moving then
+            data.moving = true
+            npc:setBumpType("IdleToWalk")
+        end
+        npc:pathToLocationF(x, y, z)
     end)
 end
 
 local function npcStopMoving(npc)
+    local data = PHNPC.npcs[npc]
     pcall(function()
-        npc:getPathFindBehavior2():cancel()
-        npc:setPath2(nil)
+        if data and data.moving then
+            data.moving = false
+            npc:setBumpType("WalkToIdle")
+        end
     end)
 end
 
 -- ============================================================
--- NPC CREATION
--- Pattern: CnpcHuman.newIsoHuman + CnpcHuman.newHumanDescObj (Custom NPC mod)
+-- CREATION NPC
+-- Pattern: GCCoreSpawn.spawnCompanionNPC (NPC_Helper_Mod)
+--       + Banditize (BanditUpdate.lua lignes 158-206)
+-- 1. addZombiesInOutfit() -> IsoZombie avec tenue humaine
+-- 2. Banditize: variables + walktype + sons + dents
+-- 3. setVariable("PHNPC_IsNPC", true) -> active AnimSets custom
 -- ============================================================
 local function createNPC(square)
-    -- Floor check (same guard as Custom NPC to prevent mid-air spawn)
-    local squareZ = 0
-    if square:isSolidFloor() then
-        squareZ = square:getZ()
-    end
+    local x = square:getX()
+    local y = square:getY()
+    local z = square:getZ()
 
-    local isFemale = (ZombRand(2) == 1)
-    local forename = SurvivorFactory.getRandomForename(isFemale)
-    local surname  = SurvivorFactory.getRandomSurname()
-    local ts       = tostring(getTimestampMs())
-    local npcId    = "PHNPC_" .. forename .. "_" .. surname .. "_" .. ts
+    local isFemale     = (ZombRand(2) == 1)
+    local femaleChance = isFemale and 100 or 0
+    local outfit       = OUTFITS[ZombRand(#OUTFITS) + 1]
+    local npcName      = NPC_NAMES[ZombRand(#NPC_NAMES) + 1]
+    local npcId        = "PHNPC_" .. npcName .. "_" .. tostring(getTimestampMs())
 
-    -- Build human visual descriptor (Bob/Kate skeleton for proper animations)
-    local ok1, desc = pcall(function()
-        return SurvivorFactory.CreateSurvivor(nil, isFemale)
+    -- 1. Spawn via addZombiesInOutfit (approche prouvee NPC_Helper_Mod / Bandits)
+    local zombieList = nil
+    local ok1, err1 = pcall(function()
+        zombieList = addZombiesInOutfit(x, y, z, 1, outfit, femaleChance)
     end)
-    if not ok1 or not desc then
-        print("[PHNPC] createNPC: SurvivorFactory.CreateSurvivor failed")
+    if not ok1 then
+        print("[PHNPC] ERREUR addZombiesInOutfit: " .. tostring(err1))
         return
     end
-    desc:setForename(forename)
-    desc:setSurname(surname)
+    if not zombieList or zombieList:size() == 0 then
+        print("[PHNPC] addZombiesInOutfit: liste vide")
+        return
+    end
 
-    -- Random profession for outfit variety
+    local npc = zombieList:get(0)
+    if not npc then
+        print("[PHNPC] zombie nil apres addZombiesInOutfit")
+        return
+    end
+
+    -- 2. Banditize: transformer zombie en NPC humain
+    -- (copie exacte du pattern Bandits BanditUpdate.lua + GCCoreConvert.lua)
     pcall(function()
-        local profs = ProfessionFactory.getProfessions()
-        if profs and profs:size() > 0 then
-            local prof = profs:get(ZombRand(profs:size()))
-            desc:setProfession(prof:getType())
-            desc:setProfessionSkills(prof)
+        -- Pas de dents zombie
+        npc:setNoTeeth(true)
+
+        -- Activer mes AnimSets XML (PHNPC_Idle.xml, PHNPC_Walk.xml)
+        -- condition: PHNPC_IsNPC = true
+        npc:setVariable("PHNPC_IsNPC", true)
+
+        -- Marche humaine (doit correspondre a zombieWalkType dans PHNPC_Walk.xml)
+        npc:setWalkType("Walk")
+        npc:setVariable("zombieWalkType", "Walk")
+
+        -- Evite crash dans testDefense (important, copie Bandits)
+        npc:setVariable("ZombieHitReaction", "Chainsaw")
+
+        -- Pas de lunge attack
+        npc:setVariable("NoLungeTarget", true)
+
+        -- Vitesses humaines
+        npc:setVariable("LimpSpeed", 0.80)
+        npc:setVariable("WalkSpeed", 1.04)
+        npc:setVariable("RunSpeed", 0.75)
+
+        -- Silence bruits zombie
+        npc:getEmitter():stopAll()
+
+        -- Supprimer armes et accessoires zombie
+        npc:setPrimaryHandItem(nil)
+        npc:setSecondaryHandItem(nil)
+        npc:resetEquippedHandsModels()
+        npc:clearAttachedItems()
+
+        -- Pas de re-habillage automatique par le moteur
+        npc:setDressInRandomOutfit(false)
+
+        -- setTurnAlertedValues: debloquer apres spawn (Bandits)
+        npc:setTurnAlertedValues(-5, 5)
+
+        -- Bump initial pour sortir de l'etat zombie idle
+        npc:setBumpType("Shrug")
+    end)
+
+    -- 3. Nettoyer les visuels zombie (sang, salet, degats)
+    pcall(function()
+        local hv = npc:getHumanVisual()
+        if hv then
+            hv:removeDirt()
+            hv:removeBlood()
         end
     end)
 
-    -- Spawn IsoPlayer entity (exact pattern from CnpcHuman.newIsoHuman)
-    local ok2, npc = pcall(function()
-        return IsoPlayer.new(getWorld():getCell(), desc, square:getX(), square:getY(), squareZ)
-    end)
-    if not ok2 or not npc then
-        print("[PHNPC] createNPC: IsoPlayer.new failed")
-        return
-    end
+    -- 4. ModData
+    local md = npc:getModData()
+    md.PHNPC_ID     = npcId
+    md.PHNPC_Name   = npcName
+    md.PHNPC_Female = isFemale
 
-    npc:getModData().PHNPC_ID = npcId
-    npc:setUsername(forename .. " " .. surname)
-    npc:setNPC(true)
-    npc:setSceneCulled(false)
-    npc:setDir(IsoDirections.SE)
-
-    -- Basic starting inventory
-    pcall(function()
-        local inv = npc:getInventory()
-        inv:AddItem("Base.WaterBottleFull")
-        inv:AddItem("Base.Bandage")
-        local foods = { "Base.Chips", "Base.Crackers", "Base.TunaCan" }
-        inv:AddItem(foods[ZombRand(3) + 1])
-        if ZombRand(2) == 0 then inv:AddItem("Base.Knife") end
-    end)
-
-    -- Store in active NPC table
+    -- 5. Enregistrer dans PHNPC.npcs
     PHNPC.npcs[npc] = {
         id         = npcId,
-        forename   = forename,
-        surname    = surname,
-        fullname   = forename .. " " .. surname,
+        name       = npcName,
         isFemale   = isFemale,
         followMode = true,
-        retarget   = 0,   -- countdown to next pathToLocation call
+        retarget   = 0,
+        moving     = false,
     }
 
-    print("[PHNPC] NPC spawned: " .. forename .. " " .. surname
+    print("[PHNPC] NPC spawne: " .. npcName
         .. " (" .. (isFemale and "F" or "M") .. ")"
-        .. " @ " .. square:getX() .. "," .. square:getY())
+        .. " outfit=" .. outfit
+        .. " @ " .. x .. "," .. y)
 end
 
 -- ============================================================
@@ -152,14 +200,14 @@ local function spawnNPC(square, playerIndex)
 end
 
 -- ============================================================
--- CONTEXT MENU ACTIONS (existing NPCs)
+-- CONTEXT MENU ACTIONS (NPCs existants)
 -- ============================================================
 local function startFollow(npc)
     local d = PHNPC.npcs[npc]
     if not d then return end
     d.followMode = true
     d.retarget   = 0
-    print("[PHNPC] " .. d.fullname .. " : suit le joueur")
+    print("[PHNPC] " .. d.name .. " : suit le joueur")
 end
 
 local function stopFollow(npc)
@@ -167,20 +215,24 @@ local function stopFollow(npc)
     if not d then return end
     d.followMode = false
     npcStopMoving(npc)
-    print("[PHNPC] " .. d.fullname .. " : reste ici")
+    print("[PHNPC] " .. d.name .. " : reste ici")
 end
 
 local function removeNPC(npc)
     local d = PHNPC.npcs[npc]
-    if d then print("[PHNPC] Suppression: " .. d.fullname) end
+    if d then print("[PHNPC] Suppression: " .. d.name) end
     npcStopMoving(npc)
-    pcall(function() npc:removeFromWorld() end)
+    pcall(function()
+        npc:removeFromWorld()
+        npc:removeFromSquare()
+    end)
     PHNPC.npcs[npc] = nil
 end
 
 -- ============================================================
 -- CONTEXT MENU
--- Pattern: Events.OnPreFillWorldObjectContextMenu (Custom NPC mod)
+-- Pattern: Events.OnPreFillWorldObjectContextMenu
+-- square via ISWorldObjectContextMenu.fetchVars.clickedSquare (B42)
 -- ============================================================
 local function onContextMenu(playerIndex, context, worldobjects, test)
     if test then return end
@@ -188,7 +240,7 @@ local function onContextMenu(playerIndex, context, worldobjects, test)
     local square = ISWorldObjectContextMenu.fetchVars.clickedSquare
     if not square then return end
 
-    -- Detect NPC on or near the clicked square (1 tile radius)
+    -- Detecter un NPC pres du carre clique (rayon 2 tiles)
     local clickedNPC = nil
     for npc, _ in pairs(PHNPC.npcs) do
         if npcValid(npc) then
@@ -202,9 +254,8 @@ local function onContextMenu(playerIndex, context, worldobjects, test)
     end
 
     if clickedNPC then
-        -- Options for existing NPC
-        local d = PHNPC.npcs[clickedNPC]
-        local name = (d and d.fullname) or "PNJ"
+        local d    = PHNPC.npcs[clickedNPC]
+        local name = (d and d.name) or "PNJ"
         if d and d.followMode then
             context:addOption("[PHNPC] " .. name .. " : Reste ici", clickedNPC, stopFollow)
         else
@@ -212,25 +263,22 @@ local function onContextMenu(playerIndex, context, worldobjects, test)
         end
         context:addOption("[PHNPC] Supprimer " .. name, clickedNPC, removeNPC)
     else
-        -- Spawn option on empty ground
+        -- Option spawn sur le sol vide
         context:addOption("[PHNPC] Faire apparaitre un PNJ", square, spawnNPC, playerIndex)
     end
 end
 
 -- ============================================================
 -- MAIN TICK
--- Every tick: update pathfinding for all NPCs.
--- Every RETARGET ticks: re-issue pathToLocation toward player.
--- Every CLEANUP ticks: remove dead/invalid NPCs.
--- Pattern: Events.OnRenderTick (Custom NPC) / Events.OnTick
+-- Suivi + retarget + cleanup
 -- ============================================================
 Events.OnTick.Add(function()
     _ticks = _ticks + 1
 
-    local player     = getSpecificPlayer(0)
-    local doCleanup  = (_ticks % CLEANUP == 0)
+    local player    = getSpecificPlayer(0)
+    local doCleanup = (_ticks % CLEANUP == 0)
 
-    -- ---- Cleanup pass ----
+    -- Cleanup: retirer les NPC morts
     if doCleanup then
         local dead = {}
         for npc in pairs(PHNPC.npcs) do
@@ -240,54 +288,50 @@ Events.OnTick.Add(function()
         end
         for i = 1, #dead do
             local d = PHNPC.npcs[dead[i]]
-            print("[PHNPC] Cleanup NPC mort: " .. (d and d.fullname or "?"))
+            print("[PHNPC] Cleanup NPC mort: " .. (d and d.name or "?"))
             PHNPC.npcs[dead[i]] = nil
         end
     end
 
-    -- ---- Movement pass ----
+    -- Mouvement
+    if not player then return end
+    local px = player:getX()
+    local py = player:getY()
+    local pz = player:getZ()
+
     for npc, data in pairs(PHNPC.npcs) do
-        if not npcValid(npc) then
-            -- handled next cleanup
-        elseif data.followMode and player then
-            local px = player:getX()
-            local py = player:getY()
-            local pz = player:getZ()
-            local dx = npc:getX() - px
-            local dy = npc:getY() - py
+        if npcValid(npc) and data.followMode then
+            local dx   = npc:getX() - px
+            local dy   = npc:getY() - py
             local dist = math.sqrt(dx * dx + dy * dy)
 
             if dist > STOP_DIST then
-                -- Re-issue pathToLocation periodically
+                -- Emettre un nouveau pathToLocationF periodiquement
                 data.retarget = data.retarget - 1
                 if data.retarget <= 0 then
                     data.retarget = RETARGET
-                    npcMoveTo(npc, px, py, pz)
+                    npcStartMoving(npc, px, py, pz)
                 end
-                -- Update path every tick (mandatory for IsoPlayer pathfinding)
-                npcUpdatePath(npc)
             else
-                -- Close enough: stop and reset retarget
-                if data.retarget ~= 999 then
-                    npcStopMoving(npc)
-                    data.retarget = 999
-                end
+                -- Assez proche: arreter
+                npcStopMoving(npc)
+                data.retarget = RETARGET
             end
-        else
-            -- followMode OFF: just keep path system updated so NPC doesn't freeze
-            npcUpdatePath(npc)
         end
     end
 end)
 
 -- ============================================================
--- GAME START: reset NPC table for new session
+-- GAME START
 -- ============================================================
 Events.OnGameStart.Add(function()
     PHNPC.npcs = {}
     _ticks = 0
     print("[PHNPC] PHNPC_Manager v1.0 pret (OnGameStart)")
 end)
+
+Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
+print("[PHNPC] PHNPC_Manager v1.0 loaded")
 
 -- ============================================================
 -- REGISTER CONTEXT MENU

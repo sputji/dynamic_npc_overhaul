@@ -36,12 +36,12 @@ Le `NPC_NetworkDispatcher` pensait etre en MULTI meme en solo (a cause de `getSe
 
 ### Ce qui fonctionne en v1.0.0
 
-- [x] Clic-droit sol → spawn NPC (`IsoPlayer.new()` exact pattern Custom NPC)
-- [x] NPC visible avec animations humaines (SurvivorFactory + Bob skeleton)
-- [x] NPC suit le joueur (`getPathFindBehavior2():pathToLocation()` chaque N ticks)
-- [x] Clic-droit NPC → "Suis-moi" / "Reste ici" / "Supprimer"
-- [x] Nettoyage automatique des NPC morts
-- [x] Limite MAX_NPCS = 10
+- [ ] Clic-droit sol → spawn NPC (`IsoPlayer.new()` exact pattern Custom NPC)
+- [ ] NPC visible avec animations humaines (SurvivorFactory + Bob skeleton)
+- [ ] NPC suit le joueur (`getPathFindBehavior2():pathToLocation()` chaque N ticks)
+- [ ] Clic-droit NPC → "Suis-moi" / "Reste ici" / "Supprimer"
+- [ ] Nettoyage automatique des NPC morts
+- [ ] Limite MAX_NPCS = 10
 
 ---
 
