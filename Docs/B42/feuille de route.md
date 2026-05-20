@@ -1,5 +1,5 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise à jour : 20 mai 2026 | Version **1.0.1** | Dernier commit : `en cours`
+> Mise à jour : 20 mai 2026 | Version **1.0.1** | Dernier commit : `6b191c1`
 
 ---
 
