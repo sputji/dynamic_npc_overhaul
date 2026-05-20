@@ -4,7 +4,7 @@
 -- NO BOM. ASCII only.
 
 PHNPC = PHNPC or {}
-PHNPC.VERSION = "3.0.0"
+PHNPC.VERSION = "1.0.0"
 PHNPC.MOD_ID  = "PH_DynamicNPCOverhaul"
 
 -- Active NPC table: [IsoPlayer reference] = { id, forename, surname, fullname, isFemale, followMode }

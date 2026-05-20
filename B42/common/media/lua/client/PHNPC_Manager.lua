@@ -286,7 +286,7 @@ end)
 Events.OnGameStart.Add(function()
     PHNPC.npcs = {}
     _ticks = 0
-    print("[PHNPC] PHNPC_Manager v3.0 pret (OnGameStart)")
+    print("[PHNPC] PHNPC_Manager v1.0 pret (OnGameStart)")
 end)
 
 -- ============================================================
@@ -294,4 +294,4 @@ end)
 -- ============================================================
 Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
 
-print("[PHNPC] PHNPC_Manager v3.0 loaded")
+print("[PHNPC] PHNPC_Manager v1.0 loaded")

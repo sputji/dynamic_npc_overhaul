@@ -1,9 +1,9 @@
 # ARCHITECTURE — PH Dynamic NPC Overhaul B42
-_Version 3.0.0 — Refonte complète (pattern Custom NPC mod)_
-| Wiki PZ modding B42 | [Référence API](https://pzwiki.net/wiki) |
+_Version 1.0.0 — Base NPC fonctionnelle (pattern Custom NPC mod)_
+
 ---
 
-## Principe fondateur v3
+## Principe fondateur v1
 
 **Client-only, sans dispatcher réseau.**  
 Le NPC est créé directement via `IsoPlayer.new()` côté client. Aucun serveur n'est impliqué en mode solo.  
@@ -19,7 +19,7 @@ B42/
     media/
       lua/
         shared/
-          PHNPC_Core.lua        <- namespace global PHNPC, VERSION = "3.0.0"
+          PHNPC_Core.lua        <- namespace global PHNPC, VERSION = "1.0.0"
         client/
           PHNPC_Manager.lua     <- TOUTE la logique (spawn, tick, menu, pathfinding)
         server/
@@ -111,3 +111,12 @@ OnTick (chaque frame)
 - Dialogue via bulle de parole
 - Factions et relations
 - Multijoueur (sync via sendModData / onServerCommand)
+
+---
+
+## Ressources
+
+| Ressource | Lien |
+|-----------|------|
+| Wiki PZ modding B42 | [pzwiki.net](https://pzwiki.net) |
+| API Lua B42 | [pzwiki.net/wiki/Modding](https://pzwiki.net/wiki/Modding) |

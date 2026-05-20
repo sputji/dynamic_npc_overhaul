@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise a jour : 22 mai 2026 | Version **3.0.0** | Refonte complete from scratch
-| Wiki PZ modding B42 | [Référence API](https://pzwiki.net) |
+> Mise a jour : 20 mai 2026 | Version **1.0.0** | Base NPC fonctionnelle from scratch
+
 ---
 
 ## Historique des versions
@@ -9,7 +9,7 @@
 |---------|------|--------|
 | 1.x | mars 2026 | Fondations, structure B42 |
 | 2.x | mai 2026 | Cerveau FSM, NetworkDispatcher — NPC jamais spawne en jeu |
-| **3.0.0** | **22 mai 2026** | **Refonte complete : pattern Custom NPC mod, IsoPlayer direct client-side** |
+| **1.0.0** | **20 mai 2026** | **Base NPC fonctionnelle : pattern Custom NPC mod, IsoPlayer direct client-side** |
 
 ---
 
@@ -19,21 +19,21 @@ Le `NPC_NetworkDispatcher` pensait etre en MULTI meme en solo (a cause de `getSe
 `Dispatcher.send("all", "PHNPC_DoSpawn")` appelait `getOnlinePlayers()` (vide en solo).
 `PHNPC_DoSpawn` n'arrivait jamais au client → aucun NPC cree.
 
-**Solution v3** : Supprimer le dispatcher. Creation directe `IsoPlayer.new()` cote client.
+**Solution v1** : Supprimer le dispatcher. Creation directe `IsoPlayer.new()` cote client.
 
 ---
 
-## v3.0.0 — Architecture finale (22 mai 2026)
+## v1.0.0 — Architecture (20 mai 2026)
 
 ### Fichiers actifs
 
 | Fichier | Role |
 |---------|------|
-| `shared/PHNPC_Core.lua` | Namespace global `PHNPC`, `VERSION = "3.0.0"` |
+| `shared/PHNPC_Core.lua` | Namespace global `PHNPC`, `VERSION = "1.0.0"` |
 | `client/PHNPC_Manager.lua` | TOUTE la logique : spawn, pathfinding, menu |
 | `server/PHNPC_Server.lua` | Stub serveur (vide, futur multi) |
 
-### Ce qui fonctionne en v3.0.0
+### Ce qui fonctionne en v1.0.0
 
 - [x] Clic-droit sol → spawn NPC (`IsoPlayer.new()` exact pattern Custom NPC)
 - [x] NPC visible avec animations humaines (SurvivorFactory + Bob skeleton)

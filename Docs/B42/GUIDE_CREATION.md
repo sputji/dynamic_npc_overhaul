@@ -1,5 +1,5 @@
 # GUIDE DE CREATION - PH Dynamic NPC Overhaul B42
-Version 3.0.0 - Pattern Custom NPC mod
+Version 1.0.0 - Pattern Custom NPC mod
 
 ## Principe
 
