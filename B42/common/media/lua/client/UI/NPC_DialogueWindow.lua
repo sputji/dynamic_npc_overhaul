@@ -70,6 +70,11 @@ function NPC_DialogueWindow:_refreshLine(ctxKey)
         name       = self.npcData.firstName  or self.npcData.fullName or "?",
         profession = self.npcData.professionId or "",
     })
+    -- D\u00e9clencher la bulle de dialogue au-dessus du NPC
+    local Bubble = PHNPC.getModule("NPC_SpeechBubble")
+    if Bubble and self._line and self._line ~= "..." then
+        pcall(function() Bubble.show(self.npcData, self.zombie, self._line) end)
+    end
 end
 
 -- ============================================================
@@ -91,11 +96,13 @@ function NPC_DialogueWindow:initialise()
     b1:initialise()
     self:addChild(b1)
 
-    -- [Commerce]
+    -- [Suivre moi / Rester ici]
+    local followLabel = (self.npcData.followMode) and "Rester ici" or "Suivre moi"
     local b2 = ISButton:new(gap + bw + gap, by, bw, bh,
-        "Commerce", self, NPC_DialogueWindow.onTrade)
+        followLabel, self, NPC_DialogueWindow.onFollowToggle)
     b2:initialise()
     self:addChild(b2)
+    self._followBtn = b2
 
     -- [Au revoir]
     local b3 = ISButton:new(PANEL_W - bw - gap, by, bw, bh,
@@ -111,6 +118,23 @@ end
 function NPC_DialogueWindow:onTalkAgain()
     self._ctxIdx = (self._ctxIdx % #TALK_CYCLE) + 1
     self:_refreshLine(TALK_CYCLE[self._ctxIdx])
+end
+
+function NPC_DialogueWindow:onFollowToggle()
+    local nd = self.npcData
+    -- Synchroniser aussi avec le registre actif (m\u00eame objet, mais s\u00e9curit\u00e9 double)
+    if self.zombie and PHNPC._activeNPCs then
+        local active = PHNPC._activeNPCs[self.zombie]
+        if active then nd = active end  -- priorit\u00e9 \u00e0 l'objet live
+    end
+    nd.followMode = not nd.followMode
+    self.npcData  = nd  -- pointer sur l'objet live
+    -- Mettre \u00e0 jour le label du bouton
+    if self._followBtn then
+        self._followBtn.title = nd.followMode and "Rester ici" or "Suivre moi"
+    end
+    -- Feedback : ligne de dialogue adapt\u00e9e
+    self:_refreshLine(nd.followMode and "greeting" or "idle")
 end
 
 function NPC_DialogueWindow:onTrade()

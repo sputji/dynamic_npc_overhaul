@@ -262,6 +262,10 @@ local function attachDataModel(zombie)
 
     -- Enregistrer dans le registre global
     PHNPC._activeNPCs[zombie] = npcData
+
+    -- Brancher NPC_Brain : le cerveau lira/écrira npcData.fsmState à chaque tick
+    local Brain = PHNPC.getModule("NPC_Brain")
+    if Brain then pcall(function() Brain.register(npcData) end) end
 end
 
 -- ============================================================
@@ -378,6 +382,47 @@ local function doWander(zombie)
         zombie:setVariable("zombieWalkType", "Walk")
         pcall(function() zombie:setWalkType("Walk") end)
         pcall(function() zombie:WalkTo(tx, ty, zombie:getZ()) end)
+    end
+end
+
+-- ============================================================
+-- Comportement autonome piloté par NPC_Brain
+-- Lit npcData.fsmState (mis à jour par NPC_Brain chaque tick) et dispatch
+-- vers l'action physique correspondante.
+-- ============================================================
+local function doBrainAction(zombie, npcData)
+    if not instanceof(zombie, "IsoZombie") then return end
+    local state = npcData and npcData.fsmState or "wander"
+
+    if state == "wander" or state == "work" then
+        -- Errance / travail : se déplacer vers un point aléatoire voisin
+        doWander(zombie)
+
+    elseif state == "flee" then
+        -- Fuir : courir dans la direction opposée au joueur
+        local player = getPlayer()
+        if player then
+            local nx, ny = zombie:getX(), zombie:getY()
+            local px, py = player:getX(), player:getY()
+            local dx, dy = nx - px, ny - py
+            local len    = math.max(math.sqrt(dx * dx + dy * dy), 0.01)
+            local tx     = nx + (dx / len) * 12   -- 12 cases à l'opposé du joueur
+            local ty     = ny + (dy / len) * 12
+            zombie:setVariable("zombieWalkType", "Run")
+            pcall(function() zombie:setWalkType("Run") end)
+            pcall(function() zombie:WalkTo(tx, ty, zombie:getZ()) end)
+        end
+
+    elseif state == "guard" or state == "defend" or state == "trade" then
+        -- Rester sur place : stopper le pathfinding
+        pcall(function()
+            zombie:setPath2(nil)
+            zombie:setVariable("zombieWalkType", "")
+        end)
+
+    else
+        -- idle et cas non gérés : errance légère
+        doWander(zombie)
     end
 end
 
@@ -521,20 +566,19 @@ local function onZombieUpdate(zombie)
     enforceNPC(zombie)
 
     -- Dispatch comportemental :
-    --   dist ≤ FOLLOW_DIST_MAX → suivre le joueur (comportement actuel)
-    --   dist > FOLLOW_DIST_MAX → errance autonome (NPC vit sa vie)
-    local player = getPlayer()
-    if player then
-        local nx, ny = zombie:getX(), zombie:getY()
-        local px, py = player:getX(), player:getY()
-        local dx, dy = nx - px, ny - py
-        local dist   = math.sqrt(dx * dx + dy * dy)
-        if dist > FOLLOW_DIST_MAX then
-            doWander(zombie)
-        else
-            _wanderTargets[zombie] = nil  -- effacer la cible: le NPC reprend le suivi
+    --   followMode = true  → NPC suit le joueur (commandé explicitement)
+    --   followMode = false → NPC_Brain pilote le comportement (défaut)
+    local npcData = PHNPC._activeNPCs and PHNPC._activeNPCs[zombie]
+    if npcData and npcData.followMode then
+        -- Mode suivi : NPC suit le joueur actif
+        local player = getPlayer()
+        if player then
+            _wanderTargets[zombie] = nil  -- annuler toute cible de rôdage
             doFollow(zombie, player)
         end
+    else
+        -- Mode autonome : NPC_Brain décide (fsmState → action physique)
+        doBrainAction(zombie, npcData)
     end
 end
 
@@ -555,6 +599,12 @@ Events.OnTick.Add(function()
         if not ok or dead then toRemove[#toRemove + 1] = isoObj end
     end
     for _, isoObj in ipairs(toRemove) do
+        -- Désenregistrer du cerveau IA avant de supprimer le npcData
+        local nd = PHNPC._activeNPCs[isoObj]
+        if nd and nd.id then
+            local Brain = PHNPC.getModule("NPC_Brain")
+            if Brain then pcall(function() Brain.unregister(nd.id) end) end
+        end
         PHNPC._activeNPCs[isoObj]  = nil
         _convertedNPCs[isoObj]     = nil
         _wanderTargets[isoObj]     = nil

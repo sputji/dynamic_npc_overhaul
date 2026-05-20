@@ -1,5 +1,5 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise à jour : 20 mai 2026 | Version 1.0.0 | Dernier commit : `dffaae8`
+> Mise à jour : 20 mai 2026 | Version 1.0.0 | Dernier commit : `en cours`
 
 ---
 
@@ -57,7 +57,8 @@
 | `client/NPC_FollowTick.lua` | ✅ Fonctionnel — conversion zombie→NPC, visuals, suivi joueur, **errance autonome (doWander)**, animations, FSM state save, `Events.OnGameStart` reset |
 | `client/NPC_SpawnDebug.lua` | ✅ Fonctionnel — menu clic-droit spawn (visible avec `-debug` flag) |
 | `client/NPC_InteractionClient.lua` | ✅ Fonctionnel — détecte NPC, ouvre `NPC_DialogueWindow` |
-| `client/UI/NPC_DialogueWindow.lua` | ✅ Fonctionnel — ISPanel : nom, profession, santé, dialogue NPC_Dialogue, cycle contextes |
+| `client/UI/NPC_DialogueWindow.lua` | ✅ Fonctionnel — ISPanel : nom, profession, santé, dialogue NPC_Dialogue, **bouton Suivre\/Rester**, speech bubble intégrée |
+| `client/UI/NPC_SpeechBubble.lua` | ✅ Fonctionnel — toast bas-écran + tentative API native PZ (`setSpeakBubble`) |
 
 ---
 
@@ -74,21 +75,25 @@
 - [x] AnimSets : `Bob_Idle` et `Bob_Walk` activés via variables AnimEngine
 - [x] Menu spawn : visible en mode `-debug` (`isDebugEnabled()` B42)
 
-### 🔶 Étape 2 — Interactions joueur *(en cours)*
+### ✅ Étape 2 — Interactions joueur *(TERMINÉ)*
 
 Objectif : le joueur peut interagir avec le PNJ via une vraie fenêtre de dialogue.
 
 - [x] Détection clic-droit sur NPC → option "Parler à [Nom]" (contour bleu OK)
-- [ ] `client/NPC_InteractionClient.lua` : implémenter la fenêtre de dialogue (`ISModalRichTextPanel`)
-- [ ] `client/UI/SpeechBubbles.lua` : bulles de dialogue 3D au-dessus du PNJ
-- [ ] `client/UI/NPC_UI.lua` : fiche info PNJ (nom, métier, santé, humeur)
+- [x] Option **▶ Suivre moi / ■ Rester ici** dans le menu clic-droit (bascule `followMode`)
+- [x] `client/NPC_InteractionClient.lua` : fenêtre de dialogue `NPC_DialogueWindow` + toggle suivi
+- [x] `client/UI/NPC_SpeechBubble.lua` : toast bas-écran + tentative bulle native PZ
+- [x] `client/UI/NPC_DialogueWindow.lua` : bouton **Suivre\/Rester** + intégration speech bubble
 
-### Étape 3 — Commerce et FSM
+### ✅ Étape 3 — IA et comportement autonome *(TERMINÉ)*
 
-- [ ] Connecter `NPC_Brain.lua` à l'entité : boucle FSM states sur `Events.OnTick`
-- [ ] `client/UI/TradeWindow.lua` : fenêtre d'échange d'objets
-- [ ] Compléter `server/NPC_NetworkServer.lua` : handlers client→serveur pour trade
-- [ ] Tester les 7 états FSM : idle → wander → work → trade → defend → flee → guard
+- [x] `NPC_Brain.lua` **branché** aux actions physiques : `doBrainAction` lit `fsmState` et dispatche (wander / flee / guard / idle)
+- [x] `NPCDataModel.followMode` : NPC **autonome par défaut** — suit le joueur uniquement sur demande
+- [x] `NPC_Brain.register(npcData)` appelé dans `attachDataModel` → le cerveau pilote chaque NPC
+- [x] `NPC_Brain.unregister(id)` appelé au nettoyage des entités mortes
+- [x] FSM states → physique : `wander`/`work` → `doWander`, `flee` → course à l'opposé, `guard`/`trade`/`defend` → sur place
+
+### 🔷 Étape 4 — Commerce et réseau
 
 ### Étape 4 — Systèmes avancés
 

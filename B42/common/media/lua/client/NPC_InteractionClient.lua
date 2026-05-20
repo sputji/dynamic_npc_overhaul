@@ -63,8 +63,17 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
                         zombie,
                         PHNPC_InteractionClient.onTalkClicked,
                         player
-                    )
-                end
+                    )                    -- Option de suivi / autonomie
+                    local isFollowing = npcData and npcData.followMode or false
+                    local followLabel = isFollowing
+                        and ("\u25A0 Rester ici  \u2014 " .. npcName)
+                        or  ("\u25B6 Suivre moi \u2014 " .. npcName)
+                    context:addOption(
+                        followLabel,
+                        zombie,
+                        PHNPC_InteractionClient.onFollowToggle,
+                        player
+                    )                end
             end
         end
     end
@@ -97,6 +106,35 @@ function PHNPC_InteractionClient.onTalkClicked(zombie, player)
         local Dlg  = PHNPC.getModule("NPC_Dialogue")
         local line = Dlg and Dlg.get("greeting", { name = name }) or "..."
         print(string.format('[PHNPC] %s : "%s"', name, line))
+    end
+end
+
+-- ============================================================
+-- Callback "Suivre moi" / "Rester ici"
+-- Bascule le mode de suivi du NPC.
+-- ============================================================
+
+function PHNPC_InteractionClient.onFollowToggle(zombie, player)
+    local npcData = PHNPC._activeNPCs and PHNPC._activeNPCs[zombie]
+    if not npcData then return end
+
+    npcData.followMode = not npcData.followMode
+
+    local mode = npcData.followMode and "suivi" or "autonome"
+    local Log  = PHNPC.getModule("NPC_Logger")
+    if Log then
+        Log.info("InteractionClient", "Mode NPC bascul\u00e9",
+            { npc = npcData.fullName, mode = mode })
+    end
+    print(string.format("[PHNPC] %s \u2192 mode %s", npcData.fullName or "NPC", mode))
+
+    -- Feedback vocal : ligne de dialogue adapt\u00e9e au mode choisi
+    local Bubble = PHNPC.getModule("NPC_SpeechBubble")
+    local Dlg    = PHNPC.getModule("NPC_Dialogue")
+    if Bubble and Dlg then
+        local ctx  = npcData.followMode and "greeting" or "idle"
+        local line = Dlg.get(ctx, { name = npcData.firstName or "?" })
+        pcall(function() Bubble.show(npcData, zombie, line) end)
     end
 end
 

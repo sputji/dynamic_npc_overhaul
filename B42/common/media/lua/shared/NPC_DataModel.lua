@@ -85,6 +85,10 @@ function NPCDataModel.new(overrides)
     self.lastFsmTick    = 0
     self.stuckTicks     = 0
 
+    -- Comportement de suivi : false = autonome (NPC_Brain), true = suit le joueur
+    -- Modifiable en jeu via clic droit → "Suivre moi" / "Rester ici"
+    self.followMode     = false
+
     -- Apprentissage passif
     self.observedSkills = {}   -- { [skillName] = xp accumulé }
 

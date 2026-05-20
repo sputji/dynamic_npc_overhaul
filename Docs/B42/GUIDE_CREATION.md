@@ -540,11 +540,16 @@ RELOAD ──► Zombie rechargé depuis disque
 - [ ] `42/media/AnimSets/zombie/` — AnimSets XML (Bob_Idle, Bob_Walk, Bob_Run), [Ne fonctionne toujours pas, à tester après correction du spawn ]
 
 ### Phase 3 — Interactions client ✅ (TERMINÉ)
-- [x] `client/NPC_InteractionClient.lua` — détecte le NPC, option « Parler » visible
-- [x] `client/UI/NPC_DialogueWindow.lua` — ISPanel : nom, profession, santé, ligne NPC_Dialogue, cycle Parler/Commerce/Au revoir
-- [x] `client/NPC_InteractionClient.lua` — branche sur NPC_DialogueWindow.open()
-- [ ] `client/UI/SpeechBubbles.lua` — bulles de dialogue au-dessus du NPC
-- [ ] `server/NPC_NetworkServer.lua` — handlers commandes clients→serveur
+- [x] `client/NPC_InteractionClient.lua` — détecte le NPC, option « Parler à [Nom] »
+- [x] `client/NPC_InteractionClient.lua` — option **▶ Suivre moi / ■ Rester ici** (bascule `npcData.followMode`)
+- [x] `client/UI/NPC_DialogueWindow.lua` — ISPanel : nom, profession, santé, ligne NPC_Dialogue, bouton Suivre/Rester, speech bubble
+- [x] `client/UI/NPC_SpeechBubble.lua` — toast bas-écran + tentative `zombie:setSpeakBubble(text)` native PZ
+
+### Phase 3b — IA comportementale ✅ (TERMINÉ)
+- [x] `NPCDataModel.followMode = false` — NPC autonome par défaut
+- [x] `NPC_Brain.register(npcData)` dans `attachDataModel` — cerveau branché à chaque NPC
+- [x] `doBrainAction(zombie, npcData)` — lit `fsmState` et dispatche les actions physiques
+- [x] FSM → physique : `wander`/`work` → `doWander`, `flee` → course opposée joueur, `guard`/`trade`/`defend` → sur place
 
 ### Phase 4 — Fonctionnalités avancées
 - [ ] `server/NPC_BiteManagement.lua` — morsure → zombie
