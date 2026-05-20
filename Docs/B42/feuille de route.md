@@ -1,5 +1,5 @@
 # Dynamic NPC Overhaul — Feuille de route B42
-> Mise à jour : 20 mai 2026 | Version 1.0.0 | Dernier commit : `6dea81d`
+> Mise à jour : 20 mai 2026 | Version **1.0.1** | Dernier commit : `en cours`
 
 ---
 
@@ -105,9 +105,14 @@ Objectif : le joueur peut interagir avec le PNJ via une vraie fenêtre de dialog
 - [x] `NPCDataModel.followMode` : NPC **autonome par défaut** — suit le joueur uniquement sur demande
 - [x] `NPC_Brain.register(npcData)` appelé dans `attachDataModel` → le cerveau pilote chaque NPC
 - [x] `NPC_Brain.unregister(id)` appelé au nettoyage des entités mortes
-- [x] FSM states → physique : `wander`/`work` → `doWander`, `flee` → course à l'opposé de la menace, `guard`/`trade`/`defend` → sur place
+- [x] FSM states → physique : `wander`/`work` → `doWander`, `flee` → course opposée menace réelle, `guard`/`trade`/`defend` → sur place
 - [x] `NPC_Brain.evaluateThreat` : scan zombie hostile proche (rayon 15 cases, cap 60) → stocke `npcData.fsmTarget`
 - [x] `doBrainAction` flee : priorité `fsmTarget` > zombie hostile proche > joueur (fallback)
+- [x] **Bug fix** : `safeCall(obj, method, ...)` — helper B42 qui vérifie l'existence de la méthode avant d'appeler
+- [x] **Bug fix** : `ZombieIdleState` absent en B42 → remplacé par `getActionContext():clear()`
+- [x] **Bug fix** : `setWalkType()` supprimé partout (variable read-only) → `setVariable("zombieWalkType", ...)` uniquement
+- [x] **Bug fix** : guard nil sur `getEmitter()` avant `stopSoundByName`
+- [x] **Bug fix** : boutons UI ISButton : `backgroundColor` + `borderColor` ajoutés (fond transparent B42)
 
 ### 🔷 Étape 4 — Systèmes avancés
 

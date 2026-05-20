@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Architecture B42
-> Version 1.0.0 | Project Zomboid Build 42.18.0 | Auteur : sputji  
-> **État actuel : Fondations ✅ — Cerveau ✅ — Corps Serveur ✅ — Corps Client ✅ — AnimSets ✅ — UI ✅ (dialogue + speech bubbles)**
+> Version 1.0.1 | Project Zomboid Build 42.18.0 | Auteur : sputji  
+> **État actuel : Fondations ✅ — Cerveau ✅ — Corps Serveur ✅ — Corps Client ✅ — AnimSets ✅ — UI ✅ — Dialogue ✅**
 
 ---
 
@@ -360,3 +360,6 @@ end
 | **Spam setVariable (perf)** | `enforceNPC` écrit `PHNPC_IsNPC` à chaque tick même si déjà défini | Guard `if not zombie:getVariableBoolean("PHNPC_IsNPC")` avant l'écriture |
 | **`getCell()` nil en multijoueur** | Sur serveur dédié sans joueur local, `getCell()` peut renvoyer `nil` | Toujours `local cell = getCell() ; if not cell then return end` avant `getZombieList()` — **guard déjà en place** dans `NPC_SpawnManager` |
 | **NPC fuit le joueur au lieu de la menace** | État `flee` calculait la direction depuis le joueur comme source | **Corrigé** : `evaluateThreat` stocke la position du zombie hostile dans `npcData.fsmTarget`; `doBrainAction` fuit cette position (fallback : zombie hostile proche, puis joueur) |
+| **`Object tried to call nil in pcall` (ligne 608/619)** | `ZombieIdleState` absent en B42, `getEmitter()` peut retourner nil, `setTimeSinceSeenFlesh` supprimé | **Corrigé** : helper `safeCall(obj, method, ...)` vérifie l'existence avant d'appeler ; guard nil sur emitter ; `getActionContext():clear()` remplace `ZombieIdleState.instance()` |
+| **WARN `Trying to set read-only variable "zombiewalktype"`** | `setWalkType()` (Java) pose `zombiewalktype` en read-only | **Corrigé** : tous les appels `setWalkType()` supprimés ; l'AnimEngine lit uniquement `zombie:setVariable("zombieWalkType", ...)` |
+| **Boutons UI transparents / illisibles** | Le moteur de rendu B42 ne donne pas de fond automatique aux ISButton | **Corrigé** : `button.backgroundColor = {r,g,b,a}` + `button.borderColor = {r,g,b,a}` sur chaque bouton dans `initialise()` |

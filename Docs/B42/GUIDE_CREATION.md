@@ -553,6 +553,9 @@ RELOAD ──► Zombie rechargé depuis disque
 - [x] FSM → physique : `wander`/`work` → `doWander`, `flee` → course opposée menace réelle, `guard`/`trade`/`defend` → sur place
 - [x] `doBrainAction` flee : priorité `fsmTarget` > zombie hostile proche > joueur (fallback)
 - [x] `NPC_Brain.unregister(id)` appelé au nettoyage des entités mortes
+- [x] **Bug fix** : `safeCall` helper + `ZombieIdleState` → `getActionContext():clear()` + guard emitter
+- [x] **Bug fix** : `setWalkType()` supprimé partout (read-only B42)
+- [x] **Bug fix** : boutons UI ISButton — `backgroundColor` + `borderColor` pour visibilité
 
 ### Phase 4 — Fonctionnalités avancées
 - [ ] `server/NPC_BiteManagement.lua` — morsure → zombie
@@ -603,6 +606,9 @@ Dans `sandbox-options.txt`, `DebugMode = true` active les logs `TRACE/DEBUG`.
 | Option Sandbox absente | `type = enum` dans sandbox-options.txt | Utiliser `type = integer` |
 | **`getCell()` nil sur serveur dédié** | Sans joueur local, `getCell()` peut renvoyer `nil` | Toujours `local cell = getCell(); if not cell then return end` avant `getZombieList()` |
 | **NPC fuit le joueur au lieu des zombies** | `flee` utilisait le joueur comme source | Utiliser `npcData.fsmTarget` (stocké par `evaluateThreat`) — voir `doBrainAction` |
+| **`Object tried to call nil in pcall`** | Méthode absente en B42 (`ZombieIdleState`, `setTimeSinceSeenFlesh`, `stopSoundByName`) | Helper `safeCall(obj, method, ...)` : vérifie `obj[method]` avant d'appeler ; remplacer `ZombieIdleState.instance()` par `getActionContext():clear()` ; guard nil sur `getEmitter()` |
+| **WARN `read-only variable "zombiewalktype"`** | `zombie:setWalkType()` (méthode Java) pose la variable en read-only | Supprimer tous les appels `setWalkType()` ; utiliser uniquement `zombie:setVariable("zombieWalkType", "Walk" \| "Run" \| "")` |
+| **Boutons UI transparents / illisibles** | B42 ne donne pas de fond automatique aux ISButton | Après `btn:initialise()` : `btn.backgroundColor = {r=0.05,g=0.05,b=0.08,a=0.92}` et `btn.borderColor = {r=0.65,g=0.50,b=0.25,a=0.80}` |
 | Commentaires `--` ignorés/plantent | Parseur PZ sandbox ne lit pas Lua | Supprimer tous les `--` du sandbox |
 | Mod non chargé | `pzversion` au lieu de `targetVersion` | Corriger mod.info |
 | **Mod rouge — dépendance manquante** | `require=` avec valeur vide dans mod.info | Supprimer la ligne `require=` si aucune dépendance |

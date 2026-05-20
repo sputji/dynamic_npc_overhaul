@@ -94,6 +94,8 @@ function NPC_DialogueWindow:initialise()
     local b1 = ISButton:new(gap, by, bw, bh,
         "Parler encore", self, NPC_DialogueWindow.onTalkAgain)
     b1:initialise()
+    b1.backgroundColor = { r=0.05, g=0.05, b=0.08, a=0.92 }
+    b1.borderColor     = { r=0.65, g=0.50, b=0.25, a=0.80 }
     self:addChild(b1)
 
     -- [Suivre moi / Rester ici]
@@ -101,6 +103,8 @@ function NPC_DialogueWindow:initialise()
     local b2 = ISButton:new(gap + bw + gap, by, bw, bh,
         followLabel, self, NPC_DialogueWindow.onFollowToggle)
     b2:initialise()
+    b2.backgroundColor = { r=0.05, g=0.05, b=0.08, a=0.92 }
+    b2.borderColor     = { r=0.65, g=0.50, b=0.25, a=0.80 }
     self:addChild(b2)
     self._followBtn = b2
 
@@ -108,6 +112,8 @@ function NPC_DialogueWindow:initialise()
     local b3 = ISButton:new(PANEL_W - bw - gap, by, bw, bh,
         "Au revoir", self, NPC_DialogueWindow.onClose)
     b3:initialise()
+    b3.backgroundColor = { r=0.05, g=0.05, b=0.08, a=0.92 }
+    b3.borderColor     = { r=0.65, g=0.50, b=0.25, a=0.80 }
     self:addChild(b3)
 end
 
