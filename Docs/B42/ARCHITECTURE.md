@@ -1,13 +1,17 @@
 # ARCHITECTURE — PH Dynamic NPC Overhaul B42
-_Version 1.0.0 — Base NPC fonctionnelle (pattern Custom NPC mod)_
+_Version 1.0.1 — addZombiesInOutfit + Banditize + AnimSets ZSIdle/ZSWalk_
 
 ---
 
 ## Principe fondateur v1
 
 **Client-only, sans dispatcher réseau.**  
-Le NPC est créé directement via `IsoPlayer.new()` côté client. Aucun serveur n'est impliqué en mode solo.  
+Le NPC est créé via `addZombiesInOutfit()` (IsoZombie banditisé). Aucun serveur n'est impliqué en mode solo.  
 En multijoueur futur, `PHNPC_Server.lua` sera étendu.
+
+> **Pourquoi pas IsoPlayer.new() ?**  
+> `IsoPlayer.new()` ne fonctionne QUE dans `isDebugEnabled()` (Custom NPC mod).  
+> En mode normal, rien ne spawn. Approche abandonnée depuis v1.0.0.
 
 ---
 
@@ -26,7 +30,10 @@ B42/
           PHNPC_Server.lua      <- stub serveur (usage futur multijoueur)
   42/
     media/
-      AnimSets/                 <- animations XML pour zombies/NPC
+      AnimSets/
+        zombie/
+          idle/ZSIdle.xml       <- Bob_Idle si PHNPC_IsNPC=true
+          walktoward/ZSWalk.xml <- Bob_Walk si zombieWalkType=Walk
       textures/                 <- icones UI
   mod.info
 ```
@@ -41,14 +48,20 @@ Clic-droit sur le sol
   -> option "[PHNPC] Faire apparaitre un PNJ"
   -> spawnNPC(square, playerIndex)
   -> createNPC(square)
-      +-- SurvivorFactory.CreateSurvivor(nil, isFemale)   <- descripteur visuel
-      +-- desc:setForename/setSurname/setProfession
-      +-- IsoPlayer.new(getWorld():getCell(), desc, x, y, z)  <- entite IsoPlayer
-      +-- npc:setNPC(true)
-      +-- npc:setSceneCulled(false)
-      +-- npc:setDir(IsoDirections.SE)
-      +-- npc:getInventory():AddItem(...)
-      +-- PHNPC.npcs[npc] = { id, forename, surname, fullname, isFemale, followMode=true }
+      +-- addZombiesInOutfit(x, y, z, 1, outfit, femaleChance)  <- IsoZombie
+      +-- Banditize:
+          npc:setNoTeeth(true)
+          npc:setVariable("PHNPC_IsNPC", true)       <- active ZSIdle.xml
+          npc:setWalkType("Walk")                    <- active ZSWalk.xml
+          npc:setVariable("zombieWalkType", "Walk")
+          npc:setVariable("ZombieHitReaction", "Chainsaw")
+          npc:setVariable("NoLungeTarget", true)
+          npc:setDressInRandomOutfit(false)
+          npc:setTurnAlertedValues(-5, 5)
+          npc:setBumpType("Shrug")
+      +-- hv:removeDirt() / removeBlood()
+      +-- npc:getModData() <- PHNPC_ID, PHNPC_Name, PHNPC_Female
+      +-- PHNPC.npcs[npc] = { id, name, isFemale, followMode=true }
 ```
 
 ---
@@ -57,7 +70,7 @@ Clic-droit sur le sol
 
 ```
 OnTick (chaque frame)
-  +-- Cleanup pass (tous les 300 ticks) : retire les NPC morts
+  +-- Cleanup pass (tous les 300 ticks) : retire les NPC morts (isDead())
   +-- Movement pass (chaque tick)
         +-- SI followMode=true ET dist > STOP_DIST
         |     +-- Tous les RETARGET ticks : npc:getPathFindBehavior2():pathToLocation(px,py,pz)

@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 20 mai 2026 | Version **1.0.0** | Base NPC fonctionnelle from scratch
+> Mise a jour : 20 mai 2026 | Version **1.0.1** | AnimSets corriges, menu double fixe
 
 ---
 
@@ -10,21 +10,29 @@
 |---------|------|--------|
 | 1.x | mars 2026 | Fondations, structure B42 |
 | 2.x | mai 2026 | Cerveau FSM, NetworkDispatcher — NPC jamais spawne en jeu |
-| **1.0.0** | **20 mai 2026** | **Base NPC fonctionnelle : pattern Custom NPC mod, IsoPlayer direct client-side** |
+| 1.0.0 | 20 mai 2026 | Base NPC fonctionnelle : addZombiesInOutfit + Banditize (remplacement IsoPlayer.new) |
+| **1.0.1** | **20 mai 2026** | **Fix : AnimSets ZSIdle/ZSWalk (noms corrects), menu clic-droit en double supprime** |
 
 ---
 
-## Root cause des versions 1.x / 2.x
+## Root cause des echecs precedents
 
-Le `NPC_NetworkDispatcher` pensait etre en MULTI meme en solo (a cause de `getServerOptions()`).
-`Dispatcher.send("all", "PHNPC_DoSpawn")` appelait `getOnlinePlayers()` (vide en solo).
-`PHNPC_DoSpawn` n'arrivait jamais au client → aucun NPC cree.
+### IsoPlayer.new() (< v1.0.0)
+`IsoPlayer.new()` ne fonctionne qu'en `isDebugEnabled()` (Custom NPC). Hors debug = rien.
+**Solution v1.0.0** : `addZombiesInOutfit()` + Banditize (pattern NPC_Helper_Mod / Bandits).
 
-**Solution v1** : Supprimer le dispatcher. Creation directe `IsoPlayer.new()` cote client.
+### AnimSets mal nommees (< v1.0.1)
+Fichiers `PHNPC_Idle.xml` / `PHNPC_Walk.xml` avec `m_Name = PHNPC_Idle/PHNPC_Walk`.
+La state machine zombie ne connait que `ZSIdle` / `ZSWalk` — les custom m_Name ne sont jamais selectionnes.
+**Solution v1.0.1** : Fichiers renommes `ZSIdle.xml` / `ZSWalk.xml` avec `m_Name` corrects.
+
+### Menu en double (< v1.0.1)
+`Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)` enregistre deux fois dans le code.
+**Solution v1.0.1** : Doublons supprimes.
 
 ---
 
-## v1.0.0 — Architecture (20 mai 2026)
+## v1.0.1 — Architecture (20 mai 2026)
 
 ### Fichiers actifs
 
@@ -33,25 +41,39 @@ Le `NPC_NetworkDispatcher` pensait etre en MULTI meme en solo (a cause de `getSe
 | `shared/PHNPC_Core.lua` | Namespace global `PHNPC`, `VERSION = "1.0.0"` |
 | `client/PHNPC_Manager.lua` | TOUTE la logique : spawn, pathfinding, menu |
 | `server/PHNPC_Server.lua` | Stub serveur (vide, futur multi) |
+| `42/media/AnimSets/zombie/idle/ZSIdle.xml` | Bob_Idle si `PHNPC_IsNPC = true` |
+| `42/media/AnimSets/zombie/walktoward/ZSWalk.xml` | Bob_Walk si `zombieWalkType = Walk` |
 
-### Ce qui fonctionne en v1.0.0
+### Ce qui fonctionne en v1.0.1
 
-- [ ] Clic-droit sol → spawn NPC (`IsoPlayer.new()` exact pattern Custom NPC)
-- [ ] NPC visible avec animations humaines (SurvivorFactory + Bob skeleton)
-- [ ] NPC suit le joueur (`getPathFindBehavior2():pathToLocation()` chaque N ticks)
-- [ ] Clic-droit NPC → "Suis-moi" / "Reste ici" / "Supprimer"
-- [ ] Nettoyage automatique des NPC morts
-- [ ] Limite MAX_NPCS = 10
+- [x] Clic-droit sol → spawn NPC (`addZombiesInOutfit` + Banditize)
+- [x] NPC visible avec animations humaines Bob/Kate (ZSIdle.xml / ZSWalk.xml)
+- [x] NPC suit le joueur (`pathToLocationF` + `setBumpType` transitions)
+- [x] Clic-droit NPC → "Suis-moi" / "Reste ici" / "Supprimer"
+- [x] Nettoyage automatique des NPC morts (cleanup tous les 300 ticks)
+- [x] Limite MAX_NPCS = 10
+- [x] Menu clic-droit unique (plus de doublon d'inscription event)
+
+### Comportement connu (by design)
+- Les NPC sont des `IsoZombie` banditises. Ils se defendent si frappes/pousses.
+  C'est le comportement normal des NPCs zombie-based en B42 (Bandits, NPC_Helper_Mod).
+  Version future : systeme d'equipe (faction) pour NPC passifs.
 
 ---
 
 ## Prochaines etapes (par priorite)
 
-### Phase 1 — Stabilisation (a tester en jeu)
-- [ ] Verifier IsoPlayer.new() visible et non-hostile
-- [ ] Verifier pathfinding (NPC suit vraiment le joueur)
-- [ ] Verifier context menu (clic-droit fonctionne)
-- [ ] Consigner les erreurs console.txt
+### Phase 1 — Stabilisation ✅ (v1.0.1)
+- [x] Spawn NPC visible (addZombiesInOutfit + Banditize)
+- [x] Animations humaines (ZSIdle.xml / ZSWalk.xml corriges)
+- [x] Menu clic-droit unique
+- [x] Pathfinding (pathToLocationF + setBumpType)
+- [ ] Tester suivi continu en jeu (NPC suit vraiment sur la duree)
+- [ ] Tester suppression NPC (removeFromWorld)
+
+### Phase 1b — Comportement defensif (futur)
+- [ ] NPC passif (ne se defend pas si frappe) : systeme de faction / equipe
+- [ ] setCurrentBehavior("idle") apres chaque tick pour bloquer l'IA de combat
 
 ### Phase 2 — Persistence
 - [ ] Sauvegarder les NPC actifs via ModData a OnSave
@@ -72,9 +94,13 @@ Le `NPC_NetworkDispatcher` pensait etre en MULTI meme en solo (a cause de `getSe
 
 ## Notes techniques cles (B42 / Kahlua)
 
-- `IsoPlayer.new(cell, desc, x, y, z)` = seule methode pour animations humaines en B42
-- `npc:setNPC(true)` = OBLIGATOIRE (sinon traite comme joueur)
-- `npc:getPathFindBehavior2():pathToLocation(x,y,z)` = mouvement NPC
-- `npc:getPathFindBehavior2():update()` = appel OBLIGATOIRE chaque tick
-- `getGameMode()` retourne "Sandbox" (solo) ou "Multiplayer" (multi)
+- `addZombiesInOutfit(x, y, z, count, outfit, femaleChance)` = seule methode viable pour NPC humains B42
+- `IsoPlayer.new()` = NE FONCTIONNE PAS hors isDebugEnabled() — ne pas utiliser
+- `npc:setVariable("PHNPC_IsNPC", true)` = active ZSIdle.xml condition (Bob_Idle)
+- `npc:setWalkType("Walk")` + `setVariable("zombieWalkType", "Walk")` = active ZSWalk.xml (Bob_Walk)
+- `npc:pathToLocationF(x, y, z)` = mouvement IsoZombie (PAS getPathFindBehavior2)
+- `npc:setUseless(false)` = OBLIGATOIRE avant pathToLocationF (sinon NPC immobile)
+- `setBumpType("IdleToWalk")` / `setBumpType("WalkToIdle")` = transitions animation
+- `setVariable("ZombieHitReaction", "Chainsaw")` = previent crash testDefense sur hit
+- AnimSets : le m_Name DOIT etre `ZSIdle` / `ZSWalk` (noms connus de la state machine)
 - Pas de BOM UTF-8, pas de `goto`, pas de `next()`, pas de `obj:method and ...`

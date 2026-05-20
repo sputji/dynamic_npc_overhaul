@@ -332,10 +332,3 @@ end)
 
 Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
 print("[PHNPC] PHNPC_Manager v1.0 loaded")
-
--- ============================================================
--- REGISTER CONTEXT MENU
--- ============================================================
-Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
-
-print("[PHNPC] PHNPC_Manager v1.0 loaded")

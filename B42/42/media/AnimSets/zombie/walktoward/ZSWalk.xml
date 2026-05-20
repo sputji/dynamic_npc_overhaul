@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PHNPC: override ZSWalk avec Bob_Walk.
+     Condition: zombieWalkType = Walk (identique NPC_Helper_Mod + Bandits).
+     La condition PHNPC_IsNPC n'est pas necessaire ici car seuls nos NPCs
+     ont setWalkType("Walk") = les zombies vanilla utilisent "Shuffle".
+     x_extends herite les transitions de ZSWalkAll.xml (pattern des 2 mods ref). -->
+<animNode x_extends="ZSWalkAll.xml">
+	<m_Name>ZSWalk</m_Name>
+	<m_AnimName>Bob_Walk</m_AnimName>
+	<m_Conditions>
+		<m_Name>zombieWalkType</m_Name>
+		<m_Type>STRING</m_Type>
+		<m_StringValue>Walk</m_StringValue>
+	</m_Conditions>
+	<m_Events>
+		<m_EventName>Footstep</m_EventName>
+		<m_TimePc>0.15</m_TimePc>
+		<m_ParameterValue>walk</m_ParameterValue>
+	</m_Events>
+	<m_Events>
+		<m_EventName>Footstep</m_EventName>
+		<m_TimePc>0.6</m_TimePc>
+		<m_ParameterValue>walk</m_ParameterValue>
+	</m_Events>
+	<m_Transitions>
+		<m_Target>ZSWalkAim</m_Target>
+		<m_AnimName>Bob_WalkToWalkAim1Hand</m_AnimName>
+	</m_Transitions>
+	<m_Transitions>
+		<m_Target>ZSWalkAimSpear</m_Target>
+		<m_AnimName>Bob_WalkToWalkAimSpear</m_AnimName>
+	</m_Transitions>
+</animNode>
