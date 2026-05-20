@@ -218,5 +218,50 @@ end
 
 Events.OnClientCommand.Add(onClientCommand)
 
+-- ============================================================
+-- Restauration des setVariable après reload de partie ou déchargement de chunk
+--
+-- Problème : zombie:setVariable() n'est PAS persisté sur disque.
+--   Après un reload ou un retour dans un chunk, les variables AnimEngine
+--   (PHNPC_IsNPC, PHNPC_IsFemale) sont perdues, même si le ModData est intact.
+-- Solution : chaque minute, scanner tous les zombies chargés. Pour ceux
+--   qui ont PHNPC_IsNPC dans leur ModData mais ont perdu le setVariable,
+--   ré-appliquer. Cela déclenche la détection côté client via Méthode A.
+-- ============================================================
+local function _restoreNPCVariables()
+    local cell = getCell()
+    if not cell then return end
+    local list = cell:getZombieList()
+    if not list then return end
+
+    local restored = 0
+    for i = 0, list:size() - 1 do
+        local z = list:get(i)
+        if z then
+            local ok, md = pcall(function() return z:getModData() end)
+            if ok and md then
+                local v = md.PHNPC_IsNPC
+                -- Tester boolean ET string (sérialisation PZ variable selon le build)
+                if v == true or v == "true" then
+                    local alreadySet = false
+                    pcall(function() alreadySet = z:getVariableBoolean("PHNPC_IsNPC") end)
+                    if not alreadySet then
+                        local fv = md.PHNPC_IsFemale
+                        z:setVariable("PHNPC_IsNPC",    true)
+                        z:setVariable("PHNPC_IsFemale", fv == true or fv == "true")
+                        restored = restored + 1
+                    end
+                end
+            end
+        end
+    end
+
+    if restored > 0 then
+        print("[PHNPC] Restauration NPC: " .. restored .. " setVariable(s) r\u00e9appliqu\u00e9(s) apr\u00e8s reload/chunk")
+    end
+end
+
+Events.EveryOneMinute.Add(_restoreNPCVariables)
+
 PHNPC.registerModule("NPC_SpawnManager", NPC_SpawnManager)
 return NPC_SpawnManager

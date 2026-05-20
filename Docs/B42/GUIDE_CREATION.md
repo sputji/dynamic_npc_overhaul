@@ -408,7 +408,98 @@ end)
 
 ---
 
-## 7. Événements PZ B42 utiles
+## 7. Persistance des NPC après reload de partie
+
+### Le problème
+
+En PZ B42, **`zombie:setVariable()` n'est PAS sauvegardé sur disque**. C'est une variable AnimEngine
+stockée en RAM sur l'objet Java. Après un reload ou un déchargement de chunk :
+- `getVariableBoolean("PHNPC_IsNPC")` → `false` (perdu)
+- Le client ne reconnaît plus le zombie comme NPC → pas d'`enforceNPC` → zombie attaque
+
+**Ce qui est persisté** : `zombie:getModData()["PHNPC_IsNPC"]` (Java HashMap sérialisé sur disque).
+
+### La solution double
+
+**Côté serveur** (`NPC_SpawnManager.lua`) :
+```lua
+-- EveryOneMinute : re-scanner et ré-appliquer setVariable si perdu
+Events.EveryOneMinute.Add(function()
+    local list = getCell() and getCell():getZombieList()
+    if not list then return end
+    for i = 0, list:size() - 1 do
+        local z = list:get(i)
+        if z then
+            local ok, md = pcall(function() return z:getModData() end)
+            if ok and md then
+                local v = md.PHNPC_IsNPC
+                -- Gérer boolean ET string (sérialisation PZ variable selon le build)
+                if v == true or v == "true" then
+                    local already = false
+                    pcall(function() already = z:getVariableBoolean("PHNPC_IsNPC") end)
+                    if not already then
+                        z:setVariable("PHNPC_IsNPC", true)
+                        z:setVariable("PHNPC_IsFemale", md.PHNPC_IsFemale == true)
+                    end
+                end
+            end
+        end
+    end
+end)
+```
+
+**Côté client** (`NPC_FollowTick.lua`) :
+```lua
+-- 1. Vider les caches sur chargement (gère "charger sans quitter")
+Events.OnGameStart.Add(function()
+    _convertedNPCs = {}
+    if PHNPC._activeNPCs then
+        for k in pairs(PHNPC._activeNPCs) do PHNPC._activeNPCs[k] = nil end
+    end
+end)
+
+-- 2. Détection Method B : tester boolean ET string
+local v = md.PHNPC_IsNPC
+if v == true or v == "true" then isNPC = true end
+
+-- 3. Persister l'état FSM en ModData toutes les ~4 secondes
+local _fsmSaveTick = 0
+Events.OnTick.Add(function()
+    _fsmSaveTick = _fsmSaveTick + 1
+    if _fsmSaveTick < 120 then return end
+    _fsmSaveTick = 0
+    for zombie, _ in pairs(_convertedNPCs) do
+        local npcData = PHNPC._activeNPCs and PHNPC._activeNPCs[zombie]
+        if npcData then
+            pcall(function()
+                local md = zombie:getModData()
+                if md then
+                    md.PHNPC_FsmState = npcData.fsmState or "idle"
+                    md.PHNPC_Health   = npcData.health   or 100
+                end
+            end)
+        end
+    end
+end)
+```
+
+### Résumé du flux de persistance
+
+```
+SPAWN ──► addZombiesInOutfit
+             ├── setVariable("PHNPC_IsNPC", true)   ← RAM seulement, perdu au reload
+             └── ModData["PHNPC_IsNPC"] = true       ← Disque, TOUJOURS persisté
+
+RELOAD ──► Zombie rechargé depuis disque
+             ├── ModData.PHNPC_IsNPC  = true  ✅ (persisté)
+             ├── getVariableBoolean() = false ❌ (perdu)
+             ├── EveryOneMinute serveur → setVariable restauré ✅
+             └── OnZombieUpdate client → convertToNPC re-déclenché ✅
+```
+
+---
+
+## 8. Événements PZ B42 utiles
 
 | Événement | Côté | Description |
 |-----------|------|-------------|
@@ -425,7 +516,7 @@ end)
 
 ---
 
-## 8. Ordre d'implémentation recommandé
+## 9. Ordre d'implémentation recommandé
 
 ### Phase 1 — Fondations (faites ✅)
 - [x] `mod.info` + `sandbox-options.txt` + traductions
@@ -446,7 +537,7 @@ end)
 - [x] `client/00_Init.lua` — point d'entrée client, handler PHNPC_SpawnConfirm
 - [x] `client/NPC_FollowTick.lua` — conversion zombie→NPC, visuals humains, animations ✅
 - [x] `client/NPC_SpawnDebug.lua` — menu debug spawn (visible avec `-debug` flag)
-- [x] `42/media/AnimSets/zombie/` — AnimSets XML (Bob_Idle, Bob_Walk, Bob_Run) ✅
+- [ ] `42/media/AnimSets/zombie/` — AnimSets XML (Bob_Idle, Bob_Walk, Bob_Run), [Ne fonctionne toujours pas, à tester après correction du spawn ]
 
 ### Phase 3 — Interactions client 🔶 (en cours)
 - [x] `client/NPC_InteractionClient.lua` — détecte le NPC, option "Parler" visible
@@ -460,8 +551,8 @@ end)
 - [ ] `client/UI/SpeechBubbles.lua` — bulles de dialogue
 
 ### Phase 5 — IA et extras
-- [ ] `server/OllamaBridge.lua` — bridge IA local
-- [ ] `client/UI/OllamaChatUI.lua` — chat IA
+- [ ] `server/OllamaBridge.lua` — bridge IA local (Facultatif)
+- [ ] `client/UI/OllamaChatUI.lua` — chat IA (Facultatif)
 - [ ] `client/UI/QuestJournalUI.lua` — journal de quêtes
 - [ ] `server/AdminCommands.lua` — commandes /phnpc
 

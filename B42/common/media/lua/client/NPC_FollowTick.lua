@@ -260,8 +260,13 @@ end
 -- ============================================================
 
 local function enforceNPC(zombie)
-    -- Maintenir le flag AnimEngine hors pcall (garantit l'écriture chaque tick)
-    zombie:setVariable("PHNPC_IsNPC", true)
+    -- Re-set uniquement si la variable a été perdue (chunk reload, reset moteur).
+    -- Évite le spam de cross-VM Java call à 30-60 fps (optimisation performance).
+    local alreadySet = false
+    pcall(function() alreadySet = zombie:getVariableBoolean("PHNPC_IsNPC") end)
+    if not alreadySet then
+        zombie:setVariable("PHNPC_IsNPC", true)  -- hors pcall pour garantir l'écriture
+    end
     -- Aucune morsure, aucune cible zombie
     pcall(function() zombie:setNoTeeth(true) end)
     pcall(function() zombie:setTarget(nil) end)
@@ -307,6 +312,10 @@ local function doFollow(zombie, player)
             zombie:setPath2(nil)
             zombie:setVariable("zombieWalkType", "")
             zombie:faceThisObject(player)
+            -- Fix glissement physique B42 : l'inertie du moteur peut faire "glisser" le modèle
+            -- quelques frames après l'arrêt. Aligner la direction sur le joueur annule l'inertie.
+            local fwd = player:getForwardDirection()
+            if fwd then zombie:setForwardDirection(fwd) end
         end)
         return
     end
@@ -340,6 +349,43 @@ end
 
 Events.EveryOneMinute.Add(_disableTiered)
 
+-- ============================================================
+-- Réinitialisation des caches sur chargement de partie
+-- (gère aussi le cas "charger une sauvegarde sans quitter" en solo)
+-- ============================================================
+Events.OnGameStart.Add(function()
+    -- Vider la table de conversion (les objets Java sont différents après reload)
+    _convertedNPCs = {}
+    -- Vider le registre actif (sera reconstruit par OnZombieUpdate)
+    if PHNPC._activeNPCs then
+        for k in pairs(PHNPC._activeNPCs) do PHNPC._activeNPCs[k] = nil end
+    end
+    print("[PHNPC] OnGameStart: caches locaux réinitialisés — re-conversion des NPC à venir")
+end)
+
+-- ============================================================
+-- Persistance de l'état FSM vers ModData (toutes les ~4 secondes)
+-- Garantit que l'état FSM et la santé survivent aux reloads de partie.
+-- ============================================================
+local _fsmSaveTick = 0
+Events.OnTick.Add(function()
+    _fsmSaveTick = _fsmSaveTick + 1
+    if _fsmSaveTick < 120 then return end
+    _fsmSaveTick = 0
+    for zombie, _ in pairs(_convertedNPCs) do
+        local npcData = PHNPC._activeNPCs and PHNPC._activeNPCs[zombie]
+        if npcData then
+            pcall(function()
+                local md = zombie:getModData()
+                if md then
+                    md.PHNPC_FsmState = npcData.fsmState or "idle"
+                    md.PHNPC_Health   = npcData.health   or 100
+                end
+            end)
+        end
+    end
+end)
+
 local function onZombieUpdate(zombie)
     if not zombie then return end
     -- Guard null Java : un zombie Java null n'est pas nil en Kahlua,
@@ -371,13 +417,20 @@ local function onZombieUpdate(zombie)
         end
     end)
 
-    -- Méthode B : ModData — fonctionne quand client/serveur partagent la même VM
-    -- (certaines versions solo B42 ou futur moteur unifié).
+    -- Méthode B : ModData — persiste dans la sauvegarde, survit aux reloads et déchargements de chunk.
+    -- Le serveur écrit md.PHNPC_IsNPC = true lors du spawn. Cette valeur est sérialisée
+    -- avec l'entité et rechargée depuis le disque à chaque reload de partie.
+    -- ⚠️ PZ peut sérialiser Java Boolean true comme String "true" selon les builds
+    --    → on teste les deux représentations pour garantir la détection post-reload.
     if not isNPC then
         local mdOk, md = pcall(function() return zombie:getModData() end)
-        if mdOk and md and md.PHNPC_IsNPC then
-            isNPC    = true
-            isFemale = md.PHNPC_IsFemale or false
+        if mdOk and md then
+            local v  = md.PHNPC_IsNPC
+            local fv = md.PHNPC_IsFemale
+            if v == true or v == "true" then
+                isNPC    = true
+                isFemale = (fv == true or fv == "true")
+            end
         end
     end
 

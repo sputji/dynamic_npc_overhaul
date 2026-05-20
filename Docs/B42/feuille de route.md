@@ -47,14 +47,14 @@
 | Fichier | État |
 |---------|------|
 | `server/00_Init.lua` | ✅ Opérationnel — enregistre le handler `PHNPC_SpawnRequest` |
-| `server/NPC_SpawnManager.lua` | ✅ Fonctionnel — `addZombiesInOutfit` B42, noms aléatoires, professions, génération NPC data |
+| `server/NPC_SpawnManager.lua` | ✅ Fonctionnel — `addZombiesInOutfit` B42, noms aléatoires, professions, génération NPC data, **`EveryOneMinute` re-scan post-reload** |
 
 ### ✅ Terminé — Corps Client (`client/`)
 
 | Fichier | État |
 |---------|------|
 | `client/00_Init.lua` | ✅ Opérationnel — handler `PHNPC_SpawnConfirm`, `disableTieredUpdates` |
-| `client/NPC_FollowTick.lua` | ✅ Fonctionnel — conversion zombie→NPC, visuals humains, suivi joueur, animations |
+| `client/NPC_FollowTick.lua` | ✅ Fonctionnel — conversion zombie→NPC, visuals, suivi, animations, FSM state save, `Events.OnGameStart` reset |
 | `client/NPC_SpawnDebug.lua` | ✅ Fonctionnel — menu clic-droit spawn (visible avec `-debug` flag) |
 | `client/NPC_InteractionClient.lua` | 🔶 Stub — détecte le NPC (contour bleu), log interaction, **dialogue non implémenté** |
 
@@ -126,7 +126,19 @@ Objectif : le joueur peut interagir avec le PNJ via une vraie fenêtre de dialog
 > **`zombie:setMaxHealth()` / `setHealth()`** : Ces méthodes n'existent pas sur `IsoZombie` en B42.  
 > Un appel dans un `pcall()` Kahlua cause `Object tried to call nil in pcall` qui remonte et  
 > crash la fonction parente à chaque tick si `_convertedNPCs[zombie]` n'est pas marqué avant.
+> **`zombie:setVariable()` n'est PAS persisté sur disque.**  
+> Après un reload de partie ou un déchargement de chunk, toutes les variables AnimEngine  
+> (PHNPC_IsNPC, PHNPC_IsFemale...) sont perdues. Solution : le serveur utilise `EveryOneMinute`  
+> pour re-scanner `getCell():getZombieList()` et ré-appliquer `setVariable` aux zombies  
+> qui ont `ModData.PHNPC_IsNPC = true` mais `getVariableBoolean("PHNPC_IsNPC") = false`.
 
+> **`ModData` (Java HashMap) IS persisté sur disque.**  
+> C'est la source de vérité pour la détection post-reload. La détection Method B vérifie  
+> `v == true or v == "true"` car PZ peut sérialiser un Java Boolean comme String selon la version.
+
+> **État FSM perdu au reload** : écrire `md.PHNPC_FsmState` en ModData périodiquement (toutes les ~4s)  
+> depuis le client via `Events.OnTick`. ModData étant sur le Java object partagé, l'écriture client  
+> est visible côté serveur et persistée lors du save.
 > **`pcall` Kahlua** : Ne jamais mettre des appels critiques (`setVariable` AnimEngine) dans un pcall.  
 > En solo B42, `pcall` peut avaler silencieusement une erreur sans que la variable soit écrite.
 

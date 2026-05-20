@@ -17,7 +17,7 @@ Chaque module s'enregistre via `PHNPC.registerModule(name, tbl)` et se retrouve 
 | Couche | Rôle | État |
 |--------|------|------|
 | **Cerveau** (`shared/`) | Logique pure, données, IA, réseau abstrait | ✅ Implémenté |
-| **Corps serveur** (`server/`) | Spawn, réseau serveur, commandes admin | ✅ Fonctionnel |
+| **Corps serveur** (`server/`) | Spawn, réseau serveur, commandes admin | ✅ Fonctionnel + réstauration reload |
 | **Corps client** (`client/`) | Menu clic-droit, FollowTick, debug spawn | ✅ Fonctionnel |
 | **AnimSets** (`42/media/AnimSets/`) | Animations humaines Bob_Idle / Bob_Walk | ✅ Actif |
 | **UI** (`client/UI/`) | Fenêtres ISPanel (commerce, chat, quêtes) | ❌ À créer |
@@ -85,14 +85,14 @@ D:\PZ Mods\Dynamic_NPC_Overhaul\
                 │
                 ├── server\          ✅ CORPS SERVEUR — Fonctionnel
                 │   ├── 00_Init.lua          # Point d'entrée serveur, handler PHNPC_SpawnRequest
-                │   └── NPC_SpawnManager.lua # Spawn via addZombiesInOutfit B42, noms/professions
+                │   └── NPC_SpawnManager.lua # Spawn addZombiesInOutfit + EveryOneMinute re-scan post-reload
                 │   ── (À créer) NPC_NetworkServer.lua, NPC_BiteManagement.lua
                 │   ── (À créer) NPC_ObservationLearning.lua, OllamaBridge.lua
                 │   ── (À créer) AdminCommands.lua
                 │
                 └── client\          ✅ CORPS CLIENT — Fonctionnel
                     ├── 00_Init.lua              # Point d'entrée client, handler PHNPC_SpawnConfirm
-                    ├── NPC_FollowTick.lua        # Conversion zombie→NPC, visuals humains, suivi, animations
+                    ├── NPC_FollowTick.lua        # Conversion, enforce (guard spam), doFollow (slide fix), FSM save
                     ├── NPC_InteractionClient.lua # Menu clic-droit (détecte NPC, dialogue stub)
                     ├── NPC_SpawnDebug.lua        # Commandes debug spawn (mode -debug)
                     └── UI\                       # ⚠️ À créer
@@ -343,3 +343,8 @@ end
 | **`getGameMode()` = Multiplayer en solo** | B42 retourne toujours `"Multiplayer"` | Utiliser `not isMultiplayer()` pour détecter le solo |
 | **`getOptionCount()` crash au lancement** | `getServerOptions()` retourne un objet sans cette méthode en solo | Guard `type(opts.getOptionCount) == "function"` avant l'appel |
 | **Zombie re-cible le joueur** | Moteur conserve la mémoire de chair fraîche | `zombie:setTimeSinceSeenFlesh(1000000)` dans `convertToNPC` et `enforceNPC` |
+| **NPC redevient zombie après reload** | `setVariable` (AnimEngine) **n'est pas persisté** sur disque | Serveur : `EveryOneMinute` re-scanne `getCell():getZombieList()` et ré-applique `setVariable` pour tout zombie avec `ModData.PHNPC_IsNPC` |
+| **NPC redevient zombie après chunk unload** | Même cause : variables AnimEngine perdues au déchargement | Même fix que ci-dessus + détection Method B (ModData) tolère `true` ET `"true"` |
+| **État FSM perdu au reload** | `fsmState` / `health` jamais écrits en ModData pendant le jeu | Client : `Events.OnTick` écrit `md.PHNPC_FsmState` et `md.PHNPC_Health` toutes les ~4 secondes |
+| **Glissement du modèle à l'arrêt** | Inertie physique B42 non réinitialisée après `setPath2(nil)` | `zombie:setForwardDirection(player:getForwardDirection())` dans `doFollow` au moment de l'arrêt |
+| **Spam setVariable (perf)** | `enforceNPC` écrit `PHNPC_IsNPC` à chaque tick même si déjà défini | Guard `if not zombie:getVariableBoolean("PHNPC_IsNPC")` avant l'écriture |
