@@ -152,19 +152,25 @@ local function convertToNPC(zombie, isFemale)
     local Log = PHNPC.getModule("NPC_Logger")
     isFemale = isFemale or false
 
-    -- 1a. Activer le flag NPC DÈS LE DÉBUT (condition AnimSet PHNPC_Idle/Walk activée,
-    --     resetModel() dans applyHumanVisuals trouvera déjà PHNPC_IsNPC=true)
-    --     Pattern GCCoreConvert : GCCompanion = true en step 3, avant applyHumanVisuals.
-    pcall(function()
-        zombie:setVariable("PHNPC_IsNPC",    true)
-        zombie:setVariable("PHNPC_IsFemale", isFemale)
-    end)
+    -- 1a. LA CLÉ ANIMENGINE : setVariable hors pcall pour garantir l'écriture
+    --     L'AnimEngine Java lit BOOL via getVariableBoolean(), PAS le ModData Lua.
+    --     On écrit string ET bool pour couvrir les deux modes de lecture du moteur.
+    zombie:setVariable("PHNPC_IsNPC",    "true")  -- STRING fallback
+    zombie:setVariable("PHNPC_IsNPC",    true)     -- BOOL  (condition XML : BOOL true)
+    zombie:setVariable("PHNPC_IsFemale", isFemale)
 
     -- 1b. Désactiver les mécaniques zombie (Bandits : lignes 164-204)
     pcall(function() zombie:setNoTeeth(true) end)
     pcall(function() zombie:setTarget(nil) end)
     pcall(function() zombie:clearAggroList() end)
     pcall(function() zombie:setEatBodyTarget(nil, false) end)
+    -- Forcer l'oubli de la présence joueur (sinon zombie reste en mode traque)
+    pcall(function() zombie:setTimeSinceSeenFlesh(1000000) end)
+
+    -- 1c. Vider le contexte d'action courant → force l'AnimEngine à relire les XML
+    pcall(function()
+        if zombie:getActionContext() then zombie:getActionContext():clear() end
+    end)
 
     -- 2. Variables de vitesse
     pcall(function() zombie:setVariable("LimpSpeed", 0.80) end)
@@ -254,22 +260,21 @@ end
 -- ============================================================
 
 local function enforceNPC(zombie)
+    -- Maintenir le flag AnimEngine hors pcall (garantit l'écriture chaque tick)
+    zombie:setVariable("PHNPC_IsNPC", true)
     -- Aucune morsure, aucune cible zombie
     pcall(function() zombie:setNoTeeth(true) end)
     pcall(function() zombie:setTarget(nil) end)
     pcall(function() zombie:clearAggroList() end)
-    -- Maintenir le flag d'identité NPC côté Java chaque tick (cross-VM)
-    pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
+    -- Supprimer la mémoire de chair fraîche (empêche le zombie de re-cibler)
+    pcall(function() zombie:setTimeSinceSeenFlesh(1000000) end)
     -- Flag Bandit : maintenu chaque tick pour que le moteur ne réactive pas l'IA zombie
     pcall(function() zombie:setVariable("Bandit", true) end)
     pcall(function() zombie:setVariable("NoLungeAttack", true) end)
     pcall(function() zombie:setVariable("ZombieHitReaction", "Chainsaw") end)
-    -- Silencer les sons zombie (stopAll chaque tick empêche tout son résiduel)
-    pcall(function() zombie:getEmitter():stopAll() end)
-    -- Empêcher le moteur de marquer l'entité comme "useless" (arrêt de l'IA)
-    pcall(function() zombie:setUseless(false) end)
-    -- Garder la marche humaine
-    pcall(function() zombie:setWalkType("Walk") end)
+    -- Silencer les grognements résiduels
+    pcall(function() zombie:getEmitter():stopSoundByName("ZombieRoam") end)
+    pcall(function() zombie:getEmitter():stopSoundByName("ZombieSurprised") end)
     -- Intercepter l'état lunge : le zombie essaie d'attaquer une cible.
     -- Pattern Bandits ManageActionState : changer vers idle + clearAggroList.
     pcall(function()
@@ -297,19 +302,19 @@ local function doFollow(zombie, player)
     local dist = math.sqrt(dx * dx + dy * dy)
 
     if dist <= FOLLOW_MIN_DIST then
-        -- Assez proche : arrêter le pathfinding B42
+        -- Assez proche : arrêter + zombieWalkType vide → PHNPC_Idle.xml prend le relais
         pcall(function()
-            zombie:getPathFindBehavior2():cancel()
+            zombie:setPath2(nil)
+            zombie:setVariable("zombieWalkType", "")
+            zombie:faceThisObject(player)
         end)
         return
     end
 
-    -- Vitesse selon distance
-    if dist > FOLLOW_RUN_DIST then
-        pcall(function() zombie:setWalkType("Run") end)
-    else
-        pcall(function() zombie:setWalkType("Walk") end)
-    end
+    -- Vitesse selon distance + écriture zombieWalkType pour PHNPC_Walk/Run.xml
+    local speed = (dist > FOLLOW_RUN_DIST) and "Run" or "Walk"
+    zombie:setVariable("zombieWalkType", speed)
+    pcall(function() zombie:setWalkType(speed) end)
 
     -- Cible : légèrement derrière le joueur (évite de le bloquer)
     local len = math.max(dist, 0.01)
@@ -317,13 +322,9 @@ local function doFollow(zombie, player)
     local targetY = py + (dy / len) * FOLLOW_OFFSET
     local targetZ = player:getZ()
 
-    -- API B42 correcte : getPathFindBehavior2():pathToLocation() + update()
-    -- (zombie:pathToLocation direct n'existe pas en B42 → crash "non-table: null")
-    -- Source : ZAMove.lua de Bandits 42.18
+    -- Pathfinding B42 : WalkTo direct + fallback pathFindBehavior2
     pcall(function()
-        local pfb = zombie:getPathFindBehavior2()
-        pfb:pathToLocation(targetX, targetY, targetZ)
-        pfb:update()
+        zombie:WalkTo(targetX, targetY, targetZ)
     end)
 end
 
