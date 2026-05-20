@@ -22,9 +22,12 @@ local PHNPC_SpawnDebug = {}
 -- ============================================================
 
 --- Retourne true si le joueur est autorisé à utiliser le menu de debug.
+-- Pattern Bandits BanditMenu.lua : isAdmin() + isDebugEnabled() (global PZ API)
+-- isAdmin() retourne true pour le joueur hôte en solo B42.
+-- player:isAccessLevel("admin") et getDebug() NE fonctionnent PAS en solo B42.
 local function isAdminOrDebug(player)
     local ok, result = pcall(function()
-        return player:isAccessLevel("admin") or getDebug()
+        return isAdmin() or isDebugEnabled()
     end)
     return ok and (result == true)
 end
@@ -38,7 +41,14 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
 
     local player = getSpecificPlayer(playerIndex)
     if not player then return end
-    if not isAdminOrDebug(player) then return end
+
+    local canSpawn = isAdminOrDebug(player)
+    -- DEBUG: confirme si le check admin/debug passe
+    print("[PHNPC DEBUG] onFillContextMenu — isAdmin=" .. tostring(isAdmin())
+        .. " isDebugEnabled=" .. tostring(isDebugEnabled())
+        .. " canSpawn=" .. tostring(canSpawn))
+
+    if not canSpawn then return end
 
     -- Toujours présent pour un admin, quelle que soit la cible du clic.
     context:addOption(
@@ -57,6 +67,7 @@ end
 -- (pas de réseau), donc l'appel est synchrone.
 function PHNPC_SpawnDebug.requestSpawn(player)
     local Log = PHNPC.getModule("NPC_Logger")
+    print("[PHNPC DEBUG] requestSpawn déclenché — envoi PHNPC_SpawnRequest au serveur")
     if Log then
         Log.info("SpawnDebug", "Demande de spawn envoyée au serveur",
             { x = math.floor(player:getX()), y = math.floor(player:getY()) })

@@ -78,12 +78,14 @@ local function onClientCommand(module, command, player, args)
     if command ~= "PHNPC_SpawnRequest" then return end
 
     local Log = PHNPC.getModule("NPC_Logger")
+    print("[PHNPC DEBUG] OnClientCommand reçu — isAdmin=" .. tostring(isAdmin())
+        .. " isDebugEnabled=" .. tostring(isDebugEnabled()))
 
     -- ---- Validation admin ----
-    local isAdmin = false
-    pcall(function() isAdmin = player:isAccessLevel("admin") end)
-
-    if not isAdmin and not getDebug() then
+    -- Pattern Bandits BanditServerSpawner.lua : isAdmin() + isDebugEnabled()
+    -- isAdmin() retourne true pour le joueur hôte en solo B42.
+    -- player:isAccessLevel("admin") et getDebug() NE fonctionnent PAS en solo B42.
+    if not isAdmin() and not isDebugEnabled() then
         if Log then
             Log.warn("Server/SpawnManager", "Spawn refusé — joueur non admin",
                 { player = tostring(player:getUsername()) })
