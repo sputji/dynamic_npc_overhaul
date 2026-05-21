@@ -1,8 +1,8 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
--- client/PHNPC_Manager.lua  v2.2
+-- client/PHNPC_Manager.lua  v2.3
 -- Spawn / Mouvement / IA / Ordres / Inventaire / Combat / Peur / Colere
 -- Necessite: PHNPC_Core.lua (shared), PHNPC_Stats.lua (shared)
--- Traductions: Translate/EN/UI.json + Translate/FR/UI.json
+-- Traductions: Translate/EN/UI.json + Translate/FR/UI.json (prefixe UI_PHNPC_*)
 -- NO BOM. ASCII only.
 
 -- ============================================================
@@ -30,17 +30,18 @@ local ATTACK_VARIANTS = { "Shove", "FrontKick", "HighKick" }
 local _attackIdx = 0
 
 -- Cles de traduction pour la colere (getText via Translate/XX/UI.json)
+-- NOTE: PZ B42 UI.json ne charge que les cles avec prefixe UI_
 local ANGER_KEYS_M = {
-    [1] = "PHNPC_Anger_M_1",
-    [2] = "PHNPC_Anger_M_2",
-    [3] = "PHNPC_Anger_M_3",
-    [4] = "PHNPC_Anger_M_4",
+    [1] = "UI_PHNPC_Anger_M_1",
+    [2] = "UI_PHNPC_Anger_M_2",
+    [3] = "UI_PHNPC_Anger_M_3",
+    [4] = "UI_PHNPC_Anger_M_4",
 }
 local ANGER_KEYS_F = {
-    [1] = "PHNPC_Anger_F_1",
-    [2] = "PHNPC_Anger_F_2",
-    [3] = "PHNPC_Anger_F_3",
-    [4] = "PHNPC_Anger_F_4",
+    [1] = "UI_PHNPC_Anger_F_1",
+    [2] = "UI_PHNPC_Anger_F_2",
+    [3] = "UI_PHNPC_Anger_F_3",
+    [4] = "UI_PHNPC_Anger_F_4",
 }
 
 -- ============================================================
@@ -168,30 +169,25 @@ local function createNPC(square)
     end
 
     -- 2. Banditize: transformer zombie en NPC humain
-    pcall(function()
-        npc:setUseless(false)
-        npc:setNoTeeth(true)
-        npc:setVariable("PHNPC_IsNPC", true)
-        npc:setWalkType("Walk")
-        npc:setVariable("zombieWalkType", "Walk")
-        npc:setVariable("ZombieHitReaction", "Chainsaw")
-        npc:setVariable("NoLungeTarget", true)
-        npc:setVariable("LimpSpeed", 0.70)
-        npc:setVariable("WalkSpeed", 0.85)
-        npc:setVariable("RunSpeed", 0.92)
-        npc:setSpeedMod(0.8)
-        npc:getEmitter():stopAll()
-        npc:setPrimaryHandItem(nil)
-        npc:setSecondaryHandItem(nil)
-        npc:resetEquippedHandsModels()
-        npc:clearAttachedItems()
-        npc:setDressInRandomOutfit(false)
-        npc:setTurnAlertedValues(-5, 5)
-        npc:setBumpType("Shrug")
-        npc:setTarget(nil)
-        npc:clearAggroList()
-        npc:setHealth(10000)
-    end)
+    -- IMPORTANT: pcalls individuels — si une ligne echoue, les suivantes s'executent quand meme
+    -- APIs supprimees (inexistantes en B42): getEmitter():stopAll(), resetEquippedHandsModels(),
+    --   clearAttachedItems(), setDressInRandomOutfit(), setPrimaryHandItem, setSecondaryHandItem
+    pcall(function() npc:setUseless(false) end)
+    pcall(function() npc:setNoTeeth(true) end)
+    pcall(function() npc:setVariable("PHNPC_IsNPC", true) end)
+    pcall(function() npc:setWalkType("Walk") end)
+    pcall(function() npc:setVariable("zombieWalkType", "Walk") end)
+    pcall(function() npc:setVariable("ZombieHitReaction", "Chainsaw") end)
+    pcall(function() npc:setVariable("NoLungeTarget", true) end)
+    pcall(function() npc:setVariable("LimpSpeed", 0.70) end)
+    pcall(function() npc:setVariable("WalkSpeed", 0.85) end)
+    pcall(function() npc:setVariable("RunSpeed", 0.92) end)
+    pcall(function() npc:setSpeedMod(0.8) end)
+    pcall(function() npc:setTurnAlertedValues(-5, 5) end)
+    pcall(function() npc:setBumpType("Shrug") end)
+    pcall(function() npc:setTarget(nil) end)       -- CRITIQUE: effacer la cible zombie
+    pcall(function() npc:clearAggroList() end)     -- CRITIQUE: effacer l'aggro
+    pcall(function() npc:setHealth(10000) end)
 
     -- 3. Visuels propres
     pcall(function()
@@ -377,22 +373,22 @@ local function onContextMenu(playerIndex, context, worldobjects, test)
         context:addSubMenu(option, subMenu)
 
         if d and d.followMode then
-            subMenu:addOption(getText("PHNPC_Menu_StayHere"),    clickedNPC, stopFollow)
+            subMenu:addOption(getText("UI_PHNPC_Menu_StayHere"),    clickedNPC, stopFollow)
         else
-            subMenu:addOption(getText("PHNPC_Menu_FollowMe"),    clickedNPC, startFollow)
+            subMenu:addOption(getText("UI_PHNPC_Menu_FollowMe"),    clickedNPC, startFollow)
         end
 
         if d and d.attackMode then
-            subMenu:addOption(getText("PHNPC_Menu_StopCombat"),  clickedNPC, stopAttackMode)
+            subMenu:addOption(getText("UI_PHNPC_Menu_StopCombat"),  clickedNPC, stopAttackMode)
         else
-            subMenu:addOption(getText("PHNPC_Menu_StartCombat"), clickedNPC, startAttackMode)
+            subMenu:addOption(getText("UI_PHNPC_Menu_StartCombat"), clickedNPC, startAttackMode)
         end
 
-        subMenu:addOption(getText("PHNPC_Menu_OpenInventory"), clickedNPC, openNPCInventory)
-        subMenu:addOption(getText("PHNPC_Menu_ShowStats"),     clickedNPC, showNPCStats)
-        subMenu:addOption(getText("PHNPC_Menu_Dismiss"),       clickedNPC, removeNPC)
+        subMenu:addOption(getText("UI_PHNPC_Menu_OpenInventory"), clickedNPC, openNPCInventory)
+        subMenu:addOption(getText("UI_PHNPC_Menu_ShowStats"),     clickedNPC, showNPCStats)
+        subMenu:addOption(getText("UI_PHNPC_Menu_Dismiss"),       clickedNPC, removeNPC)
     else
-        context:addOption(getText("PHNPC_Menu_SpawnNPC"), square,
+        context:addOption(getText("UI_PHNPC_Menu_SpawnNPC"), square,
             function(sq, pi)
                 if not sq then return end
                 local count = 0
@@ -534,10 +530,9 @@ end
 -- Toujours effacer la cible (comme NPC_Helper_Mod) — combat est manuel
 -- ============================================================
 local function enforceNPC(zombie)
-    local md = zombie:getModData()
-    if not md or not md.PHNPC_ID then return end
-
+    -- OnZombieUpdate a deja verifie PHNPC.npcs[zombie], mais on garde la garde defensive
     local data = PHNPC.npcs[zombie]
+    if not data then return end
 
     -- TOUJOURS garder l'etat NPC sain EN PREMIER
     pcall(function() zombie:setUseless(false) end)
