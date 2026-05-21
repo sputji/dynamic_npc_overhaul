@@ -1,44 +1,140 @@
+<div align="center">
+
+![Project Humain : Dynamic NPC Overhaul](icon.png)
+
 # Project Humain : Dynamic NPC Overhaul
 
-> **Mod pour Project Zomboid — Build 41 & Build 42**  
-> PNJ dynamiques avec IA, factions, commerce, quêtes et mémoire persistante.
+**Mod pour Project Zomboid — Build 42**
+
+*Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
+
+[![Version](https://img.shields.io/badge/version-0.0.5-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
+[![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
+
+</div>
 
 ---
 
 ## Présentation
 
-**Dynamic NPC Overhaul** transforme l'expérience de survie de Project Zomboid en peuplant le monde de PNJ vivants et réactifs. Chaque PNJ possède sa propre personnalité, profession, faction, et peut interagir avec le joueur de façon contextuelle.
+**Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-### Fonctionnalités principales
-
-| Fonctionnalité | Description |
-|----------------|-------------|
-| 🧠 **IA Contextuelle** | FSM 7 états (idle, wander, work, trade, defend, flee, guard) |
-| 🤝 **Commerce** | Système de troc et d'échanges selon la profession du PNJ |
-| ⚔️ **Factions** | 4 factions (survivants, marchands, bandits, inconnus) avec relations dynamiques |
-| 📜 **Quêtes** | Journal de quêtes en jeu, récompenses, objectifs |
-| 💀 **Morsure cachée** | Un PNJ mordu tousse, perd le moral, et peut se transformer |
-| 🤖 **IA Ollama** | Dialogues génératifs via un serveur Ollama local (optionnel) |
-| 🌐 **Solo & Multi** | Réseau transparent, aucune configuration manuelle |
-| 🔧 **Debug admin** | Commandes `/phnpc` pour gérer les PNJ en jeu |
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.5**.
 
 ---
 
-## État du développement
+## Fonctionnalités actuelles (v0.0.5)
 
-### Build 42 (branche principale)
+### PNJ & Professions
 
-| Phase | Composant | État |
-|-------|-----------|------|
-| **Phase 1 — Cerveau** | `shared/` : namespace, logger, config, FSM, data model, factions, dialogues, réseau | ✅ Complet |
-| **Phase 2 — Spawn** | `server/NPC_SpawnManager.lua` + `server/00_Init.lua` | ❌ À implémenter |
-| **Phase 3 — Interactions** | `client/NPC_InteractionClient.lua` + menus | ❌ À implémenter |
-| **Phase 4 — UI** | Fiche PNJ, commerce, bulles de dialogue | ❌ À implémenter |
-| **Phase 5 — Avancé** | Morsure, apprentissage, Ollama, quêtes | ❌ À implémenter |
+7 professions disponibles, chacune avec ses propres statistiques, vitesse et équipement de départ :
 
-### Build 41 (legacy)
+| Profession | Vitesse | PV | Poids max | Équipement de départ |
+|------------|---------|-----|-----------|----------------------|
+| 👨‍🌾 Fermier | 0.75 | 90 | 15 kg | Pelle, Truelle |
+| 👮 Police | 0.85 | 110 | 20 kg | Matraque, Lampe torche |
+| 🚒 Pompier | 0.80 | 120 | 25 kg | Hache |
+| 🩺 Médecin | 0.78 | 100 | 15 kg | Bandage, Analgésiques |
+| 🌲 Ranger | 0.90 | 105 | 18 kg | Couteau de chasse, Lampe torche |
+| 👨‍🍳 Chef | 0.75 | 90 | 15 kg | Couteau de cuisine, Ouvre-boîte |
+| 🧍 Survivant | 0.80 | 100 | 18 kg | Pied-de-biche |
 
-La version B41 est fonctionnelle et documentée dans `Docs/B41/`.
+### Interactions joueur
+
+- **Recruter** un PNJ via clic droit → il vous suit
+- **Ordonner** : *Suis-moi*, *Reste ici*, *Tu peux partir*
+- Distance de suivi réaliste — le PNJ ne colle pas le joueur
+
+### Système de santé
+
+- Les PNJ **encaissent les coups** du joueur (dégâts calculés selon l'arme)
+- **Animations de douleur** déclenchées (PainHead / PainTorso)
+- **Coup critique** sur la tête → dégâts doublés
+- Le PNJ **meurt** quand ses PV tombent à 0
+
+### Animations
+
+Animations humaines complètes grâce à un système d'AnimSets custom :
+
+| Animation | Déclencheur |
+|-----------|-------------|
+| Marche / Idle | Déplacement et repos |
+| WalkToIdle / IdleToWalk | Transitions fluides |
+| PainHead / PainTorso | Coup reçu |
+| FrontKick / HighKick | Menu DEBUG ou futur combat |
+| Shove / ZombiePushedBack | Repoussé |
+| WaveHi / Shrug / Yes / No | Expressions sociales |
+
+> Animations masculines (Bob) et féminines (Kate) supportées.
+
+---
+
+## Installation
+
+### Pré-requis
+- **Project Zomboid Build 42** (version ≥ 42.0)
+- Solo ou Multijoueur (côté client)
+
+### Étapes
+
+**1 — Télécharger le mod**
+
+```
+git clone https://github.com/sputji/dynamic_npc_overhaul.git
+```
+
+ou télécharger le ZIP depuis GitHub → **Code → Download ZIP**
+
+**2 — Copier le dossier dans Zomboid**
+
+Copier **uniquement** le contenu du dossier `B42/42/` vers :
+
+```
+C:\Users\<VOTRE_NOM>\Zomboid\mods\PH_DynamicNPCOverhaul\
+```
+
+Résultat attendu :
+
+```
+C:\Users\<VOTRE_NOM>\Zomboid\mods\PH_DynamicNPCOverhaul\
+├── mod.info
+├── icon.png
+├── poster.png
+└── media/
+    └── lua/
+        ├── shared/
+        └── client/
+```
+
+> ⚠️ Ne pas copier le dossier `B42/` entier — copier seulement le contenu de `B42/42/`.
+
+**3 — Activer le mod**
+
+1. Lancer Project Zomboid
+2. Menu principal → **Mods**
+3. Activer **"Project Humain : Dynamic NPC Overhaul"**
+4. Lancer ou créer une partie
+
+**4 — Utiliser le mod en jeu**
+
+- **Clic droit sur le sol** → *Spawner un NPC* pour faire apparaître un PNJ
+- **Clic droit sur un NPC** → menu d'interaction (Recruter, Suivre, Rester, Congédier)
+
+---
+
+## Menu DEBUG
+
+Un sous-menu **DEBUG_PHNPC** est disponible via clic droit (pour les tests) :
+
+| Option | Action |
+|--------|--------|
+| Spawn NPC debug | Crée un PNJ à côté du joueur |
+| Afficher l'état | Affiche les stats du NPC le plus proche (HP, vitesse, métier…) |
+| Animations → FrontKick | Déclenche l'animation FrontKick |
+| Animations → HighKick | Déclenche l'animation HighKick |
+| Animations → WaveHi / Shrug / Yes / No | Expressions |
+| Supprimer NPC | Retire le PNJ le plus proche |
 
 ---
 
@@ -46,132 +142,75 @@ La version B41 est fonctionnelle et documentée dans `Docs/B41/`.
 
 ```
 Dynamic_NPC_Overhaul/
-├── B41/                    # Mod B41 (legacy)
-│   ├── mod.info
-│   └── media/lua/
-│       ├── client/
-│       ├── server/
-│       └── shared/
-│
-├── B42/                    # Mod B42 (actif)
-│   ├── mod.info            # targetVersion=42.0
-│   ├── media/
-│   │   ├── sandbox-options.txt
-│   │   └── lua/
-│   │       ├── shared/     ← Cerveau (✅ implémenté)
-│   │       ├── server/     ← Corps serveur (❌ à créer)
-│   │       └── client/     ← Corps client (❌ à créer)
-│
+├── B42/
+│   ├── 42/                          ← Dossier du mod (à copier dans Zomboid/mods/)
+│   │   ├── mod.info                 ← Métadonnées du mod (id, version, auteur)
+│   │   ├── icon.png / poster.png
+│   │   └── media/lua/
+│   │       ├── shared/
+│   │       │   ├── PHNPC_Core.lua   ← Namespace PHNPC, constantes, OUTFIT_STATS
+│   │       │   └── PHNPC_Stats.lua  ← Stats et inventaire par profession
+│   │       └── client/
+│   │           ├── PHNPC_Manager.lua ← Spawn, follow/stay, menu contextuel
+│   │           ├── PHNPC_Health.lua  ← Système de santé (OnHitZombie)
+│   │           └── PHNPC_Debug.lua   ← Menu DEBUG_PHNPC
+│   └── common/media/
+│       ├── AnimSets/zombie/         ← AnimSets custom (idle, bumped, walk…)
+│       └── anims_X/Zombie/          ← Animations .X custom (FrontKick, HighKick…)
 └── Docs/
-    ├── B41/                # Documentation B41 complète
     └── B42/
-        ├── ARCHITECTURE.md     # Architecture détaillée
-        ├── GUIDE_CREATION.md   # Guide "partir de zéro"
-        └── feuille de route.md # Roadmap fonctionnelle
+        ├── ARCHITECTURE.md          ← Architecture technique détaillée
+        ├── CHANGELOG.md             ← Historique des versions
+        └── feuille de route.md      ← Roadmap complète
 ```
 
 ---
 
-## Installation
+## Roadmap
 
-### Steam Workshop
-> Pas encore publié — en développement actif.
+| Phase | Fonctionnalité | État |
+|-------|----------------|------|
+| v0.0.5 | Santé, stats/inventaire par métier, FrontKick, distance follow | ✅ |
+| v0.0.4 | Sons de pas, transitions walk/idle, BumpType | ✅ |
+| v0.1.0 | Dialogue, ordre "Va là-bas", réaction aux zombies | 🔜 |
+| v0.1.1 | Loot de bâtiments, échange d'items avec le joueur | 🔜 |
+| v0.1.5 | Persistance (sauvegarde/rechargement des PNJ) | 🔜 |
+| v0.2.0 | Factions, patrouille, commerce | 🔜 |
+| v0.4.0 | Cerveau IA avancé, mémoire, réputation, moralité | 🔜 |
 
-### Installation manuelle
-
-1. Télécharger ou cloner ce dépôt
-2. Copier le dossier `B42/` vers :
-   ```
-   C:\Users\<USER>\Zomboid\mods\PH_DynamicNPCOverhaul\
-   ```
-3. Lancer Project Zomboid B42
-4. Activer **"Project Humain : Dynamic NPC Overhaul"** dans le gestionnaire de mods
-5. Créer une nouvelle partie → configurer les options dans l'onglet **Sandbox → PHNPC**
+Roadmap complète : [Docs/B42/feuille de route.md](Docs/B42/feuille%20de%20route.md)
 
 ---
 
-## Configuration Sandbox
-
-Toutes les options sont accessibles dans le lanceur PZ → onglet **Sandbox**.
-
-| Option clé | Défaut | Description |
-|-----------|--------|-------------|
-| `ActiveProfile` | 2 | Profil IA (1=RP doux … 5=Ultra hardcore) |
-| `MaxActiveNPCs` | 12 | Nombre max de PNJ simultanés |
-| `SpawnRadius` | 32 | Rayon d'apparition autour des joueurs (tiles) |
-| `EnableOllama` | false | Active les dialogues génératifs via Ollama |
-| `DebugMode` | false | Active les logs détaillés en console |
-
----
-
-## Commandes admin
-
-En jeu, avec les droits administrateur :
-
-```
-/phnpc list          → Affiche tous les PNJ actifs
-/phnpc spawn         → Force un spawn près du joueur
-/phnpc kill <id>     → Supprime un PNJ par ID
-/phnpc bite <id>     → Simule une morsure sur un PNJ
-/phnpc debug         → Bascule le mode debug
-/phnpc reload        → Recharge la configuration sandbox
-```
-
----
-
-## IA Ollama (optionnel)
-
-Pour des dialogues génératifs, installer [Ollama](https://ollama.ai) localement :
-
-```bash
-ollama pull neural-chat
-ollama serve
-```
-
-Puis activer dans les options Sandbox : `EnableOllama = true`.
-
----
-
-## Architecture technique
-
-Voir [Docs/B42/ARCHITECTURE.md](Docs/B42/ARCHITECTURE.md) pour la documentation complète.
-
-**Principes clés :**
-- Namespace global `PHNPC` avec `registerModule()` / `getModule()`
-- FSM 7 états cadencée à ~33 ms (`Events.OnTick`)
-- Réseau transparent Solo/Multi via `NPC_NetworkDispatcher`
-- Fichiers de traduction B42 : `Sandbox_XX.txt`, `UI_XX.txt`, `ContextMenu_XX.txt`, `IGUI_XX.txt`
-
----
-
-## Documentation
+## Documentation technique
 
 | Fichier | Description |
 |---------|-------------|
-| [Docs/B42/ARCHITECTURE.md](Docs/B42/ARCHITECTURE.md) | Architecture, arborescence, APIs B42 |
-| [Docs/B42/GUIDE_CREATION.md](Docs/B42/GUIDE_CREATION.md) | Guide complet "partir de zéro" |
-| [Docs/B42/feuille de route.md](Docs/B42/feuille%20de%20route.md) | Roadmap fonctionnelle |
-| [Docs/B41/](Docs/B41/) | Documentation complète B41 |
+| [Docs/B42/ARCHITECTURE.md](Docs/B42/ARCHITECTURE.md) | Architecture complète, flux de création NPC, variables ModData |
+| [Docs/B42/CHANGELOG.md](Docs/B42/CHANGELOG.md) | Historique des versions |
+| [Docs/B42/feuille de route.md](Docs/B42/feuille%20de%20route.md) | Roadmap fonctionnelle avec toutes les phases |
 
 ---
 
 ## Contribuer
 
-1. Fork du dépôt
+1. Forker le dépôt
 2. Créer une branche `feature/ma-fonctionnalite`
-3. Respecter les conventions Lua (pas de `goto`/`continue`, pattern module, gardes de côté)
-4. Tester en jeu B42 en synchronisant vers `C:\Users\<USER>\Zomboid\mods\`
+3. Respecter les conventions Lua PZ (pas de `goto`/`continue`, `pcall` sur les APIs fragiles)
+4. Tester en jeu B42
 5. Pull request vers `master`
 
 ---
 
 ## Licence
 
-Projet personnel open-source. Référence aux mods exemples inclus dans `mod example/` conservés à titre de documentation uniquement.
+Projet personnel open-source.
 
 ---
 
-## Auteur
+<div align="center">
 
 **sputji** — Project Zomboid modder  
-GitHub : [github.com/sputji/dynamic_npc_overhaul](https://github.com/sputji/dynamic_npc_overhaul)
+[github.com/sputji/dynamic_npc_overhaul](https://github.com/sputji/dynamic_npc_overhaul)
+
+</div>

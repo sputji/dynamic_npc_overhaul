@@ -178,6 +178,11 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 - [ ] Tous les sons et annimations possibles selon les états et les événements (deplacement, actions, réaction, peur, colère, satisfaction, découverte, attaque, blessure, maladie, guérison, vieillissement, reproduction, mémoire, moralité, reputation, faction, profession, patrouille, construction, etc.)
 - [ ] Toutes les animations corespondantes aux sons et actions (deplacement, actions, réaction, peur, colère, satisfaction, découverte, attaque, blessure, maladie, guérison, vieillissement, reproduction, mémoire, moralité, reputation, faction, profession, patrouille, construction, etc.)
 
+### Phase 0.0.6+ —
+- [ ] Systeme de combat NPC (défendre → attaquer les zombies proches)
+- [ ] Comportement de fuite quand HP < 30%
+- [ ] Dialogue contextuel (le NPC dit quelque chose selon son état)
+
 ### Phase 0.1.0 — Qualité des interactions
 - [ ] NPC peut transporter des items dans son inventaire natif (Ne fonctionne pas, inventaire vide, à investiguer)
 - [ ] Dialogue basique (bark texte au-dessus de la tête selon état)
