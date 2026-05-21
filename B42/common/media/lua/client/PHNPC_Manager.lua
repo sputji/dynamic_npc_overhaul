@@ -1,5 +1,5 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
--- client/PHNPC_Manager.lua  v3.0
+-- client/PHNPC_Manager.lua  v3.1
 -- Spawn / Mouvement / IA / Ordres / Inventaire / Combat / Peur / Colere
 -- Necessite: PHNPC_Core.lua (shared), PHNPC_Stats.lua (shared)
 -- Traductions: Translate/EN/UI.json + Translate/FR/UI.json (prefixe UI_PHNPC_*)
@@ -565,11 +565,12 @@ local function enforceNPC(zombie)
     local data = PHNPC.npcs[zombie]
     if not data then return end
 
-    -- 1. SECURITE IMMEDIATE (GCUpdate.onZombieUpdate pattern — NPC_Helper_Mod)
-    --    Dents + cible effacees EN PREMIER, avant tout autre appel
-    --    Previent les morsures pendant la charge + entre deux frames
+    -- 1. SECURITE IMMEDIATE
+    --    setNoTeeth : toujours safe, sans effet sur pathfind
+    --    IMPORTANT: PAS de setTarget(nil) ici ! (GCCoreEnforceMain pattern)
+    --    setTarget(nil) tue le pathToCharacter → NPC ne bouge plus jamais
+    --    On le fera SEULEMENT apres verification de l'etat (step 7)
     pcall(function() zombie:setNoTeeth(true) end)
-    pcall(function() zombie:setTarget(nil) end)
 
     -- 2. Moteur actif + sante haute + pas de cadavre
     pcall(function() zombie:setUseless(false) end)
@@ -674,6 +675,19 @@ local function enforceNPC(zombie)
             em:stopSoundByName("FemaleZombieVoiceC")
         end
     end)
+
+    -- 6. Freeze zombie AI si NPC non-actif (GCCoreEnforceMain ~ligne 120)
+    --    setUseless(true) = bloque le zombie AI natif (walktoward / attack natifs)
+    --    Pattern NPC_Helper_Mod : recruited → setUseless(false), sinon → setUseless(true)
+    --    Ici : actif = followMode OU attackMode OU colere vs joueur
+    --    ATTENTION: le step 2 a deja appele setUseless(false) pour activer les vars
+    --    On re-freeze ici pour bloquer le comportement zombie indesirable
+    local isActive = data.followMode or data.attackMode
+                     or data.fleeMode
+                     or ((data.playerAngerTicks or 0) > 0)
+    if not isActive then
+        pcall(function() zombie:setUseless(true) end)
+    end
 end
 
 -- ============================================================
@@ -793,8 +807,8 @@ Events.OnGameStart.Add(function()
     PHNPC.npcs  = {}
     _ticks      = 0
     _openInvNPC = nil
-    print("[PHNPC] PHNPC_Manager v3.0 pret (OnGameStart)")
+    print("[PHNPC] PHNPC_Manager v3.1 pret (OnGameStart)")
 end)
 
 Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
-print("[PHNPC] PHNPC_Manager v3.0 loaded")
+print("[PHNPC] PHNPC_Manager v3.1 loaded")

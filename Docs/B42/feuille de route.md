@@ -125,13 +125,13 @@ Profils : Police > tir/courage | Fireman > force/endurance | Doctor < tout | Ran
 
 ### Inventaire
 - Clic-droit → "Voir l'inventaire" → `ISInventoryTransferUI.transferBetween(player, npc)`
-- NPC peut transporter des items dans son inventaire natif
+- [ ] NPC peut transporter des items dans son inventaire natif (Ne fonctionne pas, inventaire vide, à investiguer)
 
 ---
 
 ## Prochaines étapes (par priorité)
 
-### Phase 2.1 — Les sons et animations
+### Phase 2.1 — Les sons, AnimSet vanilla et des mods exemples (NPC_Helper_Mod, Bandits, etc.)
 - [ ] Sons de pas (events Footstep dans ZSWalk — déjà en XML, tester)
 - [ ] Sons d'attaque (events Attack dans ZSAttack )
 - [ ] Sons de réaction (events Pain dans ZSPain )
