@@ -45,6 +45,9 @@ local function stopMoving(npc)
     if md.PHNPC_Moving then
         md.PHNPC_Moving = false
         pcall(function() npc:setBumpType("WalkToIdle") end)
+        -- Effacer la cible pour eviter lunge/turnalerted apres WalkToIdle
+        pcall(function() npc:setTarget(nil) end)
+        pcall(function() npc:clearAggroList() end)
     end
 end
 
@@ -141,14 +144,19 @@ local function enforceNPC(zombie)
         zombie:setUseless(true)
     end
 
-    -- 8. Supprimer sons zombie chaque tick
+    -- 8. Sons : VoicePrefix genre-based pour activer footsteps, voix zombie supprimees
+    --    VoicePrefix "PHNPC" n'a pas de soundbank => aucun son
+    --    MaleZombie/FemaleZombie ont footsteps + voix => on garde footsteps, on coupe voix
     pcall(function()
-        zombie:getDescriptor():setVoicePrefix("PHNPC")
+        local voicePrefix = (md.PHNPC_Female) and "FemaleZombie" or "MaleZombie"
+        zombie:getDescriptor():setVoicePrefix(voicePrefix)
         local emitter = zombie:getEmitter()
         emitter:stopSoundByName("MaleZombieVoiceA")
         emitter:stopSoundByName("MaleZombieVoiceB")
+        emitter:stopSoundByName("MaleZombieVoiceC")
         emitter:stopSoundByName("FemaleZombieVoiceA")
         emitter:stopSoundByName("FemaleZombieVoiceB")
+        emitter:stopSoundByName("FemaleZombieVoiceC")
     end)
 end
 
@@ -198,8 +206,8 @@ local function convertToNPC(zombie, outfit, isFemale, npcName)
     -- 9. Neutraliser TurnAlerted (Bandits linea 198)
     pcall(function() zombie:setTurnAlertedValues(-5, 5) end)
 
-    -- 10. Prefixe voix (Bandits linea 204)
-    pcall(function() zombie:getDescriptor():setVoicePrefix("PHNPC") end)
+    -- 10. Prefixe voix : genre-based pour avoir footsteps ("PHNPC" n'a pas de soundbank)
+    pcall(function() zombie:getDescriptor():setVoicePrefix(isFemale and "FemaleZombie" or "MaleZombie") end)
 
     -- 11. Empecher re-habillage automatique par le moteur
     pcall(function() zombie:setDressInRandomOutfit(false) end)

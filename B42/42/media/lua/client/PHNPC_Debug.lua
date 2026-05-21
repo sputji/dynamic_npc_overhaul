@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Debug.lua  v0.0.2b  (client)
+    PHNPC_Debug.lua  v0.0.4  (client)
     Menu de DEBUG_PHNPC pour tester tous les comportements NPC.
 
     Acces : clic droit -> [DEBUG_PHNPC] -> sous-menu
@@ -145,7 +145,7 @@ local function dbgAnimYes(player)     dbgAnim(player, "Yes") end
 local function dbgAnimNo(player)      dbgAnim(player, "No") end
 local function dbgAnimPainH(player)   dbgAnim(player, "PainHead") end
 local function dbgAnimPainT(player)   dbgAnim(player, "PainTorso") end
-local function dbgAnimPushBk(player)  dbgAnim(player, "NPCPushedBack") end
+local function dbgAnimPushBk(player)  dbgAnim(player, "ZombiePushedBack") end
 local function dbgAnimShove(player)   dbgAnim(player, "Shove") end
 local function dbgAnimKick(player)    dbgAnim(player, "FrontKick") end
 
@@ -154,11 +154,13 @@ local function dbgForceHitReaction(player)
     if not npc then return end
     local md = npc:getModData()
     md.PHNPC_HitTicks = 0
+    -- ZombieHitReactionState n'existe pas en Lua B42 => crash
+    -- Simuler une hit reaction via setBumpType PainHead (bumped state)
     pcall(function()
         npc:setUseless(false)
-        npc:changeState(ZombieHitReactionState.instance())
+        npc:setBumpType("PainHead")
     end)
-    print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " -> hitreaction forcee")
+    print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " -> hitreaction simulee (PainHead)")
 end
 
 local function dbgForceIdle(player)
@@ -234,7 +236,7 @@ local function dbgSpawnAtPlayer(player)
                 pcall(function() zombie:setDressInRandomOutfit(false) end)
                 pcall(function() zombie:getEmitter():stopAll() end)
                 pcall(function() zombie:setTurnAlertedValues(-5, 5) end)
-                pcall(function() zombie:getDescriptor():setVoicePrefix("PHNPC") end)
+                pcall(function() zombie:getDescriptor():setVoicePrefix(isFemale and "FemaleZombie" or "MaleZombie") end)
                 pcall(function() zombie:setPrimaryHandItem(nil) end)
                 pcall(function() zombie:setSecondaryHandItem(nil) end)
                 pcall(function() zombie:resetEquippedHandsModels() end)
@@ -327,9 +329,9 @@ local function onFillDebugContextMenu(playerIndex, context, worldObjects, test)
     animSub:addOption("Shrug (hausser epaules)",   player, dbgAnimShrug)
     animSub:addOption("Yes (acquiescer)",           player, dbgAnimYes)
     animSub:addOption("No (refuser)",               player, dbgAnimNo)
-    animSub:addOption("PainHead (coup tete)",       player, dbgAnimPainH)
-    animSub:addOption("PainTorso (coup torse)",     player, dbgAnimPainT)
-    animSub:addOption("NPCPushedBack (recule)",     player, dbgAnimPushBk)
+    animSub:addOption("PainHead (douleur tete)",        player, dbgAnimPainH)
+    animSub:addOption("PainTorso (douleur thoracique)",  player, dbgAnimPainT)
+    animSub:addOption("ZombiePushedBack (reculer)",      player, dbgAnimPushBk)
     animSub:addOption("Shove (pousser)",            player, dbgAnimShove)
     animSub:addOption("FrontKick (coup pied)",      player, dbgAnimKick)
     animSub:addOption("ForceHitReaction",           player, dbgForceHitReaction)
@@ -344,4 +346,4 @@ end
 
 Events.OnPreFillWorldObjectContextMenu.Add(onFillDebugContextMenu)
 
-print("[PHNPC] PHNPC_Debug v0.0.2b loaded")
+print("[PHNPC] PHNPC_Debug v0.0.4 loaded")
