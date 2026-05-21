@@ -1,5 +1,5 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
--- client/PHNPC_Manager.lua  v2.3.1
+-- client/PHNPC_Manager.lua  v2.4
 -- Spawn / Mouvement / IA / Ordres / Inventaire / Combat / Peur / Colere
 -- Necessite: PHNPC_Core.lua (shared), PHNPC_Stats.lua (shared)
 -- Traductions: Translate/EN/UI.json + Translate/FR/UI.json (prefixe UI_PHNPC_*)
@@ -169,26 +169,32 @@ local function createNPC(square)
     end
 
     -- 2. Banditize: transformer zombie en NPC humain
-    -- IMPORTANT: pcalls individuels — si une ligne echoue, les suivantes s'executent quand meme
-    -- APIs supprimees (inexistantes en B42): getEmitter():stopAll(), resetEquippedHandsModels(),
-    --   clearAttachedItems(), setDressInRandomOutfit(), setPrimaryHandItem, setSecondaryHandItem
-    pcall(function() npc:setUseless(false) end)
+    -- Pattern exact : Bandits Banditize() + GCCoreConvert.lua
+    -- (toutes ces APIs existent bien en B42 — confirme par Bandits 42.18 et NPC_Helper_Mod)
     pcall(function() npc:setNoTeeth(true) end)
     pcall(function() npc:setVariable("PHNPC_IsNPC", true) end)
+    pcall(function() npc:setVariable("LimpSpeed", 0.80) end)
+    pcall(function() npc:setVariable("WalkSpeed", 1.04) end)
+    pcall(function() npc:setVariable("RunSpeed", 0.80) end)
     pcall(function() npc:setWalkType("Walk") end)
     pcall(function() npc:setVariable("zombieWalkType", "Walk") end)
     pcall(function() npc:setVariable("ZombieHitReaction", "Chainsaw") end)
     pcall(function() npc:setVariable("NoLungeTarget", true) end)
-    pcall(function() npc:setVariable("LimpSpeed", 0.70) end)
-    pcall(function() npc:setVariable("WalkSpeed", 0.85) end)
-    pcall(function() npc:setVariable("RunSpeed", 0.92) end)
-    pcall(function() npc:setSpeedMod(0.8) end)
+    -- Silencier sons zombie (Bandits ligne 190)
+    pcall(function() local em = npc:getEmitter() ; if em then em:stopAll() end end)
+    -- Vider les mains / modeles equipes (Bandits lignes 192-195)
+    pcall(function() npc:setPrimaryHandItem(nil) end)
+    pcall(function() npc:setSecondaryHandItem(nil) end)
+    pcall(function() npc:resetEquippedHandsModels() end)
+    pcall(function() npc:clearAttachedItems() end)
+    -- Empecher re-habillage automatique par l'engine
+    pcall(function() npc:setDressInRandomOutfit(false) end)
     pcall(function() npc:setTurnAlertedValues(-5, 5) end)
     pcall(function() npc:setBumpType("Shrug") end)
-    pcall(function() npc:setTarget(nil) end)       -- CRITIQUE: effacer la cible zombie
-    pcall(function() npc:clearAggroList() end)     -- CRITIQUE: effacer l'aggro
     pcall(function() npc:setHealth(10000) end)
-    -- CRITIQUE v2.3.1: forcer etat idle immediatement au spawn pour couper toute IA zombie
+    -- Effacer cible et forcer idle au spawn
+    pcall(function() npc:setTarget(nil) end)
+    pcall(function() npc:clearAggroList() end)
     pcall(function() npc:changeState(ZombieIdleState.instance()) end)
 
     -- 3. Visuels propres
@@ -529,79 +535,80 @@ end
 
 -- ============================================================
 -- ENFORCE NPC (OnZombieUpdate)
--- Toujours effacer la cible (comme NPC_Helper_Mod) — combat est manuel
+-- Pattern : GCCoreEnforceMain.lua (NPC_Helper_Mod)
+-- CRITIQUE: setTarget(nil) uniquement apres le check d'etat
+--           (setTarget(nil) PENDANT pathfind tue le pathfind)
 -- ============================================================
 local function enforceNPC(zombie)
-    -- OnZombieUpdate a deja verifie PHNPC.npcs[zombie], mais on garde la garde defensive
     local data = PHNPC.npcs[zombie]
     if not data then return end
 
-    -- TOUJOURS garder l'etat NPC sain EN PREMIER
+    -- 1. Moteur actif + sante haute + dents retirees + pas de cadavre
     pcall(function() zombie:setUseless(false) end)
     pcall(function() zombie:setHealth(10000) end)
     pcall(function() zombie:setNoTeeth(true) end)
     pcall(function() zombie:setEatBodyTarget(nil, false) end)
 
-    -- Variables AnimSet
+    -- 2. Variables AnimSet
     pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
     pcall(function() zombie:setVariable("NoLungeTarget", true) end)
     pcall(function() zombie:setVariable("zombieWalkType", "Walk") end)
     pcall(function() zombie:setWalkType("Walk") end)
     pcall(function() zombie:setSpeedMod(0.8) end)
 
-    -- TOUJOURS effacer la cible zombie sauf pendant colere vs joueur
-    -- (comme NPC_Helper_Mod — le combat est entierement manuel)
-    local angerAtk = data and (data.playerAngerTicks or 0) > 0
-    if not angerAtk then
-        pcall(function() zombie:setTarget(nil) end)
-        pcall(function() zombie:clearAggroList() end)
-    end
-
+    -- 3. Lire l'etat AVANT de toucher a setTarget
+    --    (setTarget(nil) tue le pathfind si appele pendant "pathfind")
     local asn = ""
     pcall(function() asn = tostring(zombie:getActionStateName()) end)
 
-    -- Pathfinding / porte : laisser faire
+    local skipSecurity = false  -- si true : ne pas appeler setTarget(nil)/clearAggroList
+
+    -- Pathfinding / porte : ne PAS toucher a setTarget — laisser avancer
     if asn == "pathfind" or asn == "thump" then
-        return
+        return  -- skipSecurity implicite
     end
 
-    -- Manger / alerte : reset immediat
-    if asn == "eatBody" or asn == "turnalerted" then
-        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
-        if data then data.moving = false end
-        return
-    end
-
-    -- Poussee : detection + dialogue de colere
+    -- Poussee : gestion colere (laisser l'animation se derouler)
     if asn == "bumped" then
+        skipSecurity = true
         if data then
             local isNewBump = (data.bumpTicks == 0)
             data.bumpTicks  = data.bumpTicks + 1
-
             if isNewBump then
                 handleAnger(zombie, data)
-                -- Niveau 4+ : frappe pendant la poussee
                 if data.angerLevel >= 4 then
                     pcall(function() zombie:setBumpType("AttackBareHands1") end)
                 end
             end
-
-            -- Sortir de l'etat bumped apres 35 ticks
             if data.bumpTicks > 35 then
                 pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
                 pcall(function() zombie:setBumpType("Shrug") end)
                 data.bumpTicks = 0
                 data.moving    = false
+                skipSecurity   = false  -- on vient de reset, on peut nettoyer la cible
             end
         end
+        if skipSecurity then return end
+    end
+
+    -- Etats d'attaque zombie a supprimer immediatement
+    if asn == "attack" or asn == "lunge" or asn == "turnalerted"
+    or asn == "eatBody" or asn == "walktoward" then
+        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+        pcall(function() zombie:setTarget(nil) end)
+        pcall(function() zombie:clearAggroList() end)
+        if data then data.moving = false ; data.bumpTicks = 0 end
         return
     end
 
-    -- v2.3.1: TOUT AUTRE ETAT (walktoward, attack, idle, etc.) :
-    -- Reset agressif vers idle pour supprimer TOUTE IA zombie native.
-    -- Seuls "pathfind", "thump", "eatBody", "turnalerted" et "bumped" sont geres ci-dessus.
-    pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
-    if data then data.bumpTicks = 0 ; data.moving = false end
+    -- 4. Tous les autres etats (idle, etc.) : nettoyer la cible
+    --    sauf si colere active contre le joueur (setBumpType gere l'attaque)
+    local angerAtk = (data.playerAngerTicks or 0) > 0
+    if not angerAtk then
+        pcall(function() zombie:setTarget(nil) end)
+        pcall(function() zombie:clearAggroList() end)
+    end
+    if data then data.bumpTicks = 0 end
 end
 
 -- ============================================================
@@ -718,8 +725,8 @@ Events.OnGameStart.Add(function()
     PHNPC.npcs  = {}
     _ticks      = 0
     _openInvNPC = nil
-    print("[PHNPC] PHNPC_Manager v2.3.1 pret (OnGameStart)")
+    print("[PHNPC] PHNPC_Manager v2.4 pret (OnGameStart)")
 end)
 
 Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
-print("[PHNPC] PHNPC_Manager v2.3.1 loaded")
+print("[PHNPC] PHNPC_Manager v2.4 loaded")
