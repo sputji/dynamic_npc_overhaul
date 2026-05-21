@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Manager.lua  v0.6  (client)
+    PHNPC_Manager.lua  v0.8  (client)
     Spawn / Enforce / Suivi / Menu contextuel / Inventaire NPC
     Combat NPC vs zombies / Fuite HP<30% / Dialogue contextuel
     Necessite: PHNPC_Core.lua (shared)
@@ -443,6 +443,7 @@ local function dismissNPC(npc)
     print("[PHNPC] Congedie : " .. tostring(md.PHNPC_Name))
 end
 
+local function deleteNPC(npc)
     -- CRITIQUE : mettre PHNPC_IsNPC=nil AVANT setHealth(0)
     -- Sinon OnZombieUpdate (isNPC check) ressusciterait le NPC au tick suivant
     local md   = npc:getModData()
@@ -1029,7 +1030,7 @@ Events.OnGameStart.Add(function()
     _openInventoryNPC    = nil
     _combatTimers        = {}
     _attackCooldowns     = {}
-    print("[PHNPC] Manager v0.7 pret")
+    print("[PHNPC] Manager v0.8 pret")
 end)
 
 -- Enregistrer le menu contextuel

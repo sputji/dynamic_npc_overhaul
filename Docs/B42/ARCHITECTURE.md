@@ -1,4 +1,4 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.7a
+# Architecture B42 — Dynamic NPC Overhaul v0.0.8a
 
 ## Structure des fichiers
 
@@ -9,8 +9,8 @@ B42/
 │   │   ├── PHNPC_Core.lua       # Namespace PHNPC, constantes, OUTFIT_STATS, helpers
 │   │   └── PHNPC_Stats.lua      # initStats() + initInventory() par metier
 │   └── client/
-│       ├── PHNPC_Manager.lua    # Spawn, enforceNPC, follow/stay, menu contextuel
-│       ├── PHNPC_Health.lua     # OnHitZombie -> degats -> mort
+│       ├── PHNPC_Manager.lua    # Spawn, enforceNPC, follow/stay, menu contextuel  (v0.8)
+│       ├── PHNPC_Health.lua     # OnHitZombie -> degats -> mort                    (v0.2)
 │       └── PHNPC_Debug.lua      # Menu DEBUG_PHNPC
 ├── common/media/
 │   ├── anims_X/Zombie/          # Animations custom (copies depuis NHM)
@@ -19,8 +19,8 @@ B42/
 │   │   └── Bob_PushKick.X       # Coup de pied poussee
 │   └── AnimSets/zombie/
 │       ├── idle/ZSIdle.xml      # Condition: PHNPC_IsNPC=true -> Bob_Idle
-│       ├── bumped/ZSWalkToIdle.xml
-│       ├── bumped/ZSIdleToWalk.xml
+│       ├── bumped/ZSWalkToIdle.xml      # PHNPC_IsNPC=true -> Bob_EmoteShrug rapide (SpeedScale=3.0)
+│       ├── bumped/ZSIdleToWalk.xml      # PHNPC_IsNPC=true -> Bob_EmoteShrug rapide (SpeedScale=3.0)
 │       ├── bumped/ZSFrontKick.xml
 │       ├── bumped/ZSHighKick.xml
 │       ├── bumped/ZSPainHead.xml
@@ -85,7 +85,22 @@ Events.OnHitZombie (quand joueur frappe)
         ├── md.PHNPC_Health -= damage
         ├── zombie:setHealth(10000)  -- prevent vanilla death
         ├── setBumpType("PainHead" or "PainTorso")
-        └── hp<=0? -> retirer de allNPCs/recruited, mort naturelle
+        └── hp<=0?
+              ├── md.PHNPC_IsNPC = nil      -- CRITIQUE: coupe OnZombieUpdate AVANT mort
+              ├── retirer de allNPCs/recruited
+              └── zombie:setHealth(0)       -- PZ cree corpse lootable avec tout l'inventaire
+```
+
+## Règle critique : ordre de mort d'un NPC
+
+```
+md.PHNPC_IsNPC = nil     ← TOUJOURS EN PREMIER
+PHNPC.allNPCs[npc] = nil
+PHNPC.recruited[npc] = nil
+npc:setHealth(0)         ← crée le corpse lootable
+
+-- NE PAS faire setHealth(1) : ne tue pas le NPC, aucun corpse, items perdus
+-- NE PAS laisser PHNPC_IsNPC=true : OnZombieUpdate ressuscite via setHealth(10000)
 ```
 
 ## Variables ModData importantes

@@ -1,7 +1,7 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.0.3_
+_Version 0.0.8a_
 
-> Ce guide explique le fonctionnement du systeme NPC tel qu'implemente en v0.0.3.
+> Ce guide explique le fonctionnement du systeme NPC tel qu'implemente en v0.0.8a.
 > Pattern copie EXACTEMENT depuis NPC_Helper_Mod (GCCoreConvert + GCCoreEnforceMain + GCCoreSpawn + GCUpdate).
 
 ---
@@ -326,3 +326,8 @@ B42/
 | NPC attaque le joueur | `setUseless(true)` absent | Obligatoire pour NPCs non-recrutes |
 | NPC ne bouge pas | `setUseless(false)` non appele avant pathfind | `startFollowing()` appelle `setUseless(false)` d'abord |
 | `addZombiesInOutfit` introuvable | Appele comme methode | Fonction GLOBALE : `addZombiesInOutfit(x,y,z,...)` |
+| **Tous les NPCs redeviennent zombies** | **Erreur de syntaxe/runtime dans Manager.lua** | **Verifier console.txt : `SEVERE: Error found in LUA file` = crash chargement total** |
+| **NPC ressuscite apres setHealth(0)** | `PHNPC_IsNPC=true` encore present → `OnZombieUpdate` appelle `setHealth(10000)` | **Toujours `md.PHNPC_IsNPC = nil` AVANT `setHealth(0)`** |
+| **NPC mort sans corpse / items perdus** | `setHealth(1)` ne tue pas l'IsoZombie | **Utiliser `setHealth(0)` uniquement — crée le corpse lootable** |
+| **Bulle de dialogue invisible** | `zombie:Say()` ne crée pas de bulle sur IsoZombie en B42 | **Utiliser `zombie:addLineChatElement(text, r, g, b)`** |
+| **NPC bloqué en animation bumped** | XMLs `ZSWalkToIdle.xml`/`ZSIdleToWalk.xml` absents → vanilla PZ sans condition `PHNPC_IsNPC` | **Ces XMLs doivent exister avec `PHNPC_IsNPC=true` + `SpeedScale=3.0` + `EarlyTransitionOut=true`** |

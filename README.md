@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.5-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.8a-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,11 +20,11 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.5**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.8a**.
 
 ---
 
-## Fonctionnalités actuelles (v0.0.5)
+## Fonctionnalités actuelles (v0.0.8a)
 
 ### PNJ & Professions
 
@@ -45,13 +45,20 @@
 - **Recruter** un PNJ via clic droit → il vous suit
 - **Ordonner** : *Suis-moi*, *Reste ici*, *Tu peux partir*
 - Distance de suivi réaliste — le PNJ ne colle pas le joueur
+- **Dialogue** : bulles de texte contextuelles (`addLineChatElement`) — recrutement, ordres, combat, idle
 
 ### Système de santé
 
 - Les PNJ **encaissent les coups** du joueur (dégâts calculés selon l'arme)
 - **Animations de douleur** déclenchées (PainHead / PainTorso)
 - **Coup critique** sur la tête → dégâts doublés
-- Le PNJ **meurt** quand ses PV tombent à 0
+- Le PNJ **meurt** quand ses PV tombent à 0 → **corpse lootable** avec tout son inventaire
+
+### Combat & survie
+
+- **Combat auto** contre les zombies proches (range 8 tiles) — Shove / FrontKick / HighKick
+- **Fuite** si HP < 30% — direction opposée au zombie, repli vers le joueur si zone dégagée
+- **Barks contextuels** automatiques selon l'état (following, staying, defending, fleeing, idle)
 
 ### Animations
 
@@ -60,9 +67,9 @@ Animations humaines complètes grâce à un système d'AnimSets custom :
 | Animation | Déclencheur |
 |-----------|-------------|
 | Marche / Idle | Déplacement et repos |
-| WalkToIdle / IdleToWalk | Transitions fluides |
+| WalkToIdle / IdleToWalk | Transitions fluides (override vanilla via `PHNPC_IsNPC=true`) |
 | PainHead / PainTorso | Coup reçu |
-| FrontKick / HighKick | Menu DEBUG ou futur combat |
+| FrontKick / HighKick | Combat auto NPC |
 | Shove / ZombiePushedBack | Repoussé |
 | WaveHi / Shrug / Yes / No | Expressions sociales |
 

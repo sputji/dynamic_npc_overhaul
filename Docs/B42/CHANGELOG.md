@@ -1,6 +1,31 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
-## [0.0.7b] — 2026-05-28
+## [0.0.8a] — 2026-05-21
+
+### Correction critique (hotfix)
+- **CRASH AU CHARGEMENT** : `PHNPC_Manager.lua` plantait au démarrage avec `SEVERE: Error found in LUA file` — la déclaration `local function deleteNPC(npc)` était absente du fichier, laissant le corps de la fonction comme code top-level orphelin. Résultat : le moteur Lua Kahlua lançait une exception dès le chargement, le système NPC ne s'initialisait jamais, et tous les NPCs de la save redevenaient des zombies normaux.
+- **PHNPC_Manager.lua v0.8** : correction de la déclaration manquante
+
+---
+
+## [0.0.8] — 2026-05-21
+
+### Corrections critiques
+- **Animation bumped persistante** : les NPCs restaient bloqués en état `bumped` et ne bougeaient qu'avec cette animation. Cause : `ZSWalkToIdle.xml` et `ZSIdleToWalk.xml` supprimés en v0.0.7c → le vanilla PZ reprenait ces XMLs sans condition `PHNPC_IsNPC` → animations zombie jouées sur les NPCs. Suppression des appels `setBumpType("WalkToIdle"/"IdleToWalk")` dans le code Lua (stopMoving/startFollowing/startMovingTo). Suppression de `setTarget(nil)` inconditionnel dans `OnZombieUpdate`. Timeout bumped réduit 40→15 ticks.
+- **Inventaire NPC perdu à la mort** : `setHealth(1)` ne tuait **pas** le NPC → aucun corpse PZ créé → items perdus. De plus `md.PHNPC_IsNPC` restait `true` → `OnZombieUpdate` ressuscitait le NPC via `setHealth(10000)`. Correction : `md.PHNPC_IsNPC = nil` AVANT `setHealth(0)` → PZ tue proprement et crée un corpse avec tout l'inventaire.
+- **Pas de bulle de dialogue** : `zombie:Say()` ne crée pas de bulle visible sur `IsoZombie` en B42. Remplacement complet par `addLineChatElement(text, r, g, b)` (pattern confirmé dans Bandits). Couleurs : vert (recrutement/soin), rouge (combat/mort), jaune (info/ordres), blanc (idle).
+
+### Nouveaux fichiers AnimSet
+- `common/media/AnimSets/zombie/bumped/ZSWalkToIdle.xml` : override vanilla avec `PHNPC_IsNPC=true` → `Bob_EmoteShrug` ultra-rapide (SpeedScale=3.0, EarlyTransitionOut=true, BumpAnimFinished=true au départ) → sortie quasi-instantanée de l'état bumped
+- `common/media/AnimSets/zombie/bumped/ZSIdleToWalk.xml` : identique pour `BumpType=IdleToWalk`
+
+### Fichiers modifiés
+- **PHNPC_Manager.lua v0.7** : fix bumped, fix deleteNPC (setHealth(0) + PHNPC_IsNPC=nil), fix dialogue (addLineChatElement)
+- **PHNPC_Health.lua v0.2** : fix mort NPC (setHealth(0) + PHNPC_IsNPC=nil avant mort)
+
+---
+
+## [0.0.7b] — 2026-05-21
 
 ### Corrections critiques
 - **Animations réparées** : `setUseless(false)` pour **tous** les NPCs (recrutés ET non-recrutés) — `setUseless(true)` bloquait les AnimSets (PHNPC_IsNPC) et `Say()`, causant animations zombie bras-tendus sur les NPCs libres
