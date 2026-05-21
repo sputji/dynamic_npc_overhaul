@@ -1,6 +1,6 @@
 --[[
-    PHNPC_Manager.lua  v0.3  (client)
-    Spawn / Enforce / Suivi / Menu contextuel
+    PHNPC_Manager.lua  v0.4  (client)
+    Spawn / Enforce / Suivi / Menu contextuel / Inventaire NPC
     Necessite: PHNPC_Core.lua (shared)
 
     Pattern copie EXACTEMENT NPC_Helper_Mod :
@@ -19,6 +19,7 @@
 -- ============================================================
 
 local _followTimers = {}   -- [npcRef] => ticks depuis dernier pathToCharacter
+local _openInventoryNPC = nil   -- NPC dont l'inventaire est actuellement ouvert
 
 local function startFollowing(npc, player)
     local md = npc:getModData()
@@ -164,24 +165,22 @@ local function enforceNPC(zombie)
         pcall(function() zombie:clearAggroList() end)
     end
 
-    -- 7. Gestion setUseless selon l'etat de mouvement
-    --    setUseless(false) = IA zombie active => pathfinding + animation walk
-    --    setUseless(true)  = IA zombie gelee  => pas de wander zombie, idle humain propre
-    --    CRUCIAL : setUseless(false) inconditionnel reactive l'IA zombie => bras tendus zombie
-    --    => on n'active l'IA que quand le NPC marche vraiment
-    if md.PHNPC_Moving then
+    -- 7. setUseless : pattern EXACT NPC_Helper_Mod (GCCoreEnforceMain.lua fin)
+    --    Recrute  => setUseless(false) TOUJOURS : IA active, pathfinding + animations sans gel
+    --    Non-recr => setUseless(true)  : gele pour empecher errance zombie
+    --    IMPORTANT : l'ancien code "setUseless selon PHNPC_Moving" gelait les animations
+    --    bumped (WalkToIdle, PainHead, IdleToWalk) => NPC bloque en animation bousculade.
+    --    IMPORTANT : setUseless(true) empeche aussi les variables AnimSet (PHNPC_IsNPC)
+    --    d'etre evaluees => animations vanilla zombie (bras tendus) au lieu de Bob_*.
+    if md.PHNPC_Recruited then
         zombie:setUseless(false)
     else
         zombie:setUseless(true)
-        -- Reset periodique vers ZombieIdleState (assure Bob_Idle, evite pose zombie residuelle)
+        -- Reset periodique pour non-recrutes (evite pose zombie residuelle)
         md.PHNPC_IdleTick = (md.PHNPC_IdleTick or 0) + 1
         if md.PHNPC_IdleTick >= 60 then
             md.PHNPC_IdleTick = 0
-            local asn2 = ""
-            pcall(function() asn2 = zombie:getActionStateName() end)
-            if asn2 ~= "bumped" and asn2 ~= "hitreaction" and asn2 ~= "getup" then
-                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
-            end
+            pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
         end
     end
 
@@ -391,6 +390,8 @@ end
 local function deleteNPC(npc)
     local md   = npc:getModData()
     local name = md.PHNPC_Name or "?"
+    -- Fermer l'inventaire si c'est ce NPC qui est ouvert
+    if _openInventoryNPC == npc then _openInventoryNPC = nil end
     -- Nettoyer toutes les references avant la suppression
     PHNPC.allNPCs[npc]   = nil
     PHNPC.recruited[npc] = nil
@@ -399,6 +400,70 @@ local function deleteNPC(npc)
     pcall(function() npc:removeFromWorld() end)
     print("[PHNPC] Supprime : " .. name)
 end
+
+-- ============================================================
+-- INVENTAIRE NPC (GCMenuInventory.lua pattern EXACT)
+-- Injecte le container du NPC dans le loot panel
+-- ============================================================
+
+local function openNPCInventory(npc)
+    if not npc then return end
+    local md = npc:getModData()
+    local npcInv = npc:getInventory()
+    pcall(function() npcInv:setType(md.PHNPC_Name or "Survivant") end)
+
+    _openInventoryNPC = npc
+
+    local player = getPlayer()
+    if not player then return end
+    local playerNum = player:getPlayerNum()
+    local pdata = getPlayerData(playerNum)
+    if pdata then
+        local loot = pdata.lootInventory
+        loot:refreshBackpacks()
+        if loot.isCollapsed then
+            loot.isCollapsed = false
+            pcall(function() loot:clearMaxDrawHeight() end)
+            loot.collapseCounter = 0
+        end
+        pcall(function() loot:selectButtonForContainer(npcInv) end)
+    end
+end
+
+-- Hook refresh du loot panel : injecte le container NPC a chaque refresh
+Events.OnRefreshInventoryWindowContainers.Add(function(page, step)
+    if step ~= "beforeFloor" then return end
+    if page.onCharacter then return end
+
+    local npc = _openInventoryNPC
+    if not npc then return end
+
+    -- Fermer si NPC mort ou trop loin
+    local dead = false
+    pcall(function() dead = npc:isDead() end)
+    if dead then _openInventoryNPC = nil ; return end
+
+    local player = getPlayer()
+    if player then
+        local dx = npc:getX() - player:getX()
+        local dy = npc:getY() - player:getY()
+        if (dx*dx + dy*dy) > (PHNPC.INTERACTION_DIST + 2)^2 then
+            _openInventoryNPC = nil ; return
+        end
+    end
+
+    local md = npc:getModData()
+    local npcInv = npc:getInventory()
+    local loot = getPlayerLoot(page.player)
+    if loot then
+        loot:addContainerButton(
+            npcInv,
+            nil,
+            md.PHNPC_Name or "Survivant",
+            md.PHNPC_Name or "Survivant"
+        )
+    end
+end)
 
 -- ============================================================
 -- MENU CONTEXTUEL (GCMenuContext.onFillWorldObjectContextMenu EXACT)
@@ -483,7 +548,9 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
             -- NPC non recrute : unique option de recrutement
             subMenu:addOption("Rejoins-moi !",    npc, recruitNPC)
         else
-            -- NPC recrute : sous-menu Ordres
+            -- NPC recrute : inventaire + sous-menu Ordres
+            subMenu:addOption("Inventaire...",     npc, openNPCInventory)
+
             local ordreOpt = subMenu:addOption("Ordres...")
             local ordreSub = ISContextMenu:getNew(subMenu)
             subMenu:addSubMenu(ordreOpt, ordreSub)
@@ -597,13 +664,14 @@ end)
 -- ============================================================
 
 Events.OnGameStart.Add(function()
-    PHNPC.allNPCs   = {}
-    PHNPC.recruited = {}
-    _followTimers   = {}
-    print("[PHNPC] Manager v0.3 pret")
+    PHNPC.allNPCs        = {}
+    PHNPC.recruited      = {}
+    _followTimers        = {}
+    _openInventoryNPC    = nil
+    print("[PHNPC] Manager v0.4 pret")
 end)
 
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.3 loaded")
+print("[PHNPC] PHNPC_Manager v0.4 loaded")
