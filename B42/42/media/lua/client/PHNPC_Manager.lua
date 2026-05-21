@@ -133,23 +133,19 @@ local function enforceNPC(zombie)
             skipSecurity = true
 
         elseif asn == "bumped" then
-            -- Laisser les animations bumped (Shove, Pain, etc.) se terminer
-            -- Timeout 30 ticks (pattern NHM GCCoreEnforce.lua safety net)
+            -- Pattern Bandits EXACT : laisser l'animation bumped se terminer via BumpAnimFinished.
+            -- NE PAS appeler setBumpType ici : ca re-declencherait un etat "bumped"
+            -- et creerait une boucle infinie (NPC definitivement bloque).
+            -- BumpAnimFinished=true est emis par nos XMLs (ZSShrug, ZSIdleToWalk, etc.)
+            -- quand l'animation se termine => le moteur PZ sort du bumped automatiquement.
             skipSecurity = true
             md.PHNPC_BumpTick = (md.PHNPC_BumpTick or 0) + 1
-            if md.PHNPC_BumpTick >= 30 then
+            if md.PHNPC_BumpTick >= 90 then
+                -- Safety net uniquement : si vraiment bloque depuis 90 ticks,
+                -- forcer changeState(Idle) sans setBumpType
                 md.PHNPC_BumpTick = 0
                 md.PHNPC_Moving   = false
-                -- CRITIQUE : setBumpType("IdleToWalk") APRES changeState
-                -- Sans setBumpType, l'anim Shrug vanilla zombie ne se termine jamais
-                -- et le NPC reste bloque en bumped indefiniment.
-                -- setBumpType("IdleToWalk") remplace l'anim bloquee par notre XML
-                -- ultra-court (speedScale=3.0 + EarlyTransitionOut=true) qui se
-                -- termine proprement et sort du bumped. (NHM GCCoreEnforce.lua:33-34)
-                pcall(function()
-                    zombie:changeState(ZombieIdleState.instance())
-                    zombie:setBumpType("IdleToWalk")
-                end)
+                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
                 skipSecurity = false
             end
 
@@ -1031,4 +1027,4 @@ end)
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.9 loaded")
+print("[PHNPC] PHNPC_Manager v0.10 loaded")
