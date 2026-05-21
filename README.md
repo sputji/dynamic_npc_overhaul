@@ -97,11 +97,13 @@ ou télécharger le ZIP depuis GitHub → **Code → Download ZIP**
 
 **2 — Copier le dossier dans Zomboid**
 
-Copier **uniquement** le contenu du dossier `B42/42/` vers :
+Créer le dossier `PH_DynamicNPCOverhaul` dans :
 
 ```
 C:\Users\<VOTRE_NOM>\Zomboid\mods\PH_DynamicNPCOverhaul\
 ```
+
+Puis copier le contenu de **`B42/42/`** ET **`B42/common/`** dans ce dossier.
 
 Résultat attendu :
 
@@ -110,13 +112,17 @@ C:\Users\<VOTRE_NOM>\Zomboid\mods\PH_DynamicNPCOverhaul\
 ├── mod.info
 ├── icon.png
 ├── poster.png
-└── media/
-    └── lua/
-        ├── shared/
-        └── client/
+├── 42/
+│   └── media/lua/
+│       ├── shared/   ← PHNPC_Core.lua, PHNPC_Stats.lua, Translate/
+│       └── client/   ← PHNPC_Actions.lua, PHNPC_Barks.lua, ...
+└── common/
+    └── media/
+        ├── AnimSets/zombie/  ← AnimSets custom (NPC)
+        └── anims_X/Zombie/   ← Animations .X custom
 ```
 
-> ⚠️ Ne pas copier le dossier `B42/` entier — copier seulement le contenu de `B42/42/`.
+> ⚠️ Ne pas copier le dossier `B42/` entier — copier séparément le contenu de `B42/42/` et `B42/common/`.
 
 **3 — Activer le mod**
 
@@ -189,9 +195,9 @@ Dynamic_NPC_Overhaul/
 
 | Phase | Fonctionnalité | État |
 |-------|----------------|------|
-| v0.0.9a | Traductions B42.18 (JSON), fix StaggerBack NPC, tous dialogues via getText() | ✅ |
-| v0.0.9 | Refacto 9 modules, fix proximité, fix getText() timing, fix anim coupée | ✅ |
 | v0.0.8b | Fix pathToCharacter, fix setHealth conditionnel | ✅ |
+| v0.0.9 | Refacto 9 modules, fix proximité, fix getText() timing, fix anim coupée | ✅ |
+| v0.0.9a | Traductions B42.18 (JSON), fix StaggerBack NPC, tous dialogues via getText() | ✅ |
 | v0.1.0 | Dialogue avancé, ordre "Va là-bas", réaction aux zombies | 🔜 |
 | v0.1.1 | Loot de bâtiments, échange d'items amélioré | 🔜 |
 | v0.1.5 | Persistance (sauvegarde/rechargement des PNJ) | 🔜 |
@@ -209,6 +215,18 @@ Roadmap complète : [Docs/B42/feuille de route.md](Docs/B42/feuille%20de%20route
 | [Docs/B42/ARCHITECTURE.md](Docs/B42/ARCHITECTURE.md) | Architecture complète, flux de création NPC, variables ModData |
 | [Docs/B42/CHANGELOG.md](Docs/B42/CHANGELOG.md) | Historique des versions |
 | [Docs/B42/feuille de route.md](Docs/B42/feuille%20de%20route.md) | Roadmap fonctionnelle avec toutes les phases |
+
+---
+
+## CHANGELOG
+
+Historique complet des modifications : **[Docs/B42/CHANGELOG.md](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md)**
+
+| Version | Résumé |
+|---------|--------|
+| [v0.0.9a](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009a----2026-05-22) | Fix StaggerBack NPC, traductions JSON B42.18, tous dialogues via `getText()` |
+| [v0.0.9](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009----2026-05-22) | Refacto 9 modules, fix proximité, fix `getText()` timing, fix anim coupée |
+| [v0.0.8b](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#008b----2026-05-21) | Fix `pathToCharacter`, fix `setHealth` conditionnel |
 
 ---
 
