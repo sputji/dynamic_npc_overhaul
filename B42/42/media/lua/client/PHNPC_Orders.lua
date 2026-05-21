@@ -28,14 +28,14 @@ function PHNPC.recruitNPC(npc)
         npc:changeState(ZombieIdleState.instance())
         npc:setBumpType("Shrug")
     end)
-    pcall(function() npc:addLineChatElement(md.PHNPC_Name .. " : D'accord, je vous suis !", 0.2, 0.9, 0.2) end)
+    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkRecruit"), md.PHNPC_Name), 0.2, 0.9, 0.2) end)
     print("[PHNPC] Recrute : " .. tostring(md.PHNPC_Name))
 end
 
 function PHNPC.followNPC(npc)
     local md = npc:getModData()
     md.PHNPC_State = "following"
-    pcall(function() npc:addLineChatElement(md.PHNPC_Name .. " : Je vous suis !", 0.2, 0.9, 0.2) end)
+    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkFollow"), md.PHNPC_Name), 0.2, 0.9, 0.2) end)
     print("[PHNPC] Suis le joueur : " .. tostring(md.PHNPC_Name))
 end
 
@@ -43,7 +43,7 @@ function PHNPC.stayNPC(npc)
     local md = npc:getModData()
     md.PHNPC_State = "staying"
     PHNPC.stopMoving(npc)
-    pcall(function() npc:addLineChatElement(md.PHNPC_Name .. " : Je reste ici.", 0.9, 0.9, 0.2) end)
+    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkStay"), md.PHNPC_Name), 0.9, 0.9, 0.2) end)
     print("[PHNPC] Reste ici : " .. tostring(md.PHNPC_Name))
 end
 
@@ -53,7 +53,7 @@ function PHNPC.dismissNPC(npc)
     md.PHNPC_State     = "idle"
     PHNPC.recruited[npc] = nil
     PHNPC.stopMoving(npc)
-    pcall(function() npc:addLineChatElement(md.PHNPC_Name .. " : Bonne chance.", 0.9, 0.9, 0.2) end)
+    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkDismiss"), md.PHNPC_Name), 0.9, 0.9, 0.2) end)
     print("[PHNPC] Congedie : " .. tostring(md.PHNPC_Name))
 end
 
@@ -89,7 +89,7 @@ function PHNPC.orderAttackNPC(npc)
         md.PHNPC_PrevState = md.PHNPC_State
         md.PHNPC_State     = "defending"
     end
-    pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Je m'en occupe !", 0.9, 0.2, 0.2) end)
+    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkAttack"), md.PHNPC_Name or "?"), 0.9, 0.2, 0.2) end)
 end
 
 function PHNPC.orderFleeNPC(npc)
@@ -108,17 +108,17 @@ function PHNPC.orderFleeNPC(npc)
         local player = getPlayer()
         if player then PHNPC.startMovingTo(npc, player:getX(), player:getY(), player:getZ()) end
     end
-    pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Je me mets a l'abri !", 0.9, 0.4, 0.2) end)
+    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkFlee"), md.PHNPC_Name or "?"), 0.9, 0.4, 0.2) end)
 end
 
 function PHNPC.toggleCombatNPC(npc)
     local md = npc:getModData()
     if md.PHNPC_CombatMode == "off" then
         md.PHNPC_CombatMode = "auto"
-        pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Mode combat actif.", 0.2, 0.9, 0.2) end)
+        pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkCombatOn"), md.PHNPC_Name or "?"), 0.2, 0.9, 0.2) end)
     else
         md.PHNPC_CombatMode = "off"
-        pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Mode combat desactive.", 0.9, 0.9, 0.2) end)
+        pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkCombatOff"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2) end)
     end
 end
 

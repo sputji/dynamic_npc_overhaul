@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.8a-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.9a-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,11 +20,11 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.8a**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.9a**.
 
 ---
 
-## Fonctionnalités actuelles (v0.0.8a)
+## Fonctionnalités actuelles (v0.0.9a)
 
 ### PNJ & Professions
 
@@ -43,9 +43,10 @@
 ### Interactions joueur
 
 - **Recruter** un PNJ via clic droit → il vous suit
-- **Ordonner** : *Suis-moi*, *Reste ici*, *Tu peux partir*
-- Distance de suivi réaliste — le PNJ ne colle pas le joueur
-- **Dialogue** : bulles de texte contextuelles (`addLineChatElement`) — recrutement, ordres, combat, idle
+- **Ordonner** : *Suis-moi*, *Reste ici*, *Attaque les zombies !*, *Mets-toi à l'abri*, *Tu peux partir*
+- Distance de suivi réaliste — le PNJ s'arrête à 3 tiles du joueur
+- **Échange d'inventaire** : accès à l'inventaire du PNJ via le menu
+- **Dialogue localisé** : toutes les bulles de texte passent par le système de traduction PZ (`getText()`), EN et FR supportés (B42.18+)
 
 ### Système de santé
 
@@ -68,9 +69,10 @@ Animations humaines complètes grâce à un système d'AnimSets custom :
 |-----------|-------------|
 | Marche / Idle | Déplacement et repos |
 | WalkToIdle / IdleToWalk | Transitions fluides (override vanilla via `PHNPC_IsNPC=true`) |
+| StaggerBack (NPC) | Repoussé — `Bob_RunStumble` (rig humain) |
 | PainHead / PainTorso | Coup reçu |
 | FrontKick / HighKick | Combat auto NPC |
-| Shove / ZombiePushedBack | Repoussé |
+| Shove | Repoussé |
 | WaveHi / Shrug / Yes / No | Expressions sociales |
 
 > Animations masculines (Bob) et féminines (Kate) supportées.
@@ -155,12 +157,22 @@ Dynamic_NPC_Overhaul/
 │   │   ├── icon.png / poster.png
 │   │   └── media/lua/
 │   │       ├── shared/
-│   │       │   ├── PHNPC_Core.lua   ← Namespace PHNPC, constantes, OUTFIT_STATS
-│   │       │   └── PHNPC_Stats.lua  ← Stats et inventaire par profession
+│   │       │   ├── PHNPC_Core.lua    ← Namespace PHNPC, constantes, OUTFIT_STATS
+│   │       │   ├── PHNPC_Stats.lua   ← Stats et inventaire par profession
+│   │       │   └── Translate/        ← Traductions EN/FR (.txt + .json B42.18)
 │   │       └── client/
-│   │           ├── PHNPC_Manager.lua ← Spawn, follow/stay, menu contextuel
-│   │           ├── PHNPC_Health.lua  ← Système de santé (OnHitZombie)
-│   │           └── PHNPC_Debug.lua   ← Menu DEBUG_PHNPC
+│   │           ├── PHNPC_Actions.lua  ← Déplacement NPC
+│   │           ├── PHNPC_Barks.lua    ← Système de barks
+│   │           ├── PHNPC_Combat.lua   ← Combat auto vs zombies
+│   │           ├── PHNPC_Convert.lua  ← Conversion zombie → NPC
+│   │           ├── PHNPC_Debug.lua    ← Menu DEBUG_PHNPC
+│   │           ├── PHNPC_Enforce.lua  ← Boucle OnZombieUpdate
+│   │           ├── PHNPC_Health.lua   ← Système de santé
+│   │           ├── PHNPC_Inventory.lua ← Inventaire NPC
+│   │           ├── PHNPC_Manager.lua  ← Spawn + registres
+│   │           ├── PHNPC_Menu.lua     ← Menu contextuel
+│   │           ├── PHNPC_Orders.lua   ← Ordres joueur
+│   │           └── PHNPC_Update.lua   ← OnTick principal
 │   └── common/media/
 │       ├── AnimSets/zombie/         ← AnimSets custom (idle, bumped, walk…)
 │       └── anims_X/Zombie/          ← Animations .X custom (FrontKick, HighKick…)
@@ -177,10 +189,11 @@ Dynamic_NPC_Overhaul/
 
 | Phase | Fonctionnalité | État |
 |-------|----------------|------|
-| v0.0.5 | Santé, stats/inventaire par métier, FrontKick, distance follow | ✅ |
-| v0.0.4 | Sons de pas, transitions walk/idle, BumpType | ✅ |
-| v0.1.0 | Dialogue, ordre "Va là-bas", réaction aux zombies | 🔜 |
-| v0.1.1 | Loot de bâtiments, échange d'items avec le joueur | 🔜 |
+| v0.0.9a | Traductions B42.18 (JSON), fix StaggerBack NPC, tous dialogues via getText() | ✅ |
+| v0.0.9 | Refacto 9 modules, fix proximité, fix getText() timing, fix anim coupée | ✅ |
+| v0.0.8b | Fix pathToCharacter, fix setHealth conditionnel | ✅ |
+| v0.1.0 | Dialogue avancé, ordre "Va là-bas", réaction aux zombies | 🔜 |
+| v0.1.1 | Loot de bâtiments, échange d'items amélioré | 🔜 |
 | v0.1.5 | Persistance (sauvegarde/rechargement des PNJ) | 🔜 |
 | v0.2.0 | Factions, patrouille, commerce | 🔜 |
 | v0.4.0 | Cerveau IA avancé, mémoire, réputation, moralité | 🔜 |

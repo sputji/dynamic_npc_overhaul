@@ -68,6 +68,9 @@ UI_FR = {
     UI_PHNPC_BarkIdle3          = "Dieu merci, je suis encore en vie.",
     UI_PHNPC_BarkIdle4          = "Il fait froid ce soir.",
 
+    -- Mort du NPC
+    UI_PHNPC_BarkDeath          = "%s : Argh...",
+
     -- Infos debug / etat
     UI_PHNPC_InfoLine1          = "%s (%s) — %s",
     UI_PHNPC_InfoLine2          = "HP:%d/%d  Vit:%s  For:%s  Etat:%s",

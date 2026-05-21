@@ -36,11 +36,11 @@ local function showNPCInfo(npc)
     local genre = (md.PHNPC_Female and "F" or "M")
     -- Ligne 1 : identite
     pcall(function()
-        npc:addLineChatElement((md.PHNPC_Name or "?") .. " (" .. genre .. ") — " .. outfit, 0.9, 0.9, 0.2)
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_InfoLine1"), md.PHNPC_Name or "?", genre, outfit), 0.9, 0.9, 0.2)
     end)
     -- Ligne 2 : stats
     pcall(function()
-        npc:addLineChatElement("HP:" .. hp .. "/" .. maxHp .. "  Vit:" .. speed .. "  For:" .. str .. "  Etat:" .. state, 0.9, 0.9, 0.2)
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_InfoLine2"), math.floor(hp), math.floor(maxHp), speed, str, state), 0.9, 0.9, 0.2)
     end)
 end
 
@@ -60,7 +60,7 @@ end
 local function dbgHPFull(npc)
     local md = npc:getModData()
     md.PHNPC_Health = md.PHNPC_MaxHealth or 100
-    pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : HP restaures.", 0.2, 0.9, 0.2) end)
+    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_HpRestored"), md.PHNPC_Name or "?"), 0.2, 0.9, 0.2) end)
 end
 local function dbgDeleteAll(_)
     local toDelete = {}

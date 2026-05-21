@@ -77,7 +77,7 @@ Events.OnHitZombie.Add(function(zombie, character, bodyPart, handWeapon)
 
         -- Derniere parole (addLineChatElement = bulle visible en B42)
         pcall(function()
-            zombie:addLineChatElement(tostring(md.PHNPC_Name or "?") .. " : Argh...", 0.9, 0.2, 0.2)
+            zombie:addLineChatElement(string.format(getText("UI_PHNPC_BarkDeath"), tostring(md.PHNPC_Name or "?")), 0.9, 0.2, 0.2)
         end)
 
         -- Retirer des registres PHNPC (plus traite par enforceNPC/follow)

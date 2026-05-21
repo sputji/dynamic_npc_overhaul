@@ -1,5 +1,54 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9a] — 2026-05-22
+
+### Corrections
+
+- **Animation StaggerBack NPC** : `ZSNPCStaggerBack.xml` utilisait `Bob_EmoteShrug` (identique au Shrug) — corrigé en `Bob_RunStumble`, animation humaine de trébuche adaptée au rig NPC.
+- **Traductions B42.18** : PZ 42.18 charge les fichiers `.json` et non les `.txt` non-standard. Ajout de `Translate/EN/UI.json` et `Translate/FR/UI.json` contenant toutes les clés `UI_PHNPC_*`. Les anciens `.txt` sont conservés pour compatibilité pré-42.18.
+- **Nouvelle clé `UI_PHNPC_BarkDeath`** : bark de mort du NPC (`%s: Argh...`) — ajouté dans les 4 fichiers de traduction (EN/FR, txt/json).
+- **Tous les dialogues NPC passent par `getText()`** : suppression complète des strings hardcodées dans `PHNPC_Combat.lua`, `PHNPC_Health.lua`, `PHNPC_Menu.lua` (6 chaînes). Les fichiers `PHNPC_Orders.lua` (8 chaînes) avaient été corrigés en début de version.
+
+### Fichiers modifiés
+- `common/media/AnimSets/zombie/bumped/ZSNPCStaggerBack.xml` : `Bob_EmoteShrug` → `Bob_RunStumble`
+- `client/PHNPC_Combat.lua` : FleeHurt + FleeOk via `getText()`
+- `client/PHNPC_Health.lua` : BarkDeath via `getText()`
+- `client/PHNPC_Menu.lua` : InfoLine1, InfoLine2, HpRestored via `getText()`
+- `client/PHNPC_Orders.lua` : BarkRecruit, BarkFollow, BarkStay, BarkDismiss, BarkAttack, BarkFlee, BarkCombatOn, BarkCombatOff via `getText()`
+- `shared/Translate/EN/UI.json` + `shared/Translate/FR/UI.json` : nouveaux fichiers JSON B42.18
+- `shared/Translate/EN/UI_PHNPC_EN.txt` + `shared/Translate/FR/UI_PHNPC_FR.txt` : ajout `UI_PHNPC_BarkDeath`
+
+---
+
+## [0.0.9] — 2026-05-22
+
+### Refactorisation majeure
+
+- **Éclatement de `PHNPC_Manager.lua`** (1078 lignes) en 9 modules client spécialisés, chargés dans l'ordre alphabétique PZ :
+
+| Fichier | Rôle |
+|---------|------|
+| `PHNPC_Actions.lua` | Déplacement NPC (startMovingTo, stopMoving, startFollowing) |
+| `PHNPC_Barks.lua` | Système de barks automatiques (BARK_KEYS, getRandomBark, sayBark) |
+| `PHNPC_Combat.lua` | Combat auto vs zombies (npcCombatStep, npcFlightStep, FleeHurt/FleeOk) |
+| `PHNPC_Convert.lua` | Conversion zombie → NPC (convertToNPC) |
+| `PHNPC_Debug.lua` | Menu DEBUG_PHNPC (dbgSpawnAtPlayer délègue à PHNPC.spawnNPC) |
+| `PHNPC_Enforce.lua` | Boucle OnZombieUpdate + OnTick (enforceNPC, barks auto toutes 500 ticks) |
+| `PHNPC_Health.lua` | Dégâts + mort NPC (OnHitZombie) |
+| `PHNPC_Inventory.lua` | Inventaire NPC (openNPCInventory, hook containers) |
+| `PHNPC_Manager.lua` | Spawn + registres (allNPCs, recruited, spawnNPC) |
+| `PHNPC_Menu.lua` | Menu contextuel clic-droit (showNPCInfo, sous-menus) |
+| `PHNPC_Orders.lua` | Ordres joueur (recruitNPC, followNPC, stayNPC, dismissNPC, toggleCombat…) |
+| `PHNPC_Update.lua` | Boucle OnTick principale |
+
+### Corrections
+- **Proximité NPC** : `startFollowing` utilise `pathToLocationF` avec offset `FOLLOW_STOP_DISTANCE=3` — évite la superposition joueur/NPC.
+- **getText() timing** : les clés de bark sont stockées dans `BARK_KEYS` comme strings ; `getText(key)` est appelé à l'utilisation dans `getRandomBark()`, après le chargement des traductions.
+- **Animation coupée** : handler `asn == "idle"` + vérification `PHNPC_Moving` → `stopMoving()` pour couper l'animation en cours.
+- **stopMoving** déclenché quand la cible de combat meurt.
+
+---
+
 ## [0.0.8b] — 2026-05-21
 
 ### Corrections critiques

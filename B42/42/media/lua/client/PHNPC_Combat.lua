@@ -99,7 +99,7 @@ function PHNPC.npcFlightStep(npc, player)
             md.PHNPC_PrevState = md.PHNPC_State
             md.PHNPC_State     = "fleeing"
             pcall(function()
-                npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Je suis blesse ! Je fuis !", 0.9, 0.2, 0.2)
+                npc:addLineChatElement(string.format(getText("UI_PHNPC_FleeHurt"), md.PHNPC_Name or "?"), 0.9, 0.2, 0.2)
             end)
         end
 
@@ -129,7 +129,7 @@ function PHNPC.npcFlightStep(npc, player)
             md.PHNPC_State     = md.PHNPC_PrevState or "following"
             md.PHNPC_PrevState = nil
             pcall(function()
-                npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Je peux continuer !", 0.2, 0.9, 0.2)
+                npc:addLineChatElement(string.format(getText("UI_PHNPC_FleeOk"), md.PHNPC_Name or "?"), 0.2, 0.9, 0.2)
             end)
         end
     end
