@@ -95,7 +95,10 @@ end
 local function enforceNPC(zombie)
     local md = zombie:getModData()
 
-    -- 1. (setUseless gere en step 7 selon md.PHNPC_Moving — voir ci-dessous)
+    -- 1. Activer le moteur pour TOUS (NHM GCCoreEnforceMain.lua ligne 9 EXACT)
+    --    PZ marque setUseless(true) apres certains hits => NPC se fige
+    --    Revenir a false chaque tick, puis setUseless(true) en step 7 si non-recrute
+    zombie:setUseless(false)
 
     -- 2. Fix B42 : empeche marche en arriere non souhaitee (Bandits ZAMove.lua 69-74)
     pcall(function() zombie:setAnimatingBackwards(false) end)
@@ -110,14 +113,18 @@ local function enforceNPC(zombie)
     pcall(function() zombie:setFemaleEtc(md.PHNPC_Female or false) end)
     zombie:setSpeedMod(md.PHNPC_SpeedMod or 0.8)
 
-    -- 4. Prevenir comportement zombie (dents + manger cadavre + crawl)
+    -- 4. Prevenir comportement zombie (dents + manger cadavre)
+    --    IMPORTANT : knockDown/setKnockedDown/setCanWalk sont retires d'ici.
+    --    Bandits NE les appelle JAMAIS dans leur update loop. Les appeler a chaque tick
+    --    (meme pendant "bumped") interrompait le moteur AnimSet et empechait
+    --    BumpAnimFinished=true d'etre emis => boucle bumped infinie.
+    --    Ces appels sont dans le handler "falldown/staggerback/down" (step 5) uniquement.
     zombie:setNoTeeth(true)
     pcall(function() zombie:setEatBodyTarget(nil, false) end)
-    zombie:setHealth(10000)
-    -- Empecher tout etat "a terre" (falldown/staggerback/crawl) independamment des HP
-    pcall(function() zombie:knockDown(false) end)
-    pcall(function() zombie:setKnockedDown(false) end)
-    pcall(function() zombie:setCanWalk(true) end)
+    -- setHealth : seulement si trop bas, evite recalcul constant du moteur physique
+    local _hp = 0
+    pcall(function() _hp = zombie:getHealth() end)
+    if _hp < 9000 then zombie:setHealth(10000) end
 
     -- 5. Gestion etats d'action (Bandits ManageActionState lineas 318-434)
     local skipSecurity = false
@@ -133,19 +140,20 @@ local function enforceNPC(zombie)
             skipSecurity = true
 
         elseif asn == "bumped" then
-            -- Pattern Bandits EXACT : laisser l'animation bumped se terminer via BumpAnimFinished.
-            -- NE PAS appeler setBumpType ici : ca re-declencherait un etat "bumped"
-            -- et creerait une boucle infinie (NPC definitivement bloque).
-            -- BumpAnimFinished=true est emis par nos XMLs (ZSShrug, ZSIdleToWalk, etc.)
-            -- quand l'animation se termine => le moteur PZ sort du bumped automatiquement.
+            -- Safety net EXACT NHM GCCoreEnforce.lua lignes 22-39 :
+            -- setBumpType("IdleToWalk") apres 30 ticks pour forcer sortie du bumped.
+            -- ZSIdleToWalk.xml (Bob_IdleToWalk + Event=End, copie Bandits) se termine
+            -- proprement et emet BumpAnimFinished=true => moteur sort de bumped.
+            -- NE PAS depasser 30 ticks : l'animation Shrug vanilla zombie est infinie.
             skipSecurity = true
             md.PHNPC_BumpTick = (md.PHNPC_BumpTick or 0) + 1
-            if md.PHNPC_BumpTick >= 90 then
-                -- Safety net uniquement : si vraiment bloque depuis 90 ticks,
-                -- forcer changeState(Idle) sans setBumpType
+            if md.PHNPC_BumpTick >= 30 then
                 md.PHNPC_BumpTick = 0
                 md.PHNPC_Moving   = false
-                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+                pcall(function()
+                    zombie:changeState(ZombieIdleState.instance())
+                    zombie:setBumpType("IdleToWalk")
+                end)
                 skipSecurity = false
             end
 
@@ -1027,4 +1035,4 @@ end)
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.10 loaded")
+print("[PHNPC] PHNPC_Manager v0.12 loaded")
