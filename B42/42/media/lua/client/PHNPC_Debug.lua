@@ -1,11 +1,13 @@
 --[[
-    PHNPC_Debug.lua  v0.0.2  (client)
+    PHNPC_Debug.lua  v0.0.2b  (client)
     Menu de DEBUG_PHNPC pour tester tous les comportements NPC.
 
     Acces : clic droit -> [DEBUG_PHNPC] -> sous-menu
 
-    Ce fichier est UNIQUEMENT pour les tests. Il ne fait pas partie
-    de la logique de production.
+    IMPORTANT - Signature callbacks ISContextMenu:
+        addOption(texte, target, onselect)  =>  onselect(target)
+        Le PREMIER argument est "target", PAS un contexte.
+        Toutes les fonctions ont donc la signature (player) et non (_, player).
 
     Necessite: PHNPC_Core.lua + PHNPC_Manager.lua charges avant ce fichier.
 ]]
@@ -14,7 +16,6 @@
 -- HELPERS DEBUG INTERNES
 -- ============================================================
 
--- Compte le nombre de NPCs actifs (pairs() sur table)
 local function countNPCs()
     local n = 0
     if PHNPC and PHNPC.allNPCs then
@@ -31,19 +32,28 @@ local function countRecruited()
     return n
 end
 
--- Cherche le NPC le plus proche du joueur (rayon illimite)
+-- Cherche le NPC le plus proche du joueur
 local function findNearestNPC(player)
     if not PHNPC or not PHNPC.allNPCs then return nil end
+    if not player then return nil end
     local best, bestDist = nil, math.huge
-    local px, py = player:getX(), player:getY()
+    local px, py
+    pcall(function() px = player:getX() ; py = player:getY() end)
+    if not px then return nil end
+
     for npc in pairs(PHNPC.allNPCs) do
         local alive = false
         pcall(function() alive = not npc:isDead() end)
         if alive then
-            local dx = npc:getX() - px
-            local dy = npc:getY() - py
-            local d  = math.sqrt(dx*dx + dy*dy)
-            if d < bestDist then bestDist = d ; best = npc end
+            local dx, dy
+            pcall(function()
+                dx = npc:getX() - px
+                dy = npc:getY() - py
+            end)
+            if dx then
+                local d = math.sqrt(dx*dx + dy*dy)
+                if d < bestDist then bestDist = d ; best = npc end
+            end
         end
     end
     return best, bestDist
@@ -53,8 +63,7 @@ end
 -- ACTIONS DEBUG
 -- ============================================================
 
--- Affiche l'etat complet du NPC le plus proche dans la console
-local function dbgShowState(_, player)
+local function dbgShowState(player)
     local npc, dist = findNearestNPC(player)
     if not npc then
         print("[DEBUG_PHNPC] Aucun NPC trouve")
@@ -68,96 +77,81 @@ local function dbgShowState(_, player)
     print("  Nom      : " .. tostring(md.PHNPC_Name))
     print("  Genre    : " .. (md.PHNPC_Female and "F" or "M"))
     print("  Outfit   : " .. tostring(md.PHNPC_Outfit))
-    print("  Distance : " .. string.format("%.1f", dist) .. " tiles")
+    print("  Distance : " .. string.format("%.1f", dist or 0) .. " tiles")
     print("  State    : " .. tostring(md.PHNPC_State))
     print("  Recruited: " .. tostring(md.PHNPC_Recruited))
     print("  Moving   : " .. tostring(md.PHNPC_Moving))
     print("  HitTicks : " .. tostring(md.PHNPC_HitTicks))
     print("  ShowTimer: " .. tostring(md.PHNPC_ShowTimer))
     print("  PZ State : " .. asn)
-    print("  isUseless: " .. tostring(npc:isUseless()))
-    print("  isDead   : " .. tostring(npc:isDead()))
-    print("  Health   : " .. tostring(npc:getHealth()))
-    print("  Pos      : " .. npc:getX() .. "," .. npc:getY() .. "," .. npc:getZ())
-
-    -- Variables AnimSet
-    local isNPC, walkType = "?", "?"
-    pcall(function() isNPC    = tostring(npc:getVariable("PHNPC_IsNPC")) end)
-    pcall(function() walkType = tostring(npc:getVariable("zombieWalkType")) end)
-    print("  PHNPC_IsNPC     : " .. isNPC)
-    print("  zombieWalkType  : " .. walkType)
+    local isUseless = "?"
+    pcall(function() isUseless = tostring(npc:isUseless()) end)
+    print("  isUseless: " .. isUseless)
+    local health = "?"
+    pcall(function() health = tostring(npc:getHealth()) end)
+    print("  Health   : " .. health)
+    local nx, ny, nz = "?", "?", "?"
+    pcall(function() nx = npc:getX() ; ny = npc:getY() ; nz = npc:getZ() end)
+    print("  Pos      : " .. tostring(nx) .. "," .. tostring(ny) .. "," .. tostring(nz))
+    local isNPCVar = "?"
+    pcall(function() isNPCVar = tostring(npc:getVariable("PHNPC_IsNPC")) end)
+    print("  PHNPC_IsNPC (AnimVar) : " .. isNPCVar)
     print("[DEBUG_PHNPC] ================")
 end
 
--- Liste tous les NPCs actifs dans la console
-local function dbgListAll(_, _)
-    local total    = countNPCs()
+local function dbgListAll(player)
+    local total     = countNPCs()
     local recruited = countRecruited()
     print("[DEBUG_PHNPC] === LISTE NPCs (" .. total .. " total, " .. recruited .. " recrutes) ===")
     if not PHNPC or not PHNPC.allNPCs then
-        print("  (PHNPC.allNPCs vide)")
-        return
+        print("  (PHNPC.allNPCs vide)") ; return
     end
     local i = 0
     for npc in pairs(PHNPC.allNPCs) do
         i = i + 1
         local md = npc:getModData()
-        local alive = "?"
-        pcall(function() alive = not npc:isDead() and "vivant" or "mort" end)
         local rec = PHNPC.recruited[npc] and "[recrute]" or ""
         print(string.format("  %d. %-12s %s  state=%-10s %s",
             i, tostring(md.PHNPC_Name),
             (md.PHNPC_Female and "F" or "M"),
-            tostring(md.PHNPC_State),
-            rec))
+            tostring(md.PHNPC_State), rec))
     end
     print("[DEBUG_PHNPC] ==================")
 end
 
--- Teleporte le NPC le plus proche sur la case du joueur
-local function dbgTeleportToPlayer(_, player)
+local function dbgTeleportToPlayer(player)
     local npc = findNearestNPC(player)
-    if not npc then
-        print("[DEBUG_PHNPC] Aucun NPC trouve")
-        return
-    end
+    if not npc then print("[DEBUG_PHNPC] Aucun NPC") ; return end
     local md = npc:getModData()
     pcall(function()
-        npc:setX(player:getX())
-        npc:setY(player:getY())
-        npc:setZ(player:getZ())
+        npc:setX(player:getX()) ; npc:setY(player:getY()) ; npc:setZ(player:getZ())
     end)
     print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " teleporte au joueur")
 end
 
--- Force l'animation Shrug sur le NPC le plus proche
-local function dbgAnim(_, player, bumpType)
+-- Base animation via setBumpType
+local function dbgAnim(player, bumpType)
     local npc = findNearestNPC(player)
-    if not npc then
-        print("[DEBUG_PHNPC] Aucun NPC trouve") ; return
-    end
+    if not npc then print("[DEBUG_PHNPC] Aucun NPC") ; return end
     local md = npc:getModData()
     pcall(function() npc:setBumpType(bumpType) end)
     print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " -> BumpType=" .. bumpType)
 end
 
--- Wrapper pour les animations (closure avec bumpType)
-local function dbgAnimWave(_, player)    dbgAnim(_, player, "WaveHi") end
-local function dbgAnimShrug(_, player)   dbgAnim(_, player, "Shrug") end
-local function dbgAnimYes(_, player)     dbgAnim(_, player, "Yes") end
-local function dbgAnimNo(_, player)      dbgAnim(_, player, "No") end
-local function dbgAnimPainH(_, player)   dbgAnim(_, player, "PainHead") end
-local function dbgAnimPainT(_, player)   dbgAnim(_, player, "PainTorso") end
-local function dbgAnimPushBk(_, player)  dbgAnim(_, player, "NPCPushedBack") end
-local function dbgAnimShove(_, player)   dbgAnim(_, player, "Shove") end
-local function dbgAnimKick(_, player)    dbgAnim(_, player, "FrontKick") end
+-- Wrappers 1 argument (signature callback correcte)
+local function dbgAnimWave(player)    dbgAnim(player, "WaveHi") end
+local function dbgAnimShrug(player)   dbgAnim(player, "Shrug") end
+local function dbgAnimYes(player)     dbgAnim(player, "Yes") end
+local function dbgAnimNo(player)      dbgAnim(player, "No") end
+local function dbgAnimPainH(player)   dbgAnim(player, "PainHead") end
+local function dbgAnimPainT(player)   dbgAnim(player, "PainTorso") end
+local function dbgAnimPushBk(player)  dbgAnim(player, "NPCPushedBack") end
+local function dbgAnimShove(player)   dbgAnim(player, "Shove") end
+local function dbgAnimKick(player)    dbgAnim(player, "FrontKick") end
 
--- Force l'etat hitreaction sur le NPC le plus proche (simule un coup)
-local function dbgForceHitReaction(_, player)
+local function dbgForceHitReaction(player)
     local npc = findNearestNPC(player)
-    if not npc then
-        print("[DEBUG_PHNPC] Aucun NPC trouve") ; return
-    end
+    if not npc then return end
     local md = npc:getModData()
     md.PHNPC_HitTicks = 0
     pcall(function()
@@ -167,8 +161,7 @@ local function dbgForceHitReaction(_, player)
     print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " -> hitreaction forcee")
 end
 
--- Force l'etat idle sur le NPC le plus proche
-local function dbgForceIdle(_, player)
+local function dbgForceIdle(player)
     local npc = findNearestNPC(player)
     if not npc then return end
     local md = npc:getModData()
@@ -176,13 +169,12 @@ local function dbgForceIdle(_, player)
         npc:changeState(ZombieIdleState.instance())
         npc:setBumpType("Shrug")
     end)
-    md.PHNPC_Moving  = false
+    md.PHNPC_Moving   = false
     md.PHNPC_HitTicks = 0
     print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " -> idle force")
 end
 
--- Force le suivi du joueur sur le NPC le plus proche
-local function dbgForceFollow(_, player)
+local function dbgForceFollow(player)
     local npc = findNearestNPC(player)
     if not npc then return end
     local md = npc:getModData()
@@ -193,8 +185,7 @@ local function dbgForceFollow(_, player)
     print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " -> follow force")
 end
 
--- Force le mode stay sur le NPC le plus proche
-local function dbgForceStay(_, player)
+local function dbgForceStay(player)
     local npc = findNearestNPC(player)
     if not npc then return end
     local md = npc:getModData()
@@ -204,8 +195,7 @@ local function dbgForceStay(_, player)
     print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " -> stay force")
 end
 
--- Reset complet ShowTimer sur le NPC le plus proche
-local function dbgResetShowTimer(_, player)
+local function dbgResetShowTimer(player)
     local npc = findNearestNPC(player)
     if not npc then return end
     local md = npc:getModData()
@@ -213,15 +203,8 @@ local function dbgResetShowTimer(_, player)
     print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " -> ShowTimer reset a 5")
 end
 
--- Spawn un NPC de test sur la case du joueur
-local function dbgSpawnAtPlayer(_, player)
-    local sq = player:getCurrentSquare()
-    if not sq then
-        print("[DEBUG_PHNPC] Impossible d'obtenir la case du joueur")
-        return
-    end
-    -- PHNPC_Manager expose spawnNPC comme fonction dans PHNPC_Core ou via Events
-    -- On reuse le pattern direct
+local function dbgSpawnAtPlayer(player)
+    if not player then return end
     local x = player:getX()
     local y = player:getY()
     local z = player:getZ()
@@ -236,19 +219,25 @@ local function dbgSpawnAtPlayer(_, player)
         if zlist and zlist:size() > 0 then
             local zombie = zlist:get(0)
             if zombie then
-                -- Convertir via Events (PHNPC_Manager doit exporter convertToNPC)
-                -- Si non accessible, utiliser la version inline minimaliste
                 local md = zombie:getModData()
                 pcall(function() zombie:setNoTeeth(true) end)
                 pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
-                pcall(function() zombie:setWalkType("Walk") end)
-                pcall(function() zombie:setVariable("zombieWalkType", "Walk") end)
-                pcall(function() zombie:setVariable("ZombieHitReaction", "Chainsaw") end)
                 pcall(function() zombie:setVariable("NoLungeTarget", true) end)
+                pcall(function() zombie:setVariable("ZombieHitReaction", "Chainsaw") end)
+                pcall(function() zombie:setVariable("LimpSpeed", 0.80) end)
+                pcall(function() zombie:setVariable("RunSpeed",  0.75) end)
+                pcall(function() zombie:setVariable("WalkSpeed", 1.04) end)
+                -- setWalkType fixe zombieWalkType en interne (PAS setVariable)
+                pcall(function() zombie:setWalkType("Walk") end)
+                -- Genre : Bob (male) ou Kate (female)
+                pcall(function() zombie:setFemaleEtc(isFemale) end)
+                pcall(function() zombie:setDressInRandomOutfit(false) end)
                 pcall(function() zombie:getEmitter():stopAll() end)
                 pcall(function() zombie:setTurnAlertedValues(-5, 5) end)
                 pcall(function() zombie:getDescriptor():setVoicePrefix("PHNPC") end)
-                pcall(function() zombie:setDressInRandomOutfit(false) end)
+                pcall(function() zombie:setPrimaryHandItem(nil) end)
+                pcall(function() zombie:setSecondaryHandItem(nil) end)
+                pcall(function() zombie:resetEquippedHandsModels() end)
                 pcall(function() zombie:setBumpType("Shrug") end)
                 md.PHNPC_IsNPC     = true
                 md.PHNPC_Recruited = false
@@ -269,13 +258,9 @@ local function dbgSpawnAtPlayer(_, player)
     end
 end
 
--- Supprime TOUS les NPCs
-local function dbgKillAll(_, _)
+local function dbgKillAll(player)
     local count = countNPCs()
-    if count == 0 then
-        print("[DEBUG_PHNPC] Aucun NPC a supprimer")
-        return
-    end
+    if count == 0 then print("[DEBUG_PHNPC] Aucun NPC") ; return end
     local removed = 0
     for npc in pairs(PHNPC.allNPCs) do
         pcall(function() npc:removeFromWorld() end)
@@ -286,8 +271,7 @@ local function dbgKillAll(_, _)
     print("[DEBUG_PHNPC] " .. removed .. " NPC(s) supprimes")
 end
 
--- Affiche les statistiques globales du systeme
-local function dbgStats(_, player)
+local function dbgStats(player)
     print("[DEBUG_PHNPC] === STATS SYSTEME ===")
     print("  allNPCs   : " .. countNPCs())
     print("  recruited : " .. countRecruited())
@@ -302,7 +286,7 @@ local function dbgStats(_, player)
         if nearNPC then
             local md = nearNPC:getModData()
             print("  NPC le plus proche : " .. tostring(md.PHNPC_Name) ..
-                  " (" .. string.format("%.1f", dist) .. " tiles)")
+                  " (" .. string.format("%.1f", dist or 0) .. " tiles)")
         else
             print("  NPC le plus proche : aucun")
         end
@@ -316,56 +300,42 @@ end
 
 local function onFillDebugContextMenu(playerIndex, context, worldObjects, test)
     if test then return end
-
     local player = getSpecificPlayer(playerIndex)
     if not player then return end
 
-    -- Toujours afficher le menu debug (independamment de PHNPC)
     local debugOpt = context:addOption("[DEBUG_PHNPC]")
     local sub      = ISContextMenu:getNew(context)
     context:addSubMenu(debugOpt, sub)
 
-    -- Sous-menu : Spawn
-    sub:addOption("Spawn NPC ici",          player, dbgSpawnAtPlayer)
-
+    sub:addOption("Spawn NPC ici",               player, dbgSpawnAtPlayer)
+    sub:addOption("---")
+    sub:addOption("Afficher etat NPC proche",    player, dbgShowState)
+    sub:addOption("Lister tous les NPCs",         player, dbgListAll)
+    sub:addOption("Stats systeme",                player, dbgStats)
+    sub:addOption("---")
+    sub:addOption("Forcer FOLLOW (NPC proche)",  player, dbgForceFollow)
+    sub:addOption("Forcer STAY  (NPC proche)",   player, dbgForceStay)
+    sub:addOption("Forcer IDLE  (NPC proche)",   player, dbgForceIdle)
+    sub:addOption("Teleporter NPC au joueur",    player, dbgTeleportToPlayer)
+    sub:addOption("Reset ShowTimer (NPC proche)",player, dbgResetShowTimer)
     sub:addOption("---")
 
-    -- Sous-menu : Info
-    sub:addOption("Afficher etat NPC proche", player, dbgShowState)
-    sub:addOption("Lister tous les NPCs",     player, dbgListAll)
-    sub:addOption("Stats systeme",            player, dbgStats)
-
-    sub:addOption("---")
-
-    -- Sous-menu : Controle
-    sub:addOption("Forcer FOLLOW (NPC proche)", player, dbgForceFollow)
-    sub:addOption("Forcer STAY  (NPC proche)",  player, dbgForceStay)
-    sub:addOption("Forcer IDLE  (NPC proche)",  player, dbgForceIdle)
-    sub:addOption("Teleporter NPC au joueur",   player, dbgTeleportToPlayer)
-    sub:addOption("Reset ShowTimer (NPC proche)", player, dbgResetShowTimer)
-
-    sub:addOption("---")
-
-    -- Sous-menu : Tests d'animation
     local animOpt = sub:addOption("Tester animations...")
     local animSub = ISContextMenu:getNew(sub)
     sub:addSubMenu(animOpt, animSub)
-
-    animSub:addOption("WaveHi (salut)",         player, dbgAnimWave)
-    animSub:addOption("Shrug (hausser epaules)", player, dbgAnimShrug)
-    animSub:addOption("Yes (acquiescer)",         player, dbgAnimYes)
-    animSub:addOption("No (refuser)",             player, dbgAnimNo)
-    animSub:addOption("PainHead (coup tete)",     player, dbgAnimPainH)
-    animSub:addOption("PainTorso (coup torse)",   player, dbgAnimPainT)
-    animSub:addOption("NPCPushedBack (recule)",   player, dbgAnimPushBk)
-    animSub:addOption("Shove (pousser)",          player, dbgAnimShove)
-    animSub:addOption("FrontKick (coup pied)",    player, dbgAnimKick)
-    animSub:addOption("ForceHitReaction",         player, dbgForceHitReaction)
+    animSub:addOption("WaveHi (salut)",           player, dbgAnimWave)
+    animSub:addOption("Shrug (hausser epaules)",   player, dbgAnimShrug)
+    animSub:addOption("Yes (acquiescer)",           player, dbgAnimYes)
+    animSub:addOption("No (refuser)",               player, dbgAnimNo)
+    animSub:addOption("PainHead (coup tete)",       player, dbgAnimPainH)
+    animSub:addOption("PainTorso (coup torse)",     player, dbgAnimPainT)
+    animSub:addOption("NPCPushedBack (recule)",     player, dbgAnimPushBk)
+    animSub:addOption("Shove (pousser)",            player, dbgAnimShove)
+    animSub:addOption("FrontKick (coup pied)",      player, dbgAnimKick)
+    animSub:addOption("ForceHitReaction",           player, dbgForceHitReaction)
 
     sub:addOption("---")
-
-    -- Danger zone
-    sub:addOption("[!] Supprimer TOUS les NPCs", player, dbgKillAll)
+    sub:addOption("[!] Supprimer TOUS les NPCs",  player, dbgKillAll)
 end
 
 -- ============================================================
@@ -374,4 +344,4 @@ end
 
 Events.OnPreFillWorldObjectContextMenu.Add(onFillDebugContextMenu)
 
-print("[PHNPC] PHNPC_Debug v0.0.2 loaded")
+print("[PHNPC] PHNPC_Debug v0.0.2b loaded")

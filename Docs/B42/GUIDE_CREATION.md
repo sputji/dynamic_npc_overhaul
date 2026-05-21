@@ -1,7 +1,7 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.1_
+_Version 0.0.3_
 
-> Ce guide explique le fonctionnement du systeme NPC tel qu'implemente en v0.1.
+> Ce guide explique le fonctionnement du systeme NPC tel qu'implemente en v0.0.3.
 > Pattern copie EXACTEMENT depuis NPC_Helper_Mod (GCCoreConvert + GCCoreEnforceMain + GCCoreSpawn + GCUpdate).
 
 ---
@@ -48,8 +48,13 @@ zombie:setVariable("WalkSpeed", 1.04)
 zombie:setVariable("PHNPC_IsNPC", true)
 
 -- 4. Marche humaine
+--    setWalkType() est l'API officielle PZ : elle fixe zombieWalkType en interne.
+--    NE PAS appeler setVariable("zombieWalkType",...) => variable READ-ONLY en B42 => WARN spam.
 zombie:setWalkType("Walk")
-zombie:setVariable("zombieWalkType", "Walk")    -- active ZSWalk.xml dans pathfind/
+
+-- 4b. Genre : OBLIGATOIRE pour que le moteur choisisse Bob (M) ou Kate (F)
+--     Sans ca, toutes les femmes jouent Bob_Idle au lieu de Kate_Idle
+zombie:setFemaleEtc(isFemale)
 
 -- 5. Hit reaction humaine (evite crash testDefense)
 zombie:setVariable("ZombieHitReaction", "Chainsaw")
@@ -167,8 +172,10 @@ zombie:setAnimatingBackwards(false)
 --    Sans ca, PZ les reinitialise et les animations zombie reprennent
 zombie:setVariable("PHNPC_IsNPC", true)
 zombie:setVariable("NoLungeTarget", true)
-zombie:setVariable("zombieWalkType", "Walk")
+-- setWalkType fixe zombieWalkType en interne (READ-ONLY: ne pas appeler setVariable)
 zombie:setWalkType("Walk")
+-- Genre : maintenir chaque tick pour eviter regression B42 (Bob vs Kate)
+zombie:setFemaleEtc(md.PHNPC_Female or false)
 zombie:setSpeedMod(0.8)
 
 -- 4. Prevention comportement zombie
@@ -310,9 +317,12 @@ B42/
 | Piège | Cause | Solution |
 |-------|-------|---------|
 | Animations zombie à la place de Bob | `PHNPC_IsNPC` pas re-appliqué chaque tick | Re-appliquer dans `enforceNPC` |
-| NPC mord le joueur | `setNoTeeth(true)` pas inconditionnel | En tête de `OnZombieUpdate`, AVANT `ShowTimer` |
-| NPC invisible après coup | Pas de handler `hitreaction` | Compteur 25 ticks + revive `isDead` |
-| pathToCharacter() ignoré | `setTarget(nil)` appelé pendant `pathfind` | `skipSecurity=true` dans état "pathfind" |
-| NPC attaque le joueur | `setUseless(true)` absent | Obligatoire pour NPCs non-recrutés |
-| NPC ne bouge pas | `setUseless(false)` non appelé avant pathfind | `startFollowing()` appelle `setUseless(false)` d'abord |
-| `addZombiesInOutfit` introuvable | Appelé comme méthode | Fonction GLOBALE : `addZombiesInOutfit(x,y,z,...)` |
+| Femme joue Bob_Idle au lieu de Kate_Idle | `setFemaleEtc(isFemale)` manquant | Appeler dans `convertToNPC` ET `enforceNPC` |
+| WARN spam `zombieWalkType` | `setVariable("zombieWalkType",...)` variable read-only en B42 | Utiliser uniquement `setWalkType("Walk")` |
+| Crash callback menu clic-droit | Signature `(_, player)` erronee : `player=nil` | `ISContextMenu:addOption(t,target,fn)` => `fn(target)`, signature correcte : `(player)` |
+| NPC mord le joueur | `setNoTeeth(true)` pas inconditionnel | En tete de `OnZombieUpdate`, AVANT `ShowTimer` |
+| NPC invisible apres coup | Pas de handler `hitreaction` | Compteur 25 ticks + revive `isDead` |
+| pathToCharacter() ignore | `setTarget(nil)` appele pendant `pathfind` | `skipSecurity=true` dans etat "pathfind" |
+| NPC attaque le joueur | `setUseless(true)` absent | Obligatoire pour NPCs non-recrutes |
+| NPC ne bouge pas | `setUseless(false)` non appele avant pathfind | `startFollowing()` appelle `setUseless(false)` d'abord |
+| `addZombiesInOutfit` introuvable | Appele comme methode | Fonction GLOBALE : `addZombiesInOutfit(x,y,z,...)` |

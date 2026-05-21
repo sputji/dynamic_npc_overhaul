@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 25 mai 2026 | Version **0.1** | Base minimale fonctionnelle — spawn, follow/stay. Rewrite NPC_Helper_Mod EXACT.
+> Mise a jour : 21 mai 2026 | Version **0.0.3** | Corrections bugs menu DEBUG, animations Bob/Kate, sons de pas.
 
 ---
 
@@ -9,11 +9,11 @@
 | Version | Date | Resume |
 |---------|------|---------|
 | 1.x–2.2.0 | 20–21 mai 2026 | Versions iteratives : stats, combat, peur, inventaire. NPCs avaient animations zombie, mordaient le joueur, devenaient invisibles quand frappes. |
-| **0.1** | **25 mai 2026** | **Rewrite TOTAL** base NPC_Helper_Mod EXACT. Suppression de tous les anciens fichiers Lua. 2 fichiers seulement. Spawn + follow/stay fonctionnel. Problemes resolus. |
-
+| **0.1** | **25 mai 2026** | **Rewrite TOTAL** base NPC_Helper_Mod EXACT. Suppression de tous les anciens fichiers Lua. 2 fichiers seulement. Spawn + follow/stay fonctionnel. Problemes resolus. || **0.0.2** | **21 mai 2026** | Menu DEBUG_PHNPC complet + delete NPC. Commit 1888833. (contenait bugs callbacks + zombieWalkType) |
+| **0.0.3** | **21 mai 2026** | Corrections : (1) signature callbacks ISContextMenu `(_, player)` → `(player)`, (2) `setVariable("zombieWalkType")` supprime (read-only B42), (3) `setFemaleEtc(isFemale)` ajoute dans convertToNPC + enforceNPC. |
 ---
 
-## Resultats de test v0.1 (confirmes)
+## Resultats de test v0.0.3 (attendus)
 
 | Fonctionnalite | Statut |
 |----------------|--------|
@@ -23,13 +23,17 @@
 | NPC reste en place (stay) | ✅ v0.1 |
 | NPC peut etre congedie | ✅ v0.1 |
 | Animation marche Bob_Walk | ✅ v0.1 |
-| Animation idle Bob_Idle | ✅ v0.1 |
+| Animation idle Bob_Idle | ✅ v0.0.3 (fix setFemaleEtc) |
+| Animation Kate_Walk/Kate_Idle pour femmes | ✅ v0.0.3 (fix setFemaleEtc) |
+| Sons de pas (footsteps) | ✅ v0.0.3 (via events XML ZSWalk.xml) |
 | Voix humaine (prefix PHNPC) | ✅ v0.1 |
 | NPC ne mord pas | ✅ v0.1 |
 | NPC pas invisible quand frappe | ✅ v0.1 |
 | Noms genres M/F | ✅ v0.1 |
 | Sous-menus clic-droit | ✅ v0.1 |
-| Supprimer NPC | ❌ v0.0.2 |
+| Menu DEBUG_PHNPC fonctionnel | ✅ v0.0.3 (fix signatures) |
+| Supprimer NPC | ✅ v0.0.2 |
+| WARN spam zombieWalkType | ✅ v0.0.3 (fix setWalkType) |
 | Mode combat (tuer zombies) | ❌ futur (Phase 2.2) |
 | Peur des zombies (fuite) | ❌ futur (Phase 2.2) |
 | Inventaire (transfert) | ❌ futur (Phase 2.3) |
@@ -55,6 +59,18 @@ Variables `PHNPC_IsNPC` et `zombieWalkType` non re-appliquées à chaque tick.
 ### NPC invisible apres un coup (v1.x–v2.2.x)
 Pas de handler pour l'etat `hitreaction`. Le NPC entrait en `isDead`/fakeDead.  
 **Solution** : Compteur 25 ticks dans `hitreaction` + revive dans `OnZombieUpdate` (pattern GCUpdate EXACT).
+
+### WARN spam zombieWalkType (v0.0.2)
+`setVariable("zombieWalkType", "Walk")` appele dans `enforceNPC` (chaque tick). Variable **read-only** en B42.  
+**Solution** : Supprimer `setVariable`. Seul `setWalkType("Walk")` est utilise (API PZ officielle, fixe la variable en interne).
+
+### Crash menu DEBUG_PHNPC (v0.0.2)
+`ISContextMenu:addOption(text, target, fn)` appelle `fn(target)`. Nos fonctions avaient `(_, player)` → `_=player`, `player=nil` → crash sur `player:getX()`.  
+**Solution** : Toutes les signatures callback `(_, player)` → `(player)`.
+
+### NPC joue Bob_Idle meme si c'est une femme (v0.0.2)
+`setFemaleEtc(isFemale)` manquait dans `convertToNPC`. Le moteur ne savait pas le genre → utilisait Bob (male) partout.  
+**Solution** : `setFemaleEtc(isFemale)` dans `convertToNPC` ET `setFemaleEtc(md.PHNPC_Female or false)` dans `enforceNPC` (chaque tick pour maintenir).
 
 ---
 
@@ -114,7 +130,7 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 
 ## Prochaines étapes (par priorité)
 
-### Phase 0.2.1 — Les sons, AnimSet vanilla et des mods exemples (NPC_Helper_Mod, Bandits, etc.)
+### Phase 0.2.0 — Les sons, AnimSet vanilla et des mods exemples (NPC_Helper_Mod, Bandits, etc.)
 - [ ] Sons de pas (events Footstep dans ZSWalk — déjà en XML, tester)
 - [ ] Sons d'attaque (events Attack dans ZSAttack )
 - [ ] Sons de réaction (events Pain dans ZSPain )
@@ -153,7 +169,7 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 - [ ] Tous les sons et annimations possibles selon les états et les événements (deplacement, actions, réaction, peur, colère, satisfaction, découverte, attaque, blessure, maladie, guérison, vieillissement, reproduction, mémoire, moralité, reputation, faction, profession, patrouille, construction, etc.)
 - [ ] Toutes les animations corespondantes aux sons et actions (deplacement, actions, réaction, peur, colère, satisfaction, découverte, attaque, blessure, maladie, guérison, vieillissement, reproduction, mémoire, moralité, reputation, faction, profession, patrouille, construction, etc.)
 
-### Phase 0.2.2 — Qualité des interactions
+### Phase 0.2.1 — Qualité des interactions
 - [ ] NPC peut transporter des items dans son inventaire natif (Ne fonctionne pas, inventaire vide, à investiguer)
 - [ ] Dialogue basique (bark texte au-dessus de la tête selon état)
 - [ ] Bark de dialogue (texte au-dessus de la tête selon état : peur, colère, satisfaction, etc.)
@@ -163,14 +179,12 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 - [ ] NPC peut attaquer les Zombies (doMeleeAttack) et réagir (hitreaction)
 - [ ] NPC peut demander de l'aide à un allié ou un ennemi (bark de demande d'aide, peut attaquer ou fuir selon le niveau de colère)
 
-### Phase 0.2.3 — Qualité des interactions (loot)
+### Phase 0.2.2 — Qualité des interactions (loot)
 - [ ] Fouille de bâtiments (loot)
 - [ ] Système de loot (tables d'items par type de bâtiment)
 - [ ] NPC peut ramasser des items au sol et les transporter dans son inventaire
 - [ ] NPC peut utiliser des items de son inventaire (nourriture, médicaments, armes contondantes, armes à feu, etc.)
 - [ ] NPC peut échanger des items avec le joueur (transfert via ISInventoryTransferUI)
-
-
 
 ### Phase 0.3.0 — Persistence
 - [ ] Sauvegarder l'état des NPC à OnSave (ModData global)

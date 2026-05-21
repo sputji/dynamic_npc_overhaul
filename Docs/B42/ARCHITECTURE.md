@@ -1,5 +1,5 @@
 # ARCHITECTURE — PH Dynamic NPC Overhaul B42
-_Version 0.1 — Base minimale fonctionnelle : spawn, follow/stay. Pattern NPC_Helper_Mod EXACT._
+_Version 0.0.3 — Corrections bugs menu DEBUG + animations/sons NPC._
 
 ---
 
@@ -9,6 +9,8 @@ _Version 0.1 — Base minimale fonctionnelle : spawn, follow/stay. Pattern NPC_H
 |---------|------------------|
 | 1.x–2.2.0 | Tentatives iteratives (animations zombie, NPC mordait, invisible quand frappe) |
 | **0.1** | **Rewrite complet** base NPC_Helper_Mod EXACT. 2 fichiers. Spawn + follow/stay fonctionnel. Plus d'animations zombie, plus de morsure, plus d'invisibilite. |
+| **0.0.2** | Menu DEBUG_PHNPC complet + delete NPC. (bugs callbacks + zombieWalkType) |
+| **0.0.3** | Corrections : signature callbacks ISContextMenu, suppression setVariable("zombieWalkType"), ajout setFemaleEtc() pour animations Bob/Kate. |
 
 ---
 
@@ -87,8 +89,8 @@ Clic-droit sur le sol
               |
               +-- setNoTeeth(true)                    <- dents desactivees
               +-- setVariable("PHNPC_IsNPC", true)    <- active tous les ZS*.xml
-              +-- setWalkType("Walk")                 <- marche humaine API PZ
-              +-- setVariable("zombieWalkType","Walk") <- active ZSWalk.xml
+              +-- setWalkType("Walk")                 <- marche humaine + fixe zombieWalkType en interne
+              +-- setFemaleEtc(isFemale)              <- CRITIQUE: Bob_Idle/Walk (M) vs Kate_Idle/Walk (F)
               +-- setVariable("ZombieHitReaction","Chainsaw")
               +-- setVariable("NoLungeTarget", true)
               +-- getEmitter():stopAll()              <- silence sons zombie
@@ -134,8 +136,8 @@ enforceNPC(zombie)              <- coeur du pattern NPC_Helper_Mod
   2. setAnimatingBackwards(false) <- fix B42 marche en arriere
   3. setVariable("PHNPC_IsNPC", true)       <- CHAQUE TICK (sinon zombie reprend)
      setVariable("NoLungeTarget", true)
-     setVariable("zombieWalkType", "Walk")
-     setWalkType("Walk")
+     setWalkType("Walk")                     <- fixe zombieWalkType en interne (read-only: NE PAS faire setVariable!)
+     setFemaleEtc(md.PHNPC_Female or false) <- maintenir Bob/Kate CHAQUE TICK
      setSpeedMod(0.8)
   4. setNoTeeth(true) + setEatBodyTarget(nil,false) + setHealth(10000)
   5. Machine d'etats (getActionStateName()) :
@@ -170,7 +172,7 @@ OnTick()                        <- toutes les frames
 | Variable | Type | Valeur | Effet |
 |----------|------|--------|-------|
 | `PHNPC_IsNPC` | BOOL | true | Active tous les ZS*.xml (idle, walk, lunge, bumped, attack...) |
-| `zombieWalkType` | STRING | "Walk" | Active ZSWalk.xml (Bob_Walk) dans pathfind/ et walktoward/ |
+| `zombieWalkType` | STRING | "Walk" | Active ZSWalk.xml (Bob_Walk) dans pathfind/ et walktoward/. **READ-ONLY** : fixee via `setWalkType("Walk")`, jamais via `setVariable`. |
 | `ZombieHitReaction` | STRING | "Chainsaw" | Evite crash dans testDefense (engine PZ) |
 | `NoLungeTarget` | BOOL | true | Empeche lunge automatique vers les cibles |
 | `BumpType` | STRING | "Shrug" | Animation par defaut (transition idle) |
@@ -203,7 +205,10 @@ Clic avec NPC à portee (rayon INTERACTION_DIST = 3 tiles):
 | Piège | Solution |
 |-------|----------|
 | `setUseless(false)` interrompu après hit | Re-appeler à chaque tick dans `enforceNPC` |
-| Zombie reprend ses animations | Re-appliquer `PHNPC_IsNPC=true` + `zombieWalkType="Walk"` à chaque tick |
+| Zombie reprend ses animations | Re-appliquer `PHNPC_IsNPC=true` à chaque tick + `setWalkType("Walk")` (pas `setVariable`) |
+| `setVariable("zombieWalkType",...)` → WARN spam | Variable read-only en B42. Utiliser uniquement `setWalkType("Walk")` qui la fixe en interne |
+| NPC joue `Bob_Idle` même si femme | `setFemaleEtc(isFemale)` obligatoire dans `convertToNPC` ET `enforceNPC` |
+| Callback ISContextMenu signature erronee | `addOption(text, target, fn)` → `fn(target)`. Signature correcte: `(player)`, pas `(_, player)` |
 | `setTarget(nil)` tue le pathfind | Ne l'appeler que si `skipSecurity=false` (jamais pendant "pathfind") |
 | NPC invisible après hit | Handler `hitreaction` 25 ticks + revive `isDead` dans `OnZombieUpdate` |
 | NPC mord le joueur | `setNoTeeth(true)` INCONDITIONNEL en tête de `OnZombieUpdate` |

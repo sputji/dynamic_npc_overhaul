@@ -65,11 +65,12 @@ local function enforceNPC(zombie)
 
     -- 3. Variables critiques AnimSet (CHAQUE TICK — sinon Zombie_Idle reprend)
     --    "PHNPC_IsNPC" active nos ZSIdle.xml, ZSWalk.xml, etc.
-    --    "zombieWalkType=Walk" active Bob_Walk dans pathfind/ZSWalk.xml
+    --    setWalkType("Walk") => PZ fixe zombieWalkType en interne (read-only, ne pas setVariable)
     pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
     pcall(function() zombie:setVariable("NoLungeTarget", true) end)
-    pcall(function() zombie:setVariable("zombieWalkType", "Walk") end)
     zombie:setWalkType("Walk")
+    -- Genre : Bob = male, Kate = female — CRITIQUE pour idle/walk corrects
+    pcall(function() zombie:setFemaleEtc(md.PHNPC_Female or false) end)
     zombie:setSpeedMod(0.8)
 
     -- 4. Prevenir comportement zombie (dents + manger cadavre)
@@ -175,10 +176,9 @@ local function convertToNPC(zombie, outfit, isFemale, npcName)
     pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
 
     -- 4. WalkType humain (Bandits lineas 178-179)
-    --    setWalkType => API PZ
-    --    zombieWalkType => variable lue par nos XMLs (pathfind/ZSWalk.xml)
+    --    setWalkType => API PZ, fixe zombieWalkType en interne (read-only)
+    --    NE PAS appeler setVariable("zombieWalkType",...) => WARN read-only
     pcall(function() zombie:setWalkType("Walk") end)
-    pcall(function() zombie:setVariable("zombieWalkType", "Walk") end)
 
     -- 5. Hit reaction humaine au lieu de zombie (Bandits linea 184)
     pcall(function() zombie:setVariable("ZombieHitReaction", "Chainsaw") end)
@@ -203,6 +203,10 @@ local function convertToNPC(zombie, outfit, isFemale, npcName)
 
     -- 11. Empecher re-habillage automatique par le moteur
     pcall(function() zombie:setDressInRandomOutfit(false) end)
+
+    -- 11b. Genre : necessaire pour Bob_Walk/Kate_Walk + Bob_Idle/Kate_Idle
+    --    Sans setFemaleEtc, une femme joue Bob_Idle (male) au lieu de Kate_Idle
+    pcall(function() zombie:setFemaleEtc(isFemale) end)
 
     -- 12. Premier bump => sortir de Zombie_Idle proprement
     pcall(function() zombie:setBumpType("Shrug") end)
