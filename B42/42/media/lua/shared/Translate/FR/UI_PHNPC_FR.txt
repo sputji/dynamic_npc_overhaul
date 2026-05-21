@@ -1,0 +1,68 @@
+UI_FR = {
+    -- ========================================================
+    -- PHNPC : Dynamic NPC Overhaul  (Francais)
+    -- Format : UI_FR = { Key = "Texte" }
+    -- Nom du fichier doit commencer par "UI"
+    -- ========================================================
+
+    -- Menu contextuel principal
+    UI_PHNPC_MenuLabel          = "[%s (%s) — %s — HP:%d/%d]",
+    UI_PHNPC_MenuTalk           = "Parler",
+    UI_PHNPC_MenuRecruit        = "Rejoins-moi !",
+    UI_PHNPC_MenuInventory      = "Echange d'objets...",
+    UI_PHNPC_MenuOrders         = "Ordres...",
+    UI_PHNPC_MenuDelete         = "[Supprimer]",
+    UI_PHNPC_MenuSpawn          = "[PHNPC] Appeler un survivant",
+
+    -- Sous-menu Ordres
+    UI_PHNPC_OrderFollow        = "Suis-moi !",
+    UI_PHNPC_OrderStay          = "Reste ici.",
+    UI_PHNPC_OrderAttack        = "Attaque les zombies !",
+    UI_PHNPC_OrderFlee          = "Mets-toi a l'abri !",
+    UI_PHNPC_OrderCombatAuto    = "Mode combat : AUTO",
+    UI_PHNPC_OrderCombatOff     = "Mode combat : OFF",
+    UI_PHNPC_OrderDismiss       = "Tu peux partir.",
+
+    -- Messages NPC (barks recrutement / ordres)
+    UI_PHNPC_BarkRecruit        = "%s : D'accord, je te suis.",
+    UI_PHNPC_BarkDismiss        = "%s : Prends soin de toi, survivant.",
+    UI_PHNPC_BarkStay           = "%s : Compris, j'attends ici.",
+    UI_PHNPC_BarkFollow         = "%s : J'arrive !",
+    UI_PHNPC_BarkAttack         = "%s : Je m'en occupe !",
+    UI_PHNPC_BarkFlee           = "%s : Je me mets a l'abri !",
+    UI_PHNPC_BarkCombatOn       = "%s : Mode combat actif.",
+    UI_PHNPC_BarkCombatOff      = "%s : Mode combat desactive.",
+
+    -- Barks automatiques par etat
+    UI_PHNPC_BarkFollowing1     = "Je suis juste derriere toi !",
+    UI_PHNPC_BarkFollowing2     = "Montre le chemin.",
+    UI_PHNPC_BarkFollowing3     = "Reste pres de moi !",
+    UI_PHNPC_BarkFollowing4     = "Ne m'abandonne pas.",
+
+    UI_PHNPC_BarkStaying1       = "Je surveille le coin.",
+    UI_PHNPC_BarkStaying2       = "Je tiens cette position.",
+    UI_PHNPC_BarkStaying3       = "Je reste ici.",
+    UI_PHNPC_BarkStaying4       = "Ne tarde pas.",
+
+    UI_PHNPC_BarkDefending1     = "Zombie en vue !",
+    UI_PHNPC_BarkDefending2     = "Je m'en occupe !",
+    UI_PHNPC_BarkDefending3     = "Restez derriere moi !",
+    UI_PHNPC_BarkDefending4     = "Attention !",
+
+    UI_PHNPC_BarkFleeing1       = "Je suis trop blesse !",
+    UI_PHNPC_BarkFleeing2       = "Je dois fuir !",
+    UI_PHNPC_BarkFleeing3       = "Aidez-moi !",
+    UI_PHNPC_BarkFleeing4       = "Trop de zombies !",
+
+    UI_PHNPC_BarkIdle1          = "Y a quelqu'un ?",
+    UI_PHNPC_BarkIdle2          = "...",
+    UI_PHNPC_BarkIdle3          = "Dieu merci, je suis encore en vie.",
+    UI_PHNPC_BarkIdle4          = "Il fait froid ce soir.",
+
+    -- Infos debug / etat
+    UI_PHNPC_InfoLine1          = "%s (%s) — %s",
+    UI_PHNPC_InfoLine2          = "HP:%d/%d  Vit:%s  For:%s  Etat:%s",
+    UI_PHNPC_HpRestored         = "%s : HP restaures.",
+    UI_PHNPC_FleeHurt           = "%s : Je suis blesse ! Je fuis !",
+    UI_PHNPC_FleeOk             = "%s : Je peux continuer !",
+}

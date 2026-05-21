@@ -29,9 +29,11 @@ local function startFollowing(npc, player)
     npc:setUseless(false)
     if not md.PHNPC_Moving then
         md.PHNPC_Moving = true
+        -- Transition Idle->Walk (NHM GCCoreActions pattern EXACT)
+        -- Joue Bob_IdleToWalk via ZSIdleToWalk.xml => animation humaine propre
+        pcall(function() npc:setBumpType("IdleToWalk") end)
     end
     -- pathToCharacter : methode standard IsoZombie -> IsoPlayer (NPC_Helper_Mod + Bandits)
-    -- Plus fiable que pathToLocationF manuel pour le suivi d'un IsoCharacter mobile
     pcall(function() npc:pathToCharacter(player) end)
 end
 
@@ -40,7 +42,8 @@ local function startMovingTo(npc, x, y, z)
     npc:setUseless(false)
     if not md.PHNPC_Moving then
         md.PHNPC_Moving = true
-        -- NE PAS appeler setBumpType("IdleToWalk") : le vanilla PZ reprendrait l'anim zombie
+        -- Transition Idle->Walk (NHM GCCoreActions pattern EXACT)
+        pcall(function() npc:setBumpType("IdleToWalk") end)
     end
     pcall(function() npc:pathToLocationF(x, y, z) end)
 end
@@ -49,8 +52,9 @@ local function stopMoving(npc)
     local md = npc:getModData()
     if md.PHNPC_Moving then
         md.PHNPC_Moving = false
-        -- NE PAS appeler setBumpType("WalkToIdle") : le vanilla PZ reprendrait l'anim zombie
-        -- setTarget(nil) uniquement si pas en pathfind (cf. enforceNPC step 6)
+        -- Transition Walk->Idle (NHM GCCoreActions pattern EXACT)
+        -- Joue Bob_WalkToStop via ZSWalkToIdle.xml => retour idle humain propre (fix bug bras zombie)
+        pcall(function() npc:setBumpType("WalkToIdle") end)
         pcall(function() npc:setTarget(nil) end)
         pcall(function() npc:clearAggroList() end)
     end
@@ -647,6 +651,38 @@ end
 -- ============================================================
 -- CALLBACKS DEBUG (appeles via menu clic-droit en mode debug)
 -- ============================================================
+-- ============================================================
+-- CALLBACKS ORDRES (accessibles a tous, pas uniquement debug)
+-- ============================================================
+local function orderAttackNPC(npc)
+    local md = npc:getModData()
+    md.PHNPC_CombatMode = "auto"
+    if md.PHNPC_State ~= "defending" then
+        md.PHNPC_PrevState = md.PHNPC_State
+        md.PHNPC_State     = "defending"
+    end
+    pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Je m'en occupe !", 0.9, 0.2, 0.2) end)
+end
+
+local function orderFleeNPC(npc)
+    local md = npc:getModData()
+    md.PHNPC_State = "staying"   -- s'arrete apres la fuite (evite la boucle npcFlightStep)
+    local enemy, eDist = findNearestZombie(npc, 20)
+    local nx, ny, nz = npc:getX(), npc:getY(), npc:getZ()
+    if enemy and eDist < 20 then
+        local ex, ey = enemy:getX(), enemy:getY()
+        local dx = nx - ex
+        local dy = ny - ey
+        local d = math.sqrt(dx * dx + dy * dy)
+        if d > 0 then dx, dy = dx / d, dy / d end
+        startMovingTo(npc, nx + dx * 15, ny + dy * 15, nz)
+    else
+        local player = getPlayer()
+        if player then startMovingTo(npc, player:getX(), player:getY(), player:getZ()) end
+    end
+    pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Je me mets a l'abri !", 0.9, 0.4, 0.2) end)
+end
+
 local function dbgForceIdle(npc)
     npc:getModData().PHNPC_State = "idle"
     stopMoving(npc)
@@ -847,11 +883,15 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
             subMenu:addSubMenu(ordreOpt, ordreSub)
 
             if md.PHNPC_State == "following" then
-                ordreSub:addOption("Reste ici.",    npc, stayNPC)
+                ordreSub:addOption("Reste ici.",             npc, stayNPC)
             else
-                ordreSub:addOption("Suis-moi !",    npc, followNPC)
+                ordreSub:addOption("Suis-moi !",             npc, followNPC)
             end
-            ordreSub:addOption("Tu peux partir.",   npc, dismissNPC)
+            ordreSub:addOption("Attaque les zombies !",      npc, orderAttackNPC)
+            ordreSub:addOption("Mets-toi a l'abri !",        npc, orderFleeNPC)
+            local combatLabel = "Mode combat : " .. (md.PHNPC_CombatMode == "off" and "OFF" or "AUTO")
+            ordreSub:addOption(combatLabel,                  npc, dbgToggleCombat)
+            ordreSub:addOption("Tu peux partir.",            npc, dismissNPC)
         end
 
         -- Section debug (uniquement si mode debug PZ)
@@ -1035,4 +1075,4 @@ end)
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.12 loaded")
+print("[PHNPC] PHNPC_Manager v0.13 loaded")
