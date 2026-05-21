@@ -1,6 +1,7 @@
 --[[
-    PHNPC_Core.lua  v0.1  (shared)
-    Etat global - Project Humain : Dynamic NPC Overhaul
+    PHNPC_Core.lua  v0.2  (shared)
+    Etat global + constantes + stats par metier
+    Project Humain : Dynamic NPC Overhaul
     Pattern: NPC_Helper_Mod GCCore.lua
 ]]
 
@@ -8,18 +9,89 @@ PHNPC = PHNPC or {}
 PHNPC.allNPCs   = PHNPC.allNPCs or {}   -- [npcRef] = true  (tous les NPCs actifs)
 PHNPC.recruited = PHNPC.recruited or {}  -- [npcRef] = true  (recrutes : following ou staying)
 
--- Config IA
-PHNPC.FOLLOW_DISTANCE   = 3    -- tiles : distance min avant d'arreter le suivi
+-- ============================================================
+-- CONFIG IA
+-- ============================================================
+PHNPC.FOLLOW_DISTANCE   = 5    -- tiles : distance min avant d'arreter le suivi (v0.0.5 : etait 3, trop collant)
 PHNPC.FOLLOW_TICK_RATE  = 20   -- ticks entre deux appels pathToCharacter
 PHNPC.INTERACTION_DIST  = 3    -- tiles : rayon clic droit pour interagir
 
--- Outfits disponibles au spawn
+-- ============================================================
+-- SANTE
+-- ============================================================
+PHNPC.MAX_HEALTH = 100         -- PV par defaut si outfit inconnu
+
+-- ============================================================
+-- STATS PAR METIER
+-- speed     : multiplicateur de vitesse (setSpeedMod)
+-- strength  : force (0-10), influence les degats infliges (futur)
+-- health    : points de vie max
+-- maxWeight : poids max inventaire (kg)
+-- items     : items donnes au spawn
+-- ============================================================
+PHNPC.OUTFIT_STATS = {
+    Farmer  = {
+        speed     = 0.75,
+        strength  = 7,
+        health    = 90,
+        maxWeight = 15.0,
+        items     = { "Base.Shovel", "Base.Trowel" },
+    },
+    Police  = {
+        speed     = 0.85,
+        strength  = 8,
+        health    = 110,
+        maxWeight = 20.0,
+        items     = { "Base.PoliceBaton", "Base.HandTorch" },
+    },
+    Fireman = {
+        speed     = 0.80,
+        strength  = 9,
+        health    = 120,
+        maxWeight = 25.0,
+        items     = { "Base.Axe" },
+    },
+    Doctor  = {
+        speed     = 0.78,
+        strength  = 6,
+        health    = 100,
+        maxWeight = 15.0,
+        items     = { "Base.BandageDirty", "Base.Painkillers" },
+    },
+    Ranger  = {
+        speed     = 0.90,
+        strength  = 7,
+        health    = 105,
+        maxWeight = 18.0,
+        items     = { "Base.HuntingKnife", "Base.HandTorch" },
+    },
+    Chef    = {
+        speed     = 0.75,
+        strength  = 6,
+        health    = 90,
+        maxWeight = 15.0,
+        items     = { "Base.KitchenKnife", "Base.CanOpener" },
+    },
+    Survivor = {
+        speed     = 0.80,
+        strength  = 7,
+        health    = 100,
+        maxWeight = 18.0,
+        items     = { "Base.Crowbar" },
+    },
+}
+
+-- ============================================================
+-- OUTFITS DISPONIBLES AU SPAWN
+-- ============================================================
 PHNPC.OUTFITS = {
     "Farmer", "Police", "Fireman", "Doctor",
     "Ranger", "Chef", "Survivor",
 }
 
--- Noms aleatoires
+-- ============================================================
+-- NOMS ALEATOIRES
+-- ============================================================
 PHNPC.NAMES_M = {
     "Marc", "Thomas", "Pierre", "Jean", "Luc",
     "Paul", "Alain", "Denis", "Francois", "Michel",
@@ -34,10 +106,19 @@ function PHNPC.getRandomName(isFemale)
     return list[ZombRand(#list) + 1]
 end
 
+-- ============================================================
+-- HELPERS GLOBAUX
+-- ============================================================
+
 -- Renvoie true si ce zombie est un de nos NPCs
 function PHNPC.isNPC(zombie)
     if not zombie then return false end
     return PHNPC.allNPCs[zombie] == true
 end
 
-print("[PHNPC] Core v0.1 loaded")
+-- Renvoie les stats de l'outfit (avec fallback Survivor)
+function PHNPC.getOutfitStats(outfit)
+    return PHNPC.OUTFIT_STATS[outfit] or PHNPC.OUTFIT_STATS["Survivor"]
+end
+
+print("[PHNPC] Core v0.2 loaded")

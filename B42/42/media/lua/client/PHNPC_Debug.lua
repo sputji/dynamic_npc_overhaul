@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Debug.lua  v0.0.4  (client)
+    PHNPC_Debug.lua  v0.0.5  (client)
     Menu de DEBUG_PHNPC pour tester tous les comportements NPC.
 
     Acces : clic droit -> [DEBUG_PHNPC] -> sous-menu
@@ -89,7 +89,13 @@ local function dbgShowState(player)
     print("  isUseless: " .. isUseless)
     local health = "?"
     pcall(function() health = tostring(npc:getHealth()) end)
-    print("  Health   : " .. health)
+    print("  Health PZ: " .. health)
+    -- Sante PHNPC (notre systeme)
+    local phnpcHp    = md.PHNPC_Health    or "?"
+    local phnpcMaxHp = md.PHNPC_MaxHealth or "?"
+    print("  Health   : " .. tostring(phnpcHp) .. " / " .. tostring(phnpcMaxHp))
+    print("  SpeedMod : " .. tostring(md.PHNPC_SpeedMod or "?"))
+    print("  Strength : " .. tostring(md.PHNPC_Strength or "?"))
     local nx, ny, nz = "?", "?", "?"
     pcall(function() nx = npc:getX() ; ny = npc:getY() ; nz = npc:getZ() end)
     print("  Pos      : " .. tostring(nx) .. "," .. tostring(ny) .. "," .. tostring(nz))
@@ -130,11 +136,18 @@ local function dbgTeleportToPlayer(player)
 end
 
 -- Base animation via setBumpType
+-- Pour les animations a priorite elevee (FrontKick, Shove) :
+--   setUseless(false) + changeState(ZombieIdleState) requis avant setBumpType
+--   sinon l'animation est ignoree si le NPC est freeze (useless=true)
 local function dbgAnim(player, bumpType)
     local npc = findNearestNPC(player)
     if not npc then print("[DEBUG_PHNPC] Aucun NPC") ; return end
     local md = npc:getModData()
-    pcall(function() npc:setBumpType(bumpType) end)
+    pcall(function()
+        npc:setUseless(false)                          -- debloquer AI avant bump (Bandits pattern)
+        npc:changeState(ZombieIdleState.instance())   -- etat propre => bumped transition fiable
+        npc:setBumpType(bumpType)
+    end)
     print("[DEBUG_PHNPC] " .. tostring(md.PHNPC_Name) .. " -> BumpType=" .. bumpType)
 end
 
@@ -148,6 +161,7 @@ local function dbgAnimPainT(player)   dbgAnim(player, "PainTorso") end
 local function dbgAnimPushBk(player)  dbgAnim(player, "ZombiePushedBack") end
 local function dbgAnimShove(player)   dbgAnim(player, "Shove") end
 local function dbgAnimKick(player)    dbgAnim(player, "FrontKick") end
+local function dbgAnimHighKick(player) dbgAnim(player, "HighKick") end
 
 local function dbgForceHitReaction(player)
     local npc = findNearestNPC(player)
@@ -333,7 +347,8 @@ local function onFillDebugContextMenu(playerIndex, context, worldObjects, test)
     animSub:addOption("PainTorso (douleur thoracique)",  player, dbgAnimPainT)
     animSub:addOption("ZombiePushedBack (reculer)",      player, dbgAnimPushBk)
     animSub:addOption("Shove (pousser)",            player, dbgAnimShove)
-    animSub:addOption("FrontKick (coup pied)",      player, dbgAnimKick)
+    animSub:addOption("FrontKick (coup pied avant)",player, dbgAnimKick)
+    animSub:addOption("HighKick (coup pied haut)",  player, dbgAnimHighKick)
     animSub:addOption("ForceHitReaction",           player, dbgForceHitReaction)
 
     sub:addOption("---")
@@ -346,4 +361,4 @@ end
 
 Events.OnPreFillWorldObjectContextMenu.Add(onFillDebugContextMenu)
 
-print("[PHNPC] PHNPC_Debug v0.0.4 loaded")
+print("[PHNPC] PHNPC_Debug v0.0.5 loaded")

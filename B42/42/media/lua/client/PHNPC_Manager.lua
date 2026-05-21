@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Manager.lua  v0.1  (client)
+    PHNPC_Manager.lua  v0.2  (client)
     Spawn / Enforce / Suivi / Menu contextuel
     Necessite: PHNPC_Core.lua (shared)
 
@@ -74,7 +74,7 @@ local function enforceNPC(zombie)
     zombie:setWalkType("Walk")
     -- Genre : Bob = male, Kate = female — CRITIQUE pour idle/walk corrects
     pcall(function() zombie:setFemaleEtc(md.PHNPC_Female or false) end)
-    zombie:setSpeedMod(0.8)
+    zombie:setSpeedMod(md.PHNPC_SpeedMod or 0.8)
 
     -- 4. Prevenir comportement zombie (dents + manger cadavre)
     zombie:setNoTeeth(true)
@@ -241,6 +241,14 @@ local function convertToNPC(zombie, outfit, isFemale, npcName)
 
     -- 15. Enregistrer dans le systeme
     PHNPC.allNPCs[zombie] = true
+
+    -- 15b. Stats et inventaire par metier (PHNPC_Stats.lua)
+    if PHNPC.initStats then
+        PHNPC.initStats(zombie, outfit, isFemale)
+    end
+    if PHNPC.initInventory then
+        PHNPC.initInventory(zombie, outfit)
+    end
 
     print("[PHNPC] NPC cree OK : " .. npcName)
 end
@@ -509,10 +517,10 @@ Events.OnGameStart.Add(function()
     PHNPC.allNPCs   = {}
     PHNPC.recruited = {}
     _followTimers   = {}
-    print("[PHNPC] Manager v0.1 pret")
+    print("[PHNPC] Manager v0.2 pret")
 end)
 
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.1 loaded")
+print("[PHNPC] PHNPC_Manager v0.2 loaded")
