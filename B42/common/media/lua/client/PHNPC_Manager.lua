@@ -1,5 +1,5 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
--- client/PHNPC_Manager.lua  v2.3
+-- client/PHNPC_Manager.lua  v2.3.1
 -- Spawn / Mouvement / IA / Ordres / Inventaire / Combat / Peur / Colere
 -- Necessite: PHNPC_Core.lua (shared), PHNPC_Stats.lua (shared)
 -- Traductions: Translate/EN/UI.json + Translate/FR/UI.json (prefixe UI_PHNPC_*)
@@ -188,6 +188,8 @@ local function createNPC(square)
     pcall(function() npc:setTarget(nil) end)       -- CRITIQUE: effacer la cible zombie
     pcall(function() npc:clearAggroList() end)     -- CRITIQUE: effacer l'aggro
     pcall(function() npc:setHealth(10000) end)
+    -- CRITIQUE v2.3.1: forcer etat idle immediatement au spawn pour couper toute IA zombie
+    pcall(function() npc:changeState(ZombieIdleState.instance()) end)
 
     -- 3. Visuels propres
     pcall(function()
@@ -595,8 +597,11 @@ local function enforceNPC(zombie)
         return
     end
 
-    -- Etat normal : reset bumpTicks
-    if data then data.bumpTicks = 0 end
+    -- v2.3.1: TOUT AUTRE ETAT (walktoward, attack, idle, etc.) :
+    -- Reset agressif vers idle pour supprimer TOUTE IA zombie native.
+    -- Seuls "pathfind", "thump", "eatBody", "turnalerted" et "bumped" sont geres ci-dessus.
+    pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+    if data then data.bumpTicks = 0 ; data.moving = false end
 end
 
 -- ============================================================
@@ -713,8 +718,8 @@ Events.OnGameStart.Add(function()
     PHNPC.npcs  = {}
     _ticks      = 0
     _openInvNPC = nil
-    print("[PHNPC] PHNPC_Manager v2.2 pret (OnGameStart)")
+    print("[PHNPC] PHNPC_Manager v2.3.1 pret (OnGameStart)")
 end)
 
 Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
-print("[PHNPC] PHNPC_Manager v2.2 loaded")
+print("[PHNPC] PHNPC_Manager v2.3.1 loaded")
