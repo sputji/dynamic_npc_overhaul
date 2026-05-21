@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 21 mai 2026 | Version **2.2.0** | Combat NPC manuel + traductions FR + inventaire
+> Mise a jour : 25 mai 2026 | Version **0.1** | Base minimale fonctionnelle — spawn, follow/stay. Rewrite NPC_Helper_Mod EXACT.
 
 ---
 
@@ -8,44 +8,33 @@
 
 | Version | Date | Resume |
 |---------|------|---------|
-| 1.x | mars 2026 | Fondations, structure B42, IsoPlayer.new (ne fonctionnait pas) |
-| 1.0.0 | 20 mai 2026 | Base fonctionnelle : addZombiesInOutfit + Banditize, spawn ok |
-| 1.0.1 | 20 mai 2026 | Fix AnimSets noms (ZSIdle/ZSWalk), menu double supprime |
-| 1.1.0 | 20 mai 2026 | setUseless(false) en premier, voix NotAZombie, NPC ne mord plus |
-| 1.2.0 | 21 mai 2026 | AnimSets complets NPC_Helper_Mod copies dans pathfind/, setSpeedMod, zombieWalkType re-set |
-| **2.0.0** | **21 mai 2026** | **1er NPC FONCTIONNEL** : se deplace, suit le joueur. Stats, noms genres, combat, peur zombies, inventaire, sous-menus |
-| **2.1.0** | **21 mai 2026** | Fix menu crash, vitesse NPC, systeme colere 4 niveaux, 4 AnimSets bumped, traductions JSON (PHNPC.json) |
-| **2.2.0** | **21 mai 2026** | **Fix 5 bugs in-game** : traductions FR (UI.json), combat manuel (faceLocationF+setBumpType+knockDown), npc:Say() remplace HaloTextHelper, inventaire via OnRefreshInventoryWindowContainers, suppression punch anim avant marche |
+| 1.x–2.2.0 | 20–21 mai 2026 | Versions iteratives : stats, combat, peur, inventaire. NPCs avaient animations zombie, mordaient le joueur, devenaient invisibles quand frappes. |
+| **0.1** | **25 mai 2026** | **Rewrite TOTAL** base NPC_Helper_Mod EXACT. Suppression de tous les anciens fichiers Lua. 2 fichiers seulement. Spawn + follow/stay fonctionnel. Problemes resolus. |
 
 ---
 
-## Resultats de test v2.2.0 (attendus)
+## Resultats de test v0.1 (confirmes)
 
 | Fonctionnalite | Statut |
 |----------------|--------|
-| Spawn NPC (clic droit) | ✅ |
-| NPC se deplace | ✅ |
-| NPC suit le joueur | ✅ |
-| Animation marche Bob_Walk | ✅ |
-| Animation idle Bob_Idle | ✅ |
-| Voix humaine (NotAZombie) | ✅ |
-| NPC ne mord pas | ✅ |
-| Noms genres M/F | ✅ |
-| Stats par outfit | ✅ |
-| Menus en FRANCAIS | ✅ fix v2.2 (UI.json) |
-| Mode combat (tuer zombies) | ✅ fix v2.2 (combat manuel) |
-| NPC attaque zombies | ✅ fix v2.2 (doMeleeAttack) |
-| Peur des zombies (fuite) | ✅ |
-| Inventaire (transfert) | ✅ fix v2.2 (OnRefreshInventoryWindowContainers) |
-| Stats affichees (Say) | ✅ fix v2.2 (npc:Say) |
-| Sous-menus clic-droit | ✅ |
-| Animation lunge (Bob_Walk) | ✅ |
-| Ouverture porte (Bob_FrontKick) | ✅ |
-| Colere 4 niveaux | ✅ |
-| Dialogue colere (Say) | ✅ fix v2.2 |
-| Pas de punch anim avant marche | ✅ fix v2.2 |
-| NPC attaque joueur (colere niv 4) | ✅ |
-| AnimSets bumped 4 types | ✅ v2.1 (ZSNPCBite, ZSNPCBiteLow, ZSNPCPushedBack, ZSNPCPushedFront) |
+| Spawn NPC (clic droit) | ✅ v0.1 |
+| NPC se deplace (follow) | ✅ v0.1 |
+| NPC suit le joueur | ✅ v0.1 |
+| NPC reste en place (stay) | ✅ v0.1 |
+| NPC peut etre congedie | ✅ v0.1 |
+| Animation marche Bob_Walk | ✅ v0.1 |
+| Animation idle Bob_Idle | ✅ v0.1 |
+| Voix humaine (prefix PHNPC) | ✅ v0.1 |
+| NPC ne mord pas | ✅ v0.1 |
+| NPC pas invisible quand frappe | ✅ v0.1 |
+| Noms genres M/F | ✅ v0.1 |
+| Sous-menus clic-droit | ✅ v0.1 |
+| Supprimer NPC | ❌ v0.0.2 |
+| Mode combat (tuer zombies) | ❌ futur (Phase 2.2) |
+| Peur des zombies (fuite) | ❌ futur (Phase 2.2) |
+| Inventaire (transfert) | ❌ futur (Phase 2.3) |
+| Stats par outfit | ❌ futur (Phase 2.2) |
+| Persistance (sauvegarde) | ❌ futur (Phase 3) |
 
 ---
 
@@ -55,77 +44,71 @@
 `IsoPlayer.new()` ne fonctionne qu'en `isDebugEnabled()`.  
 **Solution** : `addZombiesInOutfit()` + Banditize (pattern NPC_Helper_Mod / Bandits).
 
-### AnimSets dans le mauvais dossier (avant v1.2.0)
-`ZSWalk.xml` était dans `walktoward/` seulement.  
-`pathToLocationF()` = état `pathfind` = lit `zombie/pathfind/`.  
-**Solution** : Copier dans `pathfind/` (identique à NPC_Helper_Mod).
+### Animations zombie persistantes (v1.x–v2.2.x)
+Variables `PHNPC_IsNPC` et `zombieWalkType` non re-appliquées à chaque tick.  
+**Solution** : Re-appliquer dans `enforceNPC` à CHAQUE tick (pattern GCCoreEnforceMain EXACT).
 
-### setSpeedMod manquant (avant v1.2.0)
-Sans `setSpeedMod(1.0)`, le NPC pouvait avoir vitesse 0 → immobile.  
-**Solution** : Ajouté dans `npcStartMoving` + `enforceNPC` + Banditize.
+### NPC mordait le joueur (v1.x–v2.2.x)
+`setNoTeeth(true)` appliqué seulement dans convertToNPC, pas de facon inconditionnelle.  
+**Solution** : `setNoTeeth(true)` INCONDITIONNEL en tete de `OnZombieUpdate` + `setUseless(true)` pour NPCs non-recrutes.
+
+### NPC invisible apres un coup (v1.x–v2.2.x)
+Pas de handler pour l'etat `hitreaction`. Le NPC entrait en `isDead`/fakeDead.  
+**Solution** : Compteur 25 ticks dans `hitreaction` + revive dans `OnZombieUpdate` (pattern GCUpdate EXACT).
 
 ---
 
-## Architecture actuelle v2.0.0
+## Architecture actuelle v0.1
 
 ### Fichiers Lua
 
-| Fichier | Role |
-|---------|------|
-| `shared/PHNPC_Core.lua` | Namespace global `PHNPC`, VERSION |
-| `shared/PHNPC_Stats.lua` | Noms genrés M/F, profils stats par outfit, PHNPC.generateName/generateStats/statsToString |
-| `client/PHNPC_Manager.lua` | Toute la logique client : spawn, pathfinding, enforceNPC, menu, peur, combat |
-| `server/PHNPC_Server.lua` | Stub serveur (prêt pour futur multi) |
+| Fichier | Chemin | Role |
+|---------|--------|------|
+| `PHNPC_Core.lua` | `42/media/lua/shared/` | Namespace global `PHNPC`, constantes, `isNPC()` |
+| `PHNPC_Manager.lua` | `42/media/lua/client/` | Toute la logique : spawn, enforceNPC, follow/stay, menu |
 
-### Fichiers AnimSets (zombie/)
+### Fichiers AnimSets (common/media/AnimSets/zombie/)
 
 | Dossier | Fichier(s) | Animation | Condition |
 |---------|-----------|-----------|-----------|
 | `idle/` | ZSIdle.xml | Bob_Idle | PHNPC_IsNPC=true |
 | `pathfind/` | ZSWalk.xml | Bob_Walk | zombieWalkType=Walk |
-| `pathfind/` | ZSRun.xml | Bob_Run | zombieWalkType=Run |
-| `pathfind/` | ZSSneakWalk.xml | Bob_WalkSneak | zombieWalkType=SneakWalk |
-| `walktoward/` | ZSWalk.xml | Bob_Walk | zombieWalkType=Walk (idem) |
-| `lunge/` | ZSlunge.xml | Bob_Walk | PHNPC_IsNPC=true |
-| `thump/` | ZSdoor.xml | Bob_FrontKick | PHNPC_IsNPC=true + Door |
-| `bumped/` | ZSBump*.xml | Bob_Push* | PHNPC_IsNPC=true + BumpType |
-| `attack/` | ZSAttack*.xml | Bob_Attack* | PHNPC_IsNPC=true |
-| `hitreaction/` | ZSPain*.xml | Bob_Pain* | PHNPC_IsNPC=true |
+| `walktoward/` | ZSWalk.xml | Bob_Walk | zombieWalkType=Walk |
+| `lunge/` | defaultlunge.xml | (override vanilla) | — |
+| `bumped/` | ZS*.xml (180+) | Bob_* (Pain, Attack, Shove...) | BumpType=... |
+| `attack/` | ZS*.xml | Bob_Attack* | BumpType=... |
+| `hitreaction/` | ZSClimbWall*.xml | (override vanilla) | — |
+| `thump/` | door.xml (exclu) + ZSdoor.xml | Bob_FrontKick | PHNPC_IsNPC=true + Door |
 
-### Système de stats (PHNPC_Stats.lua)
+### PHNPC_Core.lua : constantes clés
 
-Stats générées aléatoirement selon l'outfit au spawn :
-- **courage** : résistance à la peur des zombies (0-100)
-- **force** : dégâts mêlée + capacité transport (0-100)
-- **melee** : compétence corps à corps (0-100)
-- **tir** : compétence armes à feu (0-100)
-- **endurance** : résistance fatigue, vitesse (0-100)
-
-Profils : Police > tir/courage | Fireman > force/endurance | Doctor < tout | Ranger > tir | etc.
+```lua
+PHNPC.FOLLOW_DISTANCE  = 3      -- tiles avant de commencer a suivre
+PHNPC.FOLLOW_TICK_RATE = 20     -- ticks entre chaque pathToCharacter
+PHNPC.INTERACTION_DIST = 3      -- rayon menu clic-droit (tiles)
+PHNPC.OUTFITS = {"Farmer","Police","Fireman","Doctor","Ranger","Chef","Survivor"}
+PHNPC.allNPCs   = {}            -- [npcRef] = true
+PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
+```
 
 ---
 
-## Comportements implémentés v2.0.0
+## Comportements implémentés v0.1
 
 ### Suivi joueur
-- `pathToLocationF(px, py, pz)` toutes les 15 ticks si dist > 3 tiles
-- `WalkToIdle` / `IdleToWalk` transitions via `setBumpType`
-- `enforceNPC` ne coupe pas le pathfind en cours
+- `pathToCharacter(player)` toutes les 20 ticks si dist > 3 tiles
+- `IdleToWalk` / `WalkToIdle` transitions via `setBumpType`
+- `enforceNPC` ne coupe JAMAIS le pathfind en cours (`skipSecurity=true` dans etat "pathfind")
 
-### Peur des zombies
-- Check toutes les 30 ticks
-- Si `courage < 50` ET zombie à moins de 10 tiles → fuite (direction opposée, 15 tiles)
-- Désactivé si mode combat actif
+### Ordres disponibles (v0.1)
+| Ordre | Fonction | Effect |
+|-------|----------|--------|
+| Rejoins-moi ! | `recruitNPC` | PHNPC_Recruited=true, State=following |
+| Suis-moi ! | `followNPC` | State=following |
+| Reste ici. | `stayNPC` | State=staying, stopMoving |
+| Tu peux partir. | `dismissNPC` | PHNPC_Recruited=false, State=idle |
 
-### Mode combat
-- Activation/désactivation via menu clic-droit
-- Cherche le zombie le plus proche (< 15 tiles)
-- Se déplace vers la cible → `NPCSetAttack()` si < 5 tiles
-- `enforceNPC` laisse passer l'état "attack" si mode combat actif
 
-### Inventaire
-- Clic-droit → "Voir l'inventaire" → `ISInventoryTransferUI.transferBetween(player, npc)`
-- [ ] NPC peut transporter des items dans son inventaire natif (Ne fonctionne pas, inventaire vide, à investiguer)
 
 ---
 
@@ -171,6 +154,7 @@ Profils : Police > tir/courage | Fireman > force/endurance | Doctor < tout | Ran
 - [ ] Toutes les animations corespondantes aux sons et actions (deplacement, actions, réaction, peur, colère, satisfaction, découverte, attaque, blessure, maladie, guérison, vieillissement, reproduction, mémoire, moralité, reputation, faction, profession, patrouille, construction, etc.)
 
 ### Phase 2.2 — Qualité des interactions
+- [ ] NPC peut transporter des items dans son inventaire natif (Ne fonctionne pas, inventaire vide, à investiguer)
 - [ ] Dialogue basique (bark texte au-dessus de la tête selon état)
 - [ ] Bark de dialogue (texte au-dessus de la tête selon état : peur, colère, satisfaction, etc.)
 - [ ] Ordre "Va là-bas" (click droit sur une tuile cible)

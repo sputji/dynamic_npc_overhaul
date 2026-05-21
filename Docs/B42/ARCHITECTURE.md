@@ -1,5 +1,5 @@
 # ARCHITECTURE — PH Dynamic NPC Overhaul B42
-_Version 2.2.0 — Combat manuel NPC + traductions FR corrigees + inventaire + Say() dialogue_
+_Version 0.1 — Base minimale fonctionnelle : spawn, follow/stay. Pattern NPC_Helper_Mod EXACT._
 
 ---
 
@@ -7,9 +7,8 @@ _Version 2.2.0 — Combat manuel NPC + traductions FR corrigees + inventaire + S
 
 | Version | Changements clés |
 |---------|------------------|
-| 2.0.0 | NPC fonctionnel : spawn, suivi, stats, combat (setTarget), peur, inventaire |
-| 2.1.0 | Fix menu crash, vitesse NPC, colere 4 niveaux, 4 AnimSets bumped, traductions JSON |
-| **2.2.0** | **Combat entierement manuel** (faceLocationF+setBumpType+knockDown), `npc:Say()` remplace HaloTextHelper, `UI.json` requis pour traductions FR, inventaire via `OnRefreshInventoryWindowContainers`, suppression `setBumpType("IdleToWalk")` |
+| 1.x–2.2.0 | Tentatives iteratives (animations zombie, NPC mordait, invisible quand frappe) |
+| **0.1** | **Rewrite complet** base NPC_Helper_Mod EXACT. 2 fichiers. Spawn + follow/stay fonctionnel. Plus d'animations zombie, plus de morsure, plus d'invisibilite. |
 
 ---
 
@@ -17,98 +16,93 @@ _Version 2.2.0 — Combat manuel NPC + traductions FR corrigees + inventaire + S
 
 **Client-only, sans dispatcher réseau.**  
 Le NPC est un `IsoZombie` "banditisé" : créé via `addZombiesInOutfit()` puis transformé via des appels API.  
-Aucun serveur n'est impliqué en mode solo. `PHNPC_Server.lua` est prêt pour l'extension multijoueur.
+Aucun serveur n'est impliqué en mode solo.
 
 > **Pourquoi pas IsoPlayer.new() ?**  
 > `IsoPlayer.new()` ne fonctionne QUE dans `isDebugEnabled()`. Abandonné v1.0.0.  
 > `addZombiesInOutfit()` = seule méthode prouvée pour spawner des entités humanoïdes en B42.
 
+> **Pourquoi une réécriture totale en v0.1 ?**  
+> Les versions 1.x–2.2.x présentaient des animations zombie persistantes, morsure du joueur et NPC invisible après un coup.  
+> Cause racine : patterns non conformes à NPC_Helper_Mod. Solution : copie EXACTE des patterns GCCore*.lua.
+
 ---
 
-## Structure des fichiers (v2.0.0)
+## Structure des fichiers (v0.1)
 
 ```
 B42/
-  common/
+  42/                           <- racine du mod pour B42 (mod.info ici)
+    mod.info
+    icon.png
+    poster.png
     media/
       lua/
         shared/
-          PHNPC_Core.lua          <- namespace global PHNPC, VERSION
-          PHNPC_Stats.lua         <- noms genrés, profils stats, generateName/generateStats
+          PHNPC_Core.lua        <- namespace global PHNPC, constantes, isNPC()
         client/
-          PHNPC_Manager.lua       <- spawn, enforceNPC, menu, peur, combat, inventaire
-        server/
-          PHNPC_Server.lua        <- stub (futur multijoueur)
+          PHNPC_Manager.lua     <- toute la logique : spawn, enforce, follow, menu
+  common/
+    media/
       AnimSets/
         zombie/
           idle/
-            ZSIdle.xml            <- Bob_Idle | condition: PHNPC_IsNPC=true
-          pathfind/               <- état quand pathToLocationF() est actif
-            ZSWalk.xml            <- Bob_Walk | zombieWalkType=Walk
-            ZSRun.xml             <- Bob_Run  | zombieWalkType=Run
-            ZSSneakWalk.xml       <- Bob_WalkSneak | zombieWalkType=SneakWalk
-            ZSLimp*.xml           <- Bob_Limp variants
-            ZSWalkAim*.xml        <- Bob_WalkAim variants (armes)
-          walktoward/             <- état poursuite directe (setTarget)
-            ZSWalk.xml            <- idem pathfind
-            ZSRun.xml             <- idem pathfind
-          lunge/
-            ZSlunge.xml           <- Bob_Walk (vitesse 1.1) | PHNPC_IsNPC=true
+            ZSIdle.xml          <- Bob_Idle | condition: PHNPC_IsNPC=true
+          pathfind/             <- etat quand pathToCharacter() ou pathToLocationF() actif
+            ZSWalk.xml          <- Bob_Walk | zombieWalkType=Walk
+          walktoward/           <- etat poursuite directe (setTarget)
+            ZSWalk.xml          <- Bob_Walk | zombieWalkType=Walk (idem pathfind)
+          lunge/                <- transition de deplacement
+            defaultlunge.xml    <- override vanilla (empeche lunge zombie)
           lunge-network/
-            ZSlunge.xml           <- idem
-          thump/
-            door.xml              <- Zombie_Door | PHNPC_IsNPC=false (exclusion)
-            ZSdoor.xml            <- Bob_FrontKick | PHNPC_IsNPC=true + ThumpType=Door
-            DoorBang.xml          <- Zombie_DoorBang | PHNPC_IsNPC=false
-            ZSDoorBang.xml        <- Bob_FrontKick | PHNPC_IsNPC=true + DoorBang
-            DoorClaw.xml          <- Zombie_DoorClaw | PHNPC_IsNPC=false
-            ZSDoorClaw.xml        <- Bob_FrontKick | PHNPC_IsNPC=true + DoorClaw
+            defaultlunge.xml    <- idem
           bumped/
-            ZSBump*.xml           <- Bob_Push* | PHNPC_IsNPC=true + BumpType
-          attack/                 <- combat humain
-            ZSAttack*.xml         <- Bob_Attack* | PHNPC_IsNPC=true
+            ZS*.xml             <- toutes les animations humaines Bob_ (Pain, Attack, Shove...)
+          attack/
+            ZS*.xml             <- attaques avec armes / mains nues
           hitreaction/
-            ZSPain*.xml           <- Bob_Pain* | PHNPC_IsNPC=true
-          face-target/, falldown/, getup/, climbrope/, etc.
-      textures/                   <- icones UI (futur)
-  mod.info
+            ZSClimbWall*.xml    <- override vanilla
+          thump/
+            door.xml, doorbang.xml, doorclaw.xml  <- override (excluent zombies)
+            ZSdoor.xml, ZSDoorBang.xml, ZSDoorClaw.xml <- animations humaines
+          face-target/, falldown/, getup/, staggerback/, turnalerted/, etc.
 ```
+
+**Note importante :** `mod.info`, `icon.png` et `poster.png` doivent être dans `B42/42/` (la racine B42), pas dans `B42/`. PZ B42 lit `42/` comme racine du mod.
 
 ---
 
-## Flux de création d'un NPC (v2.0.0)
+## Flux de création d'un NPC (v0.1)
 
 ```
 Clic-droit sur le sol
   -> OnPreFillWorldObjectContextMenu
-  -> option "[PHNPC] Faire apparaitre un PNJ"
-  -> createNPC(square)
+  -> option "[PHNPC] Appeler un survivant"
+  -> spawnNPC(square)
       |
       +-- addZombiesInOutfit(x, y, z, 1, outfit, femaleChance)
-      |       => IsoZombie avec tenue humaine
+      |       => IsoZombie avec tenue humaine (fonction GLOBALE, pas methode)
       |
-      +-- PHNPC.generateName(isFemale)        <- liste M/F séparées
-      +-- PHNPC.generateStats(outfit)         <- profil stats selon outfit
-      |
-      +-- Banditize (pattern NPC_Helper_Mod + Bandits):
-      |   setNoTeeth(true)
-      |   setVariable("PHNPC_IsNPC", true)    <- active ZSIdle.xml + tous les ZS*.xml
-      |   setWalkType("Walk")
-      |   setVariable("zombieWalkType", "Walk")  <- active ZSWalk.xml
-      |   setVariable("ZombieHitReaction", "Chainsaw")
-      |   setVariable("NoLungeTarget", true)
-      |   setSpeedMod(1.0)                    <- CRITIQUE: sans ça vitesse=0
-      |   setVariable("WalkSpeed", 1.04)
-      |   setVariable("RunSpeed", 1.10)
-      |   setDressInRandomOutfit(false)
-      |   setTurnAlertedValues(-5, 5)
-      |   setBumpType("Shrug")
-      |   getDescriptor():setVoicePrefix("NotAZombie")
-      |   setTarget(nil) + clearAggroList()
-      |   setHealth(10000)
-      |
-      +-- ModData: PHNPC_ID, PHNPC_Name, PHNPC_Female, PHNPC_Outfit, PHNPC_Stats
-      +-- PHNPC.npcs[npc] = { id, name, stats, followMode, attackMode, ... }
+      +-- convertToNPC(zombie, outfit, isFemale, name)
+              |
+              +-- setNoTeeth(true)                    <- dents desactivees
+              +-- setVariable("PHNPC_IsNPC", true)    <- active tous les ZS*.xml
+              +-- setWalkType("Walk")                 <- marche humaine API PZ
+              +-- setVariable("zombieWalkType","Walk") <- active ZSWalk.xml
+              +-- setVariable("ZombieHitReaction","Chainsaw")
+              +-- setVariable("NoLungeTarget", true)
+              +-- getEmitter():stopAll()              <- silence sons zombie
+              +-- vider les mains
+              +-- setTurnAlertedValues(-5, 5)
+              +-- getDescriptor():setVoicePrefix("PHNPC")
+              +-- setDressInRandomOutfit(false)
+              +-- setBumpType("Shrug")
+              +-- nettoyer sang/saleté (HumanVisual)
+              +-- ModData: PHNPC_IsNPC=true, PHNPC_Recruited=false,
+                           PHNPC_State="idle", PHNPC_Name, PHNPC_Female,
+                           PHNPC_Outfit, PHNPC_Moving=false, PHNPC_HitTicks=0
+              +-- PHNPC_ShowTimer = 5   <- ignore les 5 premiers ticks (spawn)
+              +-- PHNPC.allNPCs[zombie] = true
 ```
 
 ---
@@ -117,34 +111,56 @@ Clic-droit sur le sol
 
 ```
 OnZombieUpdate(zombie)          <- une fois par IsoZombie par frame
-  -> si PHNPC.npcs[zombie]:
-       enforceNPC(zombie)
-         setUseless(false)      <- PREMIER APPEL: débloque le NPC après un hit
-         setHealth(10000)
-         setNoTeeth(true)
-         setVariable("PHNPC_IsNPC", true) + zombieWalkType + setSpeedMod
-         switch(getActionStateName()):
-           "pathfind" -> return (ne pas interrompre le déplacement)
-           "thump"    -> return (laisser ouvrir la porte)
-           "attack"   -> return si attackMode actif, sinon reset
-           "lunge"/"eatBody" -> changeState(ZombieIdleState) + reset
-           "turnalerted"     -> changeState(ZombieIdleState) + reset
-           "bumped"   -> compter 35 ticks, handleAnger, setBumpType niveau 4
-           TOUJOURS en debut: setTarget(nil) + clearAggroList (sauf colere joueur)
+  -> si pas PHNPC.isNPC(zombie) : return
+
+  -- IMMEDIAT (GCUpdate pattern inconditionnel) :
+  pcall setNoTeeth(true)
+  pcall setTarget(nil)
+
+  -- Gerer isDead (fakeDead/knockDown) :
+     si isDead -> setHealth(10000)+setFakeDead(false)+knockDown(false)+
+                  setKnockedDown(false)+setCanWalk(true)+setUseless(false)+
+                  changeState(ZombieIdleState)
+     -> si encore mort : return
+
+  -- ShowTimer guard :
+     si PHNPC_ShowTimer > 0 -> decrementer, return
+
+  pcall(enforceNPC(zombie))
+
+
+enforceNPC(zombie)              <- coeur du pattern NPC_Helper_Mod
+  1. setUseless(false)          <- active l'engine zombie (pathfind possible)
+  2. setAnimatingBackwards(false) <- fix B42 marche en arriere
+  3. setVariable("PHNPC_IsNPC", true)       <- CHAQUE TICK (sinon zombie reprend)
+     setVariable("NoLungeTarget", true)
+     setVariable("zombieWalkType", "Walk")
+     setWalkType("Walk")
+     setSpeedMod(0.8)
+  4. setNoTeeth(true) + setEatBodyTarget(nil,false) + setHealth(10000)
+  5. Machine d'etats (getActionStateName()) :
+     "pathfind"    -> skipSecurity = true   (ne jamais couper pathfind)
+     "bumped"      -> skipSecurity = true   (laisser animation se terminer)
+     "hitreaction" -> skipSecurity=true + PHNPC_HitTicks++ ;
+                      si HitTicks>25 : changeState(idle)+Shrug+reset
+     "turnalerted" -> changeState(idle) + clearAggro + setTarget(nil)
+     "lunge"       -> si PHNPC_Moving: skipSecurity=true
+                      sinon: changeState(idle)+clearAggro+reset
+     "attack","eatBody" -> changeState(idle)+clearAggro+setTarget(nil)+Moving=false
+  6. si not skipSecurity : setTarget(nil) + clearAggroList()
+  7. si not PHNPC_Recruited : setUseless(true)  <- CRITIQUE: freeze zombie AI
+  8. Supprimer sons zombie (stopSoundByName) + setVoicePrefix("PHNPC")
+
 
 OnTick()                        <- toutes les frames
-  -> cleanup NPC morts (toutes les 300 ticks)
-  -> pour chaque NPC:
-       colere vs joueur  (si playerAngerTicks > 0)
-         doMeleeAttack() si dist <= 1.8 tile, sinon approcher
-       checkFear()     (toutes les 30 ticks)
-         si courage < 50 ET zombie < 10 tiles -> fuite (oppose, 15 tiles)
-       checkCombat()   (toutes les 10 ticks si attackMode)
-         trouver zombie le plus proche < 15 tiles
-         si dist <= 1.8 tile -> doMeleeAttack(npc, zombie) + cooldown 60 ticks
-         si trop loin -> npcStartMoving() vers zombie
-       suivre joueur   (si followMode + dist > 3 tiles + pas en fuite/combat)
-         pathToLocationF(px, py, pz) toutes les 15 ticks
+  -> pour chaque NPC dans PHNPC.recruited :
+       si isDead -> cleanup (allNPCs, recruited, followTimers)
+       si PHNPC_State == "following" :
+          calculer distance joueur
+          si dist > FOLLOW_DISTANCE (3 tiles) :
+             _followTimers++ ; si >= FOLLOW_TICK_RATE (20) :
+               startFollowing(npc, player)   <- pathToCharacter + IdleToWalk
+          sinon : stopMoving (WalkToIdle)
 ```
 
 ---
@@ -153,101 +169,44 @@ OnTick()                        <- toutes les frames
 
 | Variable | Type | Valeur | Effet |
 |----------|------|--------|-------|
-| `PHNPC_IsNPC` | BOOL | true | Active tous les ZS*.xml (idle, walk, lunge, thump, attack...) |
+| `PHNPC_IsNPC` | BOOL | true | Active tous les ZS*.xml (idle, walk, lunge, bumped, attack...) |
 | `zombieWalkType` | STRING | "Walk" | Active ZSWalk.xml (Bob_Walk) dans pathfind/ et walktoward/ |
-| `zombieWalkType` | STRING | "Run" | Active ZSRun.xml (Bob_Run) |
-| `zombieWalkType` | STRING | "SneakWalk" | Active ZSSneakWalk.xml (Bob_WalkSneak) |
-| `ZombieHitReaction` | STRING | "Chainsaw" | Évite crash dans testDefense |
-| `NoLungeTarget` | BOOL | true | Empêche le lunge vers les cibles |
-| `BumpType` | STRING | "Shrug" | Animation de bump par défaut |
+| `ZombieHitReaction` | STRING | "Chainsaw" | Evite crash dans testDefense (engine PZ) |
+| `NoLungeTarget` | BOOL | true | Empeche lunge automatique vers les cibles |
+| `BumpType` | STRING | "Shrug" | Animation par defaut (transition idle) |
+| `BumpType` | STRING | "IdleToWalk" | Transition idle → marche |
+| `BumpType` | STRING | "WalkToIdle" | Transition marche → idle |
+| `BumpType` | STRING | "PainHead/PainTorso/..." | Animations de douleur quand frappe |
+
+**Règle critique :** `PHNPC_IsNPC` et `zombieWalkType` doivent être re-appliqués à CHAQUE tick dans `enforceNPC`. Sans ça, le moteur PZ les réinitialise et reprend les animations zombie.
 
 ---
 
-## Système de stats (PHNPC_Stats.lua)
-
-### Profils par outfit
-| Outfit | Courage | Force | Mêlée | Tir | Endurance |
-|--------|---------|-------|-------|-----|-----------|
-| Police | 60-95 | 50-80 | 55-85 | 60-90 | 55-80 |
-| Fireman | 70-100 | 65-95 | 60-90 | 30-60 | 70-95 |
-| Doctor | 35-65 | 30-55 | 25-50 | 30-60 | 40-65 |
-| Ranger | 55-85 | 50-80 | 45-75 | 65-95 | 60-85 |
-| Chef | 30-60 | 40-70 | 35-65 | 20-50 | 35-60 |
-| Farmer | 40-70 | 55-85 | 40-70 | 40-70 | 50-75 |
-| Survivor | 45-75 | 40-70 | 40-70 | 35-65 | 45-70 |
-
-### Seuils comportementaux
-- `FEAR_COURAGE_THRESHOLD = 50` : en-dessous → peut fuir les zombies proches
-- `FEAR_ZOMBIE_DIST = 10` : distance (tiles) de détection
-- `FIGHT_COURAGE_THRESHOLD = 40` : utilisé pour l'engagement automatique (futur)
-
----
-
-## Menu clic-droit (v2.0.0)
+## Menu clic-droit (v0.1)
 
 ```
-Clic sur sol vide:
-  "[PHNPC] Faire apparaitre un PNJ"
+Clic sur sol vide (aucun NPC à portee):
+  "[PHNPC] Appeler un survivant"  -> spawnNPC(square)
 
-Clic sur un NPC (rayon 2 tiles):
-  "[PHNPC] NomNPC (M/F)"
-    -> "Suis-moi" / "Reste ici"
-    -> "Mode combat (tuer zombies)" / "Arreter le combat"
-    -> "Voir l'inventaire"  (hook OnRefreshInventoryWindowContainers)
-    -> "Voir les stats"     (npc:Say() avec nom + stats)
-    -> "Renvoyer"           (removeFromWorld)
+Clic avec NPC à portee (rayon INTERACTION_DIST = 3 tiles):
+  "[NomNPC (M/F)]"
+    -> "Rejoins-moi !"          (si pas recrute)
+    -> "Reste ici."             (si following)
+    -> "Suis-moi !"             (si staying)
+    -> "Tu peux partir."        (si recrute)
 ```
 
 ---
 
-## Systeme de traductions (v2.2)
+## Règles importantes (pièges B42)
 
-- Fichiers JSON dans `Translate/EN/UI.json` et `Translate/FR/UI.json`
-- **Nom obligatoire : `UI.json`** — tout autre nom (ex: `PHNPC.json`) est ignore pour les langues non-EN en B42
-- Acces : `getText("PHNPC_Menu_StayHere")` etc.
-- Cle exemple : `"PHNPC_Menu_SpawnNPC"`, `"PHNPC_Anger_M_1"`...
-- Pattern confirme depuis ssr_quests (supporte 7 langues)
+| Piège | Solution |
+|-------|----------|
+| `setUseless(false)` interrompu après hit | Re-appeler à chaque tick dans `enforceNPC` |
+| Zombie reprend ses animations | Re-appliquer `PHNPC_IsNPC=true` + `zombieWalkType="Walk"` à chaque tick |
+| `setTarget(nil)` tue le pathfind | Ne l'appeler que si `skipSecurity=false` (jamais pendant "pathfind") |
+| NPC invisible après hit | Handler `hitreaction` 25 ticks + revive `isDead` dans `OnZombieUpdate` |
+| NPC mord le joueur | `setNoTeeth(true)` INCONDITIONNEL en tête de `OnZombieUpdate` |
+| `addZombiesInOutfit` retourne IsoZombie | Fonction GLOBALE (pas méthode), prendre `zombieList:get(0)` |
+| `mod.info` au mauvais endroit | Doit être dans `B42/42/`, pas `B42/` |
 
----
-
-## Dialogue NPC (v2.2)
-
-- `npc:Say("texte")` — bulle blanche au-dessus du NPC
-- Utilise pour : colere (handleAnger), stats (showNPCStats), salutation (createNPC)
-- **`HaloTextHelper.addText()` n'existe pas en B42** — ne pas utiliser
-
----
-
-## Combat manuel (v2.2)
-
-```lua
--- doMeleeAttack(npc, target)
-npc:faceLocationF(target:getX(), target:getY())
-npc:setBumpType("Shove")       -- ou "FrontKick", "HighKick" (en alternance)
-pcall(function() target:knockDown(true) end)  -- sur zombies seulement
-data.attackCooldown = 60       -- ticks avant prochaine attaque
-```
-
-> Confirme depuis GCCombatActionsAttack.lua (NPC_Helper_Mod)
-> `setTarget(nil)` + `clearAggroList()` TOUJOURS appeles dans enforceNPC
-> Le zombie AI natif est 100% desactive pour les NPCs
-
----
-
-## Inventaire (v2.2)
-
-```lua
--- Hook — ajoute le conteneur NPC a la fenetre de loot
-Events.OnRefreshInventoryWindowContainers.Add(function(page, step)
-    if step ~= "beforeFloor" then return end
-    if page.onCharacter then return end
-    if not _openInvNPC then return end
-    local loot = getPlayerLoot(page.player)
-    if loot then
-        loot:addContainerButton(npcInv, nil, npcName, npcName)
-    end
-end)
-```
-
-> `ISInventoryTransferUI.transferBetween()` crash en B42 (module ISInventoryTransferAction echoue)
-> Pattern confirme depuis GCMenuInventory.lua (NPC_Helper_Mod)
