@@ -136,6 +136,9 @@ local function enforceNPC(zombie)
     pcall(function()
         local asn = zombie:getActionStateName()
 
+        -- Reset tick bumped si on n'est plus en bumped
+        if asn ~= "bumped" then md.PHNPC_BumpTick = 0 end
+
         if asn == "pathfind" then
             -- CRITIQUE : ne jamais interrompre un pathfinding en cours
             -- (GCCoreEnforceMain : "setTarget(nil) mata el pathfind")
@@ -143,7 +146,15 @@ local function enforceNPC(zombie)
 
         elseif asn == "bumped" then
             -- Laisser les animations bumped (Shove, Pain, etc.) se terminer
+            -- Timeout : si bloque en bumped trop longtemps (collision PZ, etc.) → forcer idle
             skipSecurity = true
+            md.PHNPC_BumpTick = (md.PHNPC_BumpTick or 0) + 1
+            if md.PHNPC_BumpTick >= 40 then
+                md.PHNPC_BumpTick = 0
+                md.PHNPC_Moving   = false
+                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+                skipSecurity = false
+            end
 
         elseif asn == "hitreaction" then
             -- NPC frappe : laisser l'animation se jouer (~25 ticks) puis reset

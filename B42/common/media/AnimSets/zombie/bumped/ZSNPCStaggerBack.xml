@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <animNode>
-	<m_Name>ZSStaggerBack</m_Name>
-	<m_AnimName>Zombie_ShoveStagger_2m</m_AnimName>
+	<m_Name>ZSNPCStaggerBack</m_Name>
+	<m_AnimName>Bob_EmoteShrug</m_AnimName>
+	<m_deferredBoneAxis>Y</m_deferredBoneAxis>
 	<m_Looped>false</m_Looped>
+	<m_EarlyTransitionOut>true</m_EarlyTransitionOut>
 	<m_SpeedScale>0.80</m_SpeedScale>
 	<m_BlendTime>0.20</m_BlendTime>
 	<m_Conditions>
 		<m_Name>PHNPC_IsNPC</m_Name>
 		<m_Type>BOOL</m_Type>
-		<m_BoolValue>false</m_BoolValue>
+		<m_BoolValue>true</m_BoolValue>
 	</m_Conditions>
 	<m_Conditions>
 		<m_Name>BumpType</m_Name>
