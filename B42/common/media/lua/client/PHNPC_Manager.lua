@@ -1,5 +1,5 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
--- client/PHNPC_Manager.lua  v2.4
+-- client/PHNPC_Manager.lua  v2.5
 -- Spawn / Mouvement / IA / Ordres / Inventaire / Combat / Peur / Colere
 -- Necessite: PHNPC_Core.lua (shared), PHNPC_Stats.lua (shared)
 -- Traductions: Translate/EN/UI.json + Translate/FR/UI.json (prefixe UI_PHNPC_*)
@@ -60,26 +60,33 @@ local function npcValid(npc)
 end
 
 -- ============================================================
--- MOUVEMENT
--- NOTE: pas de setBumpType ici — le walk est gere par pathToLocationF
+-- MOUVEMENT (pattern GCCoreActions.lua — NPC_Helper_Mod)
+-- setBumpType("IdleToWalk") seulement au premier appel (transition idle->walk)
+-- setBumpType("WalkToIdle") a l'arret (transition walk->idle)
 -- ============================================================
 local function npcStartMoving(npc, x, y, z)
     local data = PHNPC.npcs[npc]
     pcall(function()
-        npc:setUseless(false)
+        npc:setUseless(false)  -- OBLIGATOIRE avant pathfind (GCCoreActions ligne 8)
         npc:setVariable("PHNPC_IsNPC", true)
         npc:setVariable("zombieWalkType", "Walk")
         npc:setWalkType("Walk")
         npc:setSpeedMod(0.8)
-        if data then data.moving = true end
+        -- Transition idle->walk uniquement quand on COMMENCE a marcher
+        if data and not data.moving then
+            data.moving = true
+            npc:setBumpType("IdleToWalk")  -- CRITIQUE: declenche l'AnimSet ZSWalk.xml
+        end
         npc:pathToLocationF(x, y, z)
     end)
 end
 
 local function npcStopMoving(npc)
     local data = PHNPC.npcs[npc]
-    if data then data.moving = false end
-    pcall(function() npc:setBumpType("Shrug") end)
+    if data and data.moving then
+        data.moving = false
+        pcall(function() npc:setBumpType("WalkToIdle") end)  -- transition walk->idle
+    end
 end
 
 -- ============================================================
@@ -192,6 +199,8 @@ local function createNPC(square)
     pcall(function() npc:setTurnAlertedValues(-5, 5) end)
     pcall(function() npc:setBumpType("Shrug") end)
     pcall(function() npc:setHealth(10000) end)
+    -- Silence: eviter les grognements zombie (GCCoreConvert ligne 49)
+    pcall(function() npc:getDescriptor():setVoicePrefix("PHNPC") end)
     -- Effacer cible et forcer idle au spawn
     pcall(function() npc:setTarget(nil) end)
     pcall(function() npc:clearAggroList() end)
@@ -543,21 +552,27 @@ local function enforceNPC(zombie)
     local data = PHNPC.npcs[zombie]
     if not data then return end
 
-    -- 1. Moteur actif + sante haute + dents retirees + pas de cadavre
+    -- 1. SECURITE IMMEDIATE (GCUpdate.onZombieUpdate pattern — NPC_Helper_Mod)
+    --    Dents + cible effacees EN PREMIER, avant tout autre appel
+    --    Previent les morsures pendant la charge + entre deux frames
+    pcall(function() zombie:setNoTeeth(true) end)
+    pcall(function() zombie:setTarget(nil) end)
+
+    -- 2. Moteur actif + sante haute + pas de cadavre
     pcall(function() zombie:setUseless(false) end)
     pcall(function() zombie:setHealth(10000) end)
-    pcall(function() zombie:setNoTeeth(true) end)
     pcall(function() zombie:setEatBodyTarget(nil, false) end)
 
-    -- 2. Variables AnimSet
+    -- 3. Variables AnimSet (chaque tick pour garantir coherence)
     pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
     pcall(function() zombie:setVariable("NoLungeTarget", true) end)
     pcall(function() zombie:setVariable("zombieWalkType", "Walk") end)
     pcall(function() zombie:setWalkType("Walk") end)
     pcall(function() zombie:setSpeedMod(0.8) end)
 
-    -- 3. Lire l'etat AVANT de toucher a setTarget
-    --    (setTarget(nil) tue le pathfind si appele pendant "pathfind")
+    -- 4. Lire l'etat
+    --    clearAggroList() (pas setTarget qui est deja fait) interrompt pathfind
+    --    → ne l'appeler qu'apres avoir verifie qu'on n'est pas en pathfind
     local asn = ""
     pcall(function() asn = tostring(zombie:getActionStateName()) end)
 
@@ -725,8 +740,8 @@ Events.OnGameStart.Add(function()
     PHNPC.npcs  = {}
     _ticks      = 0
     _openInvNPC = nil
-    print("[PHNPC] PHNPC_Manager v2.4 pret (OnGameStart)")
+    print("[PHNPC] PHNPC_Manager v2.5 pret (OnGameStart)")
 end)
 
 Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
-print("[PHNPC] PHNPC_Manager v2.4 loaded")
+print("[PHNPC] PHNPC_Manager v2.5 loaded")
