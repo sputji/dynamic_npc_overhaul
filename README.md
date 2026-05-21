@@ -112,14 +112,42 @@ C:\Users\<VOTRE_NOM>\Zomboid\mods\PH_DynamicNPCOverhaul\
 ├── mod.info
 ├── icon.png
 ├── poster.png
-├── 42/
-│   └── media/lua/
-│       ├── shared/   ← PHNPC_Core.lua, PHNPC_Stats.lua, Translate/
-│       └── client/   ← PHNPC_Actions.lua, PHNPC_Barks.lua, ...
-└── common/
-    └── media/
-        ├── AnimSets/zombie/  ← AnimSets custom (NPC)
-        └── anims_X/Zombie/   ← Animations .X custom
+├── media\lua\
+│   ├── client\
+│   │   ├── PHNPC_Actions.lua
+│   │   ├── PHNPC_Barks.lua
+│   │   ├── PHNPC_Combat.lua
+│   │   ├── PHNPC_Convert.lua
+│   │   ├── PHNPC_Debug.lua
+│   │   ├── PHNPC_Enforce.lua
+│   │   ├── PHNPC_Health.lua
+│   │   ├── PHNPC_Inventory.lua
+│   │   ├── PHNPC_Manager.lua
+│   │   ├── PHNPC_Menu.lua
+│   │   ├── PHNPC_Orders.lua
+│   │   └── PHNPC_Update.lua
+│   └── shared\
+│       ├── PHNPC_Core.lua
+│       ├── PHNPC_Stats.lua
+│       └── Translate\
+│           ├── EN\
+│           │   ├── UI_PHNPC_EN.txt
+│           │   └── UI.json
+│           └── FR\
+│               ├── UI_PHNPC_FR.txt
+│               └── UI.json
+├── media\textures\
+│   ├── NPC_Icon.png
+│   ├── NPC_base.png
+│   └── ... (58 icônes NPC)
+└── common\media\
+    ├── AnimSets\zombie\
+    │   ├── attack\, bumped\, idle\, lunge\, pathfind\, staggerback\, ...
+    ├── anims_X\Zombie\
+    │   ├── Bob_FrontKick.X
+    │   ├── Bob_HighKick.x
+    │   └── Bob_PushKick.X
+    └── sandbox-options.txt
 ```
 
 > ⚠️ Ne pas copier le dossier `B42/` entier — copier séparément le contenu de `B42/42/` et `B42/common/`.
