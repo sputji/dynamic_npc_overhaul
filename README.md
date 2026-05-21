@@ -100,7 +100,7 @@ ou télécharger le ZIP depuis GitHub → **Code → Download ZIP**
 Créer le dossier `PH_DynamicNPCOverhaul` dans :
 
 ```
-C:\Users\<VOTRE_NOM>\Zomboid\mods\PH_DynamicNPCOverhaul\
+C:\Users\<VOTRE_NOM>\Zomboid\mods\
 ```
 
 Puis copier le contenu de **`B42/42/`** ET **`B42/common/`** dans ce dossier.
