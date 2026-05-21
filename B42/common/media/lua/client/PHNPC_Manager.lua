@@ -1,5 +1,5 @@
 -- Project Humain: Dynamic NPC Overhaul - B42
--- client/PHNPC_Manager.lua  v2.5
+-- client/PHNPC_Manager.lua  v3.0
 -- Spawn / Mouvement / IA / Ordres / Inventaire / Combat / Peur / Colere
 -- Necessite: PHNPC_Core.lua (shared), PHNPC_Stats.lua (shared)
 -- Traductions: Translate/EN/UI.json + Translate/FR/UI.json (prefixe UI_PHNPC_*)
@@ -60,25 +60,40 @@ local function npcValid(npc)
 end
 
 -- ============================================================
--- MOUVEMENT (pattern GCCoreActions.lua — NPC_Helper_Mod)
--- setBumpType("IdleToWalk") seulement au premier appel (transition idle->walk)
--- setBumpType("WalkToIdle") a l'arret (transition walk->idle)
+-- MOUVEMENT (pattern EXACT GCCoreActions.lua — NPC_Helper_Mod)
+-- setUseless(false) et pathToLocationF/pathToCharacter : appels DIRECTS (pas de pcall)
+-- setBumpType : pcall uniquement (peut planter en transition)
 -- ============================================================
 local function npcStartMoving(npc, x, y, z)
     local data = PHNPC.npcs[npc]
-    pcall(function()
-        npc:setUseless(false)  -- OBLIGATOIRE avant pathfind (GCCoreActions ligne 8)
-        npc:setVariable("PHNPC_IsNPC", true)
-        npc:setVariable("zombieWalkType", "Walk")
-        npc:setWalkType("Walk")
-        npc:setSpeedMod(0.8)
-        -- Transition idle->walk uniquement quand on COMMENCE a marcher
-        if data and not data.moving then
-            data.moving = true
-            npc:setBumpType("IdleToWalk")  -- CRITIQUE: declenche l'AnimSet ZSWalk.xml
-        end
-        npc:pathToLocationF(x, y, z)
-    end)
+    -- GCCoreActions: setUseless DIRECT, pas de pcall englobant
+    npc:setUseless(false)
+    pcall(function() npc:setVariable("PHNPC_IsNPC", true) end)
+    pcall(function() npc:setVariable("zombieWalkType", "Walk") end)
+    pcall(function() npc:setWalkType("Walk") end)
+    pcall(function() npc:setSpeedMod(0.8) end)
+    if data and not data.moving then
+        data.moving = true
+        pcall(function() npc:setBumpType("IdleToWalk") end)
+    end
+    -- GCCoreActions: pathToLocationF DIRECT (sinon une erreur avant silencierait l'appel)
+    npc:pathToLocationF(x, y, z)
+end
+
+-- Suivi joueur via pathToCharacter (NPC_Helper_Mod GCUpdateAI.lua)
+-- Plus robuste que pathToLocationF(px,py,pz) : gere la tuile occupee et la cible mobile
+local function npcFollowPlayer(npc, player)
+    local data = PHNPC.npcs[npc]
+    npc:setUseless(false)
+    pcall(function() npc:setVariable("PHNPC_IsNPC", true) end)
+    pcall(function() npc:setVariable("zombieWalkType", "Walk") end)
+    pcall(function() npc:setWalkType("Walk") end)
+    pcall(function() npc:setSpeedMod(0.8) end)
+    if data and not data.moving then
+        data.moving = true
+        pcall(function() npc:setBumpType("IdleToWalk") end)
+    end
+    pcall(function() npc:pathToCharacter(player) end)
 end
 
 local function npcStopMoving(npc)
@@ -201,10 +216,8 @@ local function createNPC(square)
     pcall(function() npc:setHealth(10000) end)
     -- Silence: eviter les grognements zombie (GCCoreConvert ligne 49)
     pcall(function() npc:getDescriptor():setVoicePrefix("PHNPC") end)
-    -- Effacer cible et forcer idle au spawn
-    pcall(function() npc:setTarget(nil) end)
-    pcall(function() npc:clearAggroList() end)
-    pcall(function() npc:changeState(ZombieIdleState.instance()) end)
+    -- NOTE: PAS de setTarget/clearAggroList/changeState au spawn
+    --   (GCCoreConvert confirme: ces appels appartiennent au loop enforce, pas a l'init)
 
     -- 3. Visuels propres
     pcall(function()
@@ -560,6 +573,8 @@ local function enforceNPC(zombie)
 
     -- 2. Moteur actif + sante haute + pas de cadavre
     pcall(function() zombie:setUseless(false) end)
+    -- B42 FIX: empeche l'animation "marche en arriere" (GCCoreEnforceMain ligne 12)
+    pcall(function() zombie:setAnimatingBackwards(false) end)
     pcall(function() zombie:setHealth(10000) end)
     pcall(function() zombie:setEatBodyTarget(nil, false) end)
 
@@ -607,8 +622,10 @@ local function enforceNPC(zombie)
     end
 
     -- Etats d'attaque zombie a supprimer immediatement
-    if asn == "attack" or asn == "lunge" or asn == "turnalerted"
-    or asn == "eatBody" or asn == "walktoward" then
+    -- NOTE: "walktoward" VOLONTAIREMENT ABSENT (GCCoreEnforceMain pattern)
+    --   -> walktoward = zombie AI marche vers cible vue; on nettoie juste target/aggro
+    --      sans changeState (evite la boucle: walktoward->idle->walktoward->...)
+    if asn == "attack" or asn == "eatBody" then
         pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
         pcall(function() zombie:setTarget(nil) end)
         pcall(function() zombie:clearAggroList() end)
@@ -616,14 +633,47 @@ local function enforceNPC(zombie)
         return
     end
 
-    -- 4. Tous les autres etats (idle, etc.) : nettoyer la cible
-    --    sauf si colere active contre le joueur (setBumpType gere l'attaque)
+    if asn == "turnalerted" then
+        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+        pcall(function() zombie:clearAggroList() end)
+        pcall(function() zombie:setTarget(nil) end)
+        return
+    end
+
+    if asn == "lunge" then
+        -- Si le NPC est en mouvement, laisser le lunge se jouer (skipSecurity)
+        if data and data.moving then
+            return  -- skipSecurity: ne pas interrompre le pathfind
+        end
+        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+        pcall(function() zombie:clearAggroList() end)
+        pcall(function() zombie:setTarget(nil) end)
+        if data then data.moving = false end
+        return
+    end
+
+    -- 4. Tous les autres etats (idle, walktoward, etc.) : nettoyer cible/aggro
+    --    sauf si colere active contre le joueur
     local angerAtk = (data.playerAngerTicks or 0) > 0
     if not angerAtk then
         pcall(function() zombie:setTarget(nil) end)
         pcall(function() zombie:clearAggroList() end)
     end
     if data then data.bumpTicks = 0 end
+
+    -- 5. Suppression sons zombie chaque tick (GCCoreEnforceMain lignes 126-134)
+    pcall(function()
+        zombie:getDescriptor():setVoicePrefix("PHNPC")
+        local em = zombie:getEmitter()
+        if em then
+            em:stopSoundByName("MaleZombieVoiceA")
+            em:stopSoundByName("MaleZombieVoiceB")
+            em:stopSoundByName("MaleZombieVoiceC")
+            em:stopSoundByName("FemaleZombieVoiceA")
+            em:stopSoundByName("FemaleZombieVoiceB")
+            em:stopSoundByName("FemaleZombieVoiceC")
+        end
+    end)
 end
 
 -- ============================================================
@@ -710,7 +760,10 @@ Events.OnTick.Add(function()
                 checkCombat(npc, data)
             end
 
-            -- Suivi joueur
+            -- Suivi joueur (pattern GCUpdateAI.lua — NPC_Helper_Mod)
+            -- pathToCharacter(player) : plus robuste que pathToLocationF(px,py,pz)
+            --   -> gere la tuile occupee par le joueur
+            --   -> suit la cible mobile (pas besoin de recalculer chaque tick)
             if data.followMode and not data.fleeMode
                and not data.attackMode
                and data.playerAngerTicks == 0 then
@@ -722,7 +775,7 @@ Events.OnTick.Add(function()
                     data.retarget = (data.retarget or 0) - 1
                     if data.retarget <= 0 then
                         data.retarget = RETARGET
-                        npcStartMoving(npc, px, py, pz)
+                        npcFollowPlayer(npc, player)
                     end
                 else
                     npcStopMoving(npc)
@@ -740,8 +793,8 @@ Events.OnGameStart.Add(function()
     PHNPC.npcs  = {}
     _ticks      = 0
     _openInvNPC = nil
-    print("[PHNPC] PHNPC_Manager v2.5 pret (OnGameStart)")
+    print("[PHNPC] PHNPC_Manager v3.0 pret (OnGameStart)")
 end)
 
 Events.OnPreFillWorldObjectContextMenu.Add(onContextMenu)
-print("[PHNPC] PHNPC_Manager v2.5 loaded")
+print("[PHNPC] PHNPC_Manager v3.0 loaded")
