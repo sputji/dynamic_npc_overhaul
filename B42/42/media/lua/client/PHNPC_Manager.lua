@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Manager.lua  v0.8  (client)
+    PHNPC_Manager.lua  v0.9  (client)
     Spawn / Enforce / Suivi / Menu contextuel / Inventaire NPC
     Combat NPC vs zombies / Fuite HP<30% / Dialogue contextuel
     Necessite: PHNPC_Core.lua (shared)
@@ -29,22 +29,10 @@ local function startFollowing(npc, player)
     npc:setUseless(false)
     if not md.PHNPC_Moving then
         md.PHNPC_Moving = true
-        -- NE PAS appeler setBumpType("IdleToWalk") : le vanilla PZ reprendrait l'anim zombie
     end
-    -- Pathfinder vers un point a FOLLOW_STOP_DISTANCE tiles du joueur (pas sur le joueur)
-    -- Evite le "collant" en ne ciblant jamais la case exacte du joueur
-    pcall(function()
-        local stopDist = PHNPC.FOLLOW_STOP_DISTANCE or 3
-        local px, py, pz = player:getX(), player:getY(), player:getZ()
-        local nx, ny     = npc:getX(), npc:getY()
-        local dx, dy     = px - nx, py - ny
-        local d = math.sqrt(dx*dx + dy*dy)
-        if d > stopDist + 0.5 then
-            local ratio = (d - stopDist) / d
-            npc:pathToLocationF(nx + dx * ratio, ny + dy * ratio, pz)
-        end
-        -- Si deja assez proche, stopMoving sera appele par OnTick
-    end)
+    -- pathToCharacter : methode standard IsoZombie -> IsoPlayer (NPC_Helper_Mod + Bandits)
+    -- Plus fiable que pathToLocationF manuel pour le suivi d'un IsoCharacter mobile
+    pcall(function() npc:pathToCharacter(player) end)
 end
 
 local function startMovingTo(npc, x, y, z)
@@ -1030,10 +1018,10 @@ Events.OnGameStart.Add(function()
     _openInventoryNPC    = nil
     _combatTimers        = {}
     _attackCooldowns     = {}
-    print("[PHNPC] Manager v0.8 pret")
+    print("[PHNPC] Manager v0.9 pret")
 end)
 
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.7 loaded")
+print("[PHNPC] PHNPC_Manager v0.9 loaded")

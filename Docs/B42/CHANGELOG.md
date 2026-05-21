@@ -1,5 +1,15 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.8b] — 2026-05-21
+
+### Corrections critiques
+- **NPCs ne suivent plus le joueur** : `startFollowing` utilisait `pathToLocationF` avec calcul manuel de destination (point à N tiles du joueur). Remplacé par `pathToCharacter(player)` — méthode standard IsoZombie→IsoPlayer utilisée par NPC_Helper_Mod et Bandits. Plus fiable pour cibler un IsoCharacter mobile.
+- **Pas de loot à la mort du NPC** : dans `OnHitZombie`, `setHealth(10000)` était appelé inconditionnellement AVANT le check `hp <= 0`. Résultat : `setHealth(10000)` puis `setHealth(0)` dans le même callback → PZ ignorait `setHealth(0)` → pas de corpse créé → items inaccessibles. Correction : `setHealth(10000)` déplacé dans la branche `hp > 0` (NPC vivant) uniquement.
+- **PHNPC_Manager.lua v0.9** : fix pathToCharacter dans startFollowing
+- **PHNPC_Health.lua v0.3** : fix setHealth(10000) conditionnel
+
+---
+
 ## [0.0.8a] — 2026-05-21
 
 ### Correction critique (hotfix)

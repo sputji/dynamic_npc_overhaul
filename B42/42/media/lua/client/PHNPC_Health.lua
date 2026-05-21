@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Health.lua  v0.2  (client)
+    PHNPC_Health.lua  v0.3  (client)
     Systeme de sante NPC : degats, animations de douleur, mort
     Project Humain : Dynamic NPC Overhaul
 
@@ -54,15 +54,15 @@ Events.OnHitZombie.Add(function(zombie, character, bodyPart, handWeapon)
     hp = math.max(0, hp - damage)
     md.PHNPC_Health = hp
 
-    -- Empecher la mort vanilla (enforceNPC le fait aussi, double securite ici)
-    pcall(function() zombie:setHealth(10000) end)
-    pcall(function() zombie:setFakeDead(false) end)
-
     print(string.format("[PHNPC][HIT] %s dmg=%d HP=%d/%d",
         tostring(md.PHNPC_Name or "?"), damage, hp, md.PHNPC_MaxHealth or 100))
 
     -- ---- Reaction ----
     if hp > 0 then
+        -- NPC vivant : empecher la mort vanilla + animation douleur
+        -- setHealth(10000) ICI SEULEMENT (pas quand hp==0, sinon overridera le setHealth(0) de mort)
+        pcall(function() zombie:setHealth(10000) end)
+        pcall(function() zombie:setFakeDead(false) end)
         -- Animation de douleur aleatoire
         pcall(function()
             zombie:setUseless(false)
@@ -71,6 +71,8 @@ Events.OnHitZombie.Add(function(zombie, character, bodyPart, handWeapon)
         end)
     else
         -- ---- MORT NPC ----
+        -- NE PAS appeler setHealth(10000) ici !
+        -- (setHealth(10000) puis setHealth(0) dans le meme callback = setHealth(0) ignore par PZ)
         print("[PHNPC][MORT] " .. tostring(md.PHNPC_Name or "?"))
 
         -- Derniere parole (addLineChatElement = bulle visible en B42)
@@ -93,4 +95,4 @@ Events.OnHitZombie.Add(function(zombie, character, bodyPart, handWeapon)
     end
 end)
 
-print("[PHNPC] Health v0.2 loaded")
+print("[PHNPC] Health v0.3 loaded")
