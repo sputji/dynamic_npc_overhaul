@@ -1,5 +1,36 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.7a] — 2026-05-27
+
+### Ajouts
+- **Combat auto NPC vs zombies** : `npcCombatStep()` — détection range=8 tiles, attaque melee (Shove/FrontKick/HighKick), knockDown(true), cooldown 60 ticks
+- **Fuite HP<30%** : `npcFlightStep()` — état "fleeing", direction opposée au zombie, replier sur joueur si zone dégagée
+- **Dialogue contextuel** : table `PHNPC_BARKS` — 5 états (following/staying/defending/fleeing/idle), bark auto via `BARK_TICK_RATE`, bark immédiat via menu "Parler"
+- **Menu clic-droit complet** : "Parler", "Mode combat : AUTO/OFF", sous-menu "[DEBUG]..." (états forcés, HP, animations)
+- **PHNPC_Core.lua v0.4** : constantes `COMBAT_RANGE`, `COMBAT_ATTACK_RANGE`, `COMBAT_TICK_RATE`, `FLEE_HP_RATIO`, `FLEE_DISTANCE`, `BARK_TICK_RATE`
+- **PHNPC_Manager.lua v0.5** : `npcCombatStep`, `npcFlightStep`, `talkNPC`, `dbgToggleCombat`, callbacks debug complets
+- **OnTick** : appels `npcFlightStep` + `npcCombatStep` pour chaque NPC recruté à chaque tick
+
+### Corrections
+- Cleanup `_combatTimers` + `_attackCooldowns` dans `deleteNPC` et `OnTick` (NPC mort)
+- Cleanup `_combatTimers` + `_attackCooldowns` dans `OnGameStart`
+- Menu debug section `[DEBUG]...` uniquement si `isDebugEnabled()` — ne pollue pas le menu prod
+- État "defending" ajouté dans condition stayNPC (suit → reste quand en combat)
+
+---
+
+## [0.0.7] — 2026-05-27
+
+### Ajouts
+- `setUseless(false)` pour tous les NPCs recrutés (pattern NPC_Helper_Mod) — empêche le freeze en hitreaction
+- Inventaire NPC : `openNPCInventory()` + hook `OnRefreshInventoryWindowContainers` (injecte container dans loot panel)
+
+### Corrections
+- NPC bloqué après coup (stuck bumped) : `setUseless(false)` pour les recrutés
+- Mauvaise animation "push" sur NPC : `ZSZombiePushedBack.xml` + `ZSZombiePushedFront.xml` avec condition `PHNPC_IsNPC=false`
+
+---
+
 ## [0.0.5] — 2026-05-21
 
 ### Ajouts

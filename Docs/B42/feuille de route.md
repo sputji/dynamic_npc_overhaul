@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 21 mai 2026 | Version **0.0.5** | Sante NPC, stats+inventaire par metier, FrontKick corrige, follow distance, HighKick.
+> Mise a jour : 27 mai 2026 | Version **0.0.7a** | Combat NPC auto, fuite HP<30%, dialogue contextuel, menu complet.
 
 ---
 
@@ -8,6 +8,8 @@
 
 | Version | Date | Resume |
 |---------|------|---------|
+| **0.0.7a** | **27 mai 2026** | Combat NPC vs zombies (Shove/FrontKick/HighKick), fuite HP<30%, barks contextuels, menu Parler + Mode combat + DEBUG sous-menu |
+| **0.0.7** | **27 mai 2026** | setUseless(false) recruited fix stuck, inventaire NPC (openNPCInventory + OnRefreshInventoryWindowContainers), XMLs push PHNPC_IsNPC=false |
 | **0.0.5** | **21 mai 2026** | Stats + inventaire par metier, sante (OnHitZombie), FrontKick corrige (Bob_FrontKick.X absent vanilla), FOLLOW_DISTANCE 3→5, HighKick ajoute, dbgAnim fix. |
 | **0.0.4** | **21 mai 2026** | Sons de pas (VoicePrefix genre-based), stopMoving fix, BumpType ZombiePushedBack, crash ForceHitReaction fixe. |
 | 1.x–2.2.0 | 20–21 mai 2026 | Versions iteratives : stats, combat, peur, inventaire. NPCs avaient animations zombie, mordaient le joueur, devenaient invisibles quand frappes. |
@@ -44,9 +46,13 @@
 | NPC meurt quand HP=0 | ✅ v0.0.5 |
 | Stats par metier (vitesse, force, HP) | ✅ v0.0.5 (OUTFIT_STATS) |
 | Inventaire poids max + items de depart | ✅ v0.0.5 (initInventory) |
-| Mode combat (tuer zombies) | ❌ futur (Phase 2.2) |
-| Peur des zombies (fuite) | ❌ futur (Phase 2.2) |
-| Inventaire (transfert ISInventoryTransferUI) | ❌ futur (Phase 0.1.1) |
+| Mode combat (tuer zombies) | ⏳ v0.0.7a (A TESTER) |
+| Peur des zombies (fuite HP<30%) | ⏳ v0.0.7a (A TESTER) |
+| Dialogue contextuel (barks automatiques) | ⏳ v0.0.7a (A TESTER) |
+| Menu Parler (bark immediat) | ⏳ v0.0.7a (A TESTER) |
+| Mode combat toggle (AUTO/OFF) | ⏳ v0.0.7a (A TESTER) |
+| Menu [DEBUG] sous-menu (isDebugEnabled) | ⏳ v0.0.7a (A TESTER) |
+| Inventaire (transfert ISInventoryTransferUI) | ✅ v0.0.7 (A valider en jeu) |
 | Persistance (sauvegarde) | ❌ futur (Phase 0.1.5) |
 
 ---

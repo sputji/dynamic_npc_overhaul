@@ -1,4 +1,4 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.5
+# Architecture B42 — Dynamic NPC Overhaul v0.0.7a
 
 ## Structure des fichiers
 
@@ -69,9 +69,15 @@ Events.OnZombieUpdate (chaque tick)
         └── setUseless(true) si non-recrute
 
 Events.OnTick (chaque trame)
-  └── [NPCs recruited] distJoueur > FOLLOW_DISTANCE?
-        ├── oui: startFollowing() -> setBumpType("IdleToWalk") + pathToCharacter
-        └── non: stopMoving() -> setBumpType("WalkToIdle") + setTarget(nil)
+  └── [NPCs recruited]
+        ├── npcFlightStep(npc, player)    -- fuite si HP < 30%
+        ├── npcCombatStep(npc)            -- attaque zombie le plus proche
+        └── State == "following"?
+              ├── dist > FOLLOW_DISTANCE? startFollowing() -> pathToCharacter
+              └── non: stopMoving()
+        -- "staying"   : setUseless(false), pas de pathfind
+        -- "defending" : gere par npcCombatStep
+        -- "fleeing"   : gere par npcFlightStep
 
 Events.OnHitZombie (quand joueur frappe)
   └── PHNPC.isNPC(zombie)?
@@ -88,7 +94,7 @@ Events.OnHitZombie (quand joueur frappe)
 |----------|------|-------------|
 | PHNPC_IsNPC | bool | Marque NPC (aussi variable AnimSet) |
 | PHNPC_Recruited | bool | Recrute ou non |
-| PHNPC_State | string | "idle"/"following"/"staying" |
+| PHNPC_State | string | "idle"/"following"/"staying"/"defending"/"fleeing" |
 | PHNPC_Moving | bool | En deplacement |
 | PHNPC_Health | number | PV actuels (systeme PHNPC) |
 | PHNPC_MaxHealth | number | PV max |
@@ -99,6 +105,10 @@ Events.OnHitZombie (quand joueur frappe)
 | PHNPC_Name | string | Nom |
 | PHNPC_HitTicks | number | Compteur ticks hitreaction |
 | PHNPC_ShowTimer | number | Delai apres spawn (ignore enforce) |
+| PHNPC_CombatMode | string | "auto" (combat actif) ou "off" (combat desactive) |
+| PHNPC_PrevState | string | Etat sauvegarde avant combat/fuite |
+| PHNPC_BarkTick | number | Compteur pour barks auto (reset a BARK_TICK_RATE) |
+| PHNPC_AttackCooldown | number | Ticks restants avant prochain attack melee |
 
 ## Variable AnimSet critiques (setVariable)
 

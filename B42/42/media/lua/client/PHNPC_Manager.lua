@@ -1,6 +1,7 @@
 --[[
-    PHNPC_Manager.lua  v0.4  (client)
+    PHNPC_Manager.lua  v0.5  (client)
     Spawn / Enforce / Suivi / Menu contextuel / Inventaire NPC
+    Combat NPC vs zombies / Fuite HP<30% / Dialogue contextuel
     Necessite: PHNPC_Core.lua (shared)
 
     Pattern copie EXACTEMENT NPC_Helper_Mod :
@@ -18,8 +19,10 @@
 -- HELPERS DE DEPLACEMENT (GCCoreActions.lua pattern EXACT)
 -- ============================================================
 
-local _followTimers = {}   -- [npcRef] => ticks depuis dernier pathToCharacter
+local _followTimers     = {}   -- [npcRef] => ticks depuis dernier pathToCharacter
 local _openInventoryNPC = nil   -- NPC dont l'inventaire est actuellement ouvert
+local _combatTimers     = {}   -- [npcRef] => ticks evaluation combat
+local _attackCooldowns  = {}   -- [npcRef] => ticks avant prochain attack
 
 local function startFollowing(npc, player)
     local md = npc:getModData()
@@ -63,6 +66,37 @@ local function stopMoving(npc)
         pcall(function() npc:setTarget(nil) end)
         pcall(function() npc:clearAggroList() end)
     end
+end
+
+-- ============================================================
+-- HELPER COMBAT : chercher le zombie non-NPC le plus proche
+-- (Pattern GCCombatAI.lua NPC_Helper_Mod simplifie)
+-- ============================================================
+local function findNearestZombie(npc, range)
+    local cell = npc:getCell()
+    if not cell then return nil, 999 end
+    local zlist = cell:getZombieList()
+    local nx, ny = npc:getX(), npc:getY()
+    local rangeSq = range * range
+    local bestSq = rangeSq + 1
+    local bestZ  = nil
+    for i = 0, zlist:size() - 1 do
+        local z = zlist:get(i)
+        if z and not PHNPC.isNPC(z) then
+            local dead = false
+            pcall(function() dead = z:isDead() end)
+            if not dead then
+                local dx = z:getX() - nx
+                local dy = z:getY() - ny
+                local dSq = dx * dx + dy * dy
+                if dSq < bestSq then
+                    bestSq = dSq
+                    bestZ  = z
+                end
+            end
+        end
+    end
+    return bestZ, math.sqrt(bestSq)
 end
 
 -- ============================================================
@@ -198,6 +232,19 @@ local function enforceNPC(zombie)
         emitter:stopSoundByName("FemaleZombieVoiceB")
         emitter:stopSoundByName("FemaleZombieVoiceC")
     end)
+
+    -- 9. Dialogue contextuel auto (bark selon etat, pool de phrases, timer)
+    --    Uniquement pour les NPCs recrutes (reduire le bruit pour les non-recrutes)
+    if md.PHNPC_Recruited then
+        md.PHNPC_BarkTick = (md.PHNPC_BarkTick or 0) + 1
+        if md.PHNPC_BarkTick >= (PHNPC.BARK_TICK_RATE or 500) then
+            md.PHNPC_BarkTick = 0
+            local state = md.PHNPC_State or "idle"
+            local barkPool = PHNPC_BARKS[state] or PHNPC_BARKS["idle"]
+            local bark = barkPool[ZombRand(#barkPool) + 1]
+            pcall(function() zombie:Say(bark) end)
+        end
+    end
 end
 
 -- ============================================================
@@ -274,7 +321,11 @@ local function convertToNPC(zombie, outfit, isFemale, npcName)
     md.PHNPC_Female     = isFemale
     md.PHNPC_Outfit     = outfit
     md.PHNPC_Moving     = false
-    md.PHNPC_HitTicks   = 0
+    md.PHNPC_HitTicks      = 0
+    md.PHNPC_CombatMode    = "auto"  -- "auto" | "off" : combat auto vs zombies proches
+    md.PHNPC_PrevState     = nil     -- etat sauvegarde avant combat/fuite
+    md.PHNPC_BarkTick      = 0       -- compteur pour barks auto
+    md.PHNPC_AttackCooldown= 0       -- ticks restants avant prochain attack
     -- ShowTimer : ignore les premiers ticks le temps que les animations se stabilisent
     -- (GCCoreSpawn.lua pattern : GC_ShowTimer = 5)
     md.PHNPC_ShowTimer  = 5
@@ -393,19 +444,245 @@ local function deleteNPC(npc)
     -- Fermer l'inventaire si c'est ce NPC qui est ouvert
     if _openInventoryNPC == npc then _openInventoryNPC = nil end
     -- Nettoyer toutes les references avant la suppression
-    PHNPC.allNPCs[npc]   = nil
-    PHNPC.recruited[npc] = nil
-    _followTimers[npc]   = nil
+    PHNPC.allNPCs[npc]    = nil
+    PHNPC.recruited[npc]  = nil
+    _followTimers[npc]    = nil
+    _combatTimers[npc]    = nil
+    _attackCooldowns[npc] = nil
     -- Supprimer du monde (removeFromWorld = retire immediatement)
     pcall(function() npc:removeFromWorld() end)
     print("[PHNPC] Supprime : " .. name)
 end
 
 -- ============================================================
+-- BARKS CONTEXTUELS (dialogue automatique selon etat)
+-- Pool de phrases par etat : following, staying, defending,
+-- fleeing, idle.  Utilise dans enforceNPC step 9.
+-- ============================================================
+PHNPC_BARKS = {
+    following = {
+        "Je vous couvre !",
+        "Je vous suis.",
+        "Allons-y.",
+        "Quel endroit sinistre...",
+        "Restez groupes.",
+        "J'espere qu'on va trouver un abri.",
+        "Vous savez ou on va ?",
+    },
+    staying = {
+        "Je monte la garde ici.",
+        "Je reste ici.",
+        "Soyez prudent.",
+        "Je surveille les alentours.",
+        "Revenez vite.",
+    },
+    defending = {
+        "Zombie en vue !",
+        "Je m'en occupe !",
+        "Restez derriere moi !",
+        "Reculez, je gere !",
+        "Attention !",
+    },
+    fleeing = {
+        "Je suis trop blesse !",
+        "Je dois fuir !",
+        "Aidez-moi !",
+        "Trop de zombies !",
+    },
+    idle = {
+        "Y a quelqu'un ?",
+        "...",
+        "Dieu merci, je suis encore en vie.",
+        "Il fait froid ce soir.",
+    },
+}
+
+-- ============================================================
+-- COMBAT NPC : chercher et attaquer les zombies proches
+-- Pattern GCCombatActionsAttack.lua (NPC_Helper_Mod) simplifie
+-- Appele depuis OnTick pour chaque NPC recrute
+-- ============================================================
+local ATTACK_VARIANTS = {"Shove", "FrontKick", "HighKick"}
+
+local function npcCombatStep(npc)
+    local md = npc:getModData()
+    if not md.PHNPC_Recruited then return end
+    if md.PHNPC_CombatMode == "off" then return end
+    -- Pas de combat si en fuite
+    if md.PHNPC_State == "fleeing" then return end
+
+    -- Decrementer cooldown attaque
+    if (md.PHNPC_AttackCooldown or 0) > 0 then
+        md.PHNPC_AttackCooldown = md.PHNPC_AttackCooldown - 1
+        return
+    end
+
+    -- Timer : ne pas evaluer chaque tick
+    _combatTimers[npc] = (_combatTimers[npc] or 0) + 1
+    if _combatTimers[npc] < (PHNPC.COMBAT_TICK_RATE or 30) then return end
+    _combatTimers[npc] = 0
+
+    -- Chercher zombie dans le rayon de combat
+    local target, dist = findNearestZombie(npc, PHNPC.COMBAT_RANGE or 8)
+
+    if not target then
+        -- Plus de cible : quitter l'etat "defending" si on y etait
+        if md.PHNPC_State == "defending" then
+            md.PHNPC_State = md.PHNPC_PrevState or "following"
+            md.PHNPC_PrevState = nil
+        end
+        return
+    end
+
+    -- Entrer en mode defense si pas deja dedans
+    if md.PHNPC_State ~= "defending" then
+        md.PHNPC_PrevState = md.PHNPC_State
+        md.PHNPC_State = "defending"
+        -- Bark d'alerte (une seule fois au debut du combat)
+        pcall(function()
+            local pool = PHNPC_BARKS["defending"]
+            npc:Say(pool[ZombRand(#pool) + 1])
+        end)
+    end
+
+    if dist <= (PHNPC.COMBAT_ATTACK_RANGE or 1.5) then
+        -- Assez proche : attaquer
+        local targetDead = false
+        pcall(function() targetDead = target:isDead() end)
+        if targetDead then return end
+
+        pcall(function() npc:faceLocationF(target:getX(), target:getY()) end)
+
+        local anim = ATTACK_VARIANTS[(ZombRand(#ATTACK_VARIANTS) + 1)]
+        pcall(function() npc:setBumpType(anim) end)
+        -- Knock down le zombie (seule methode safe sans setTarget)
+        pcall(function() target:knockDown(true) end)
+        md.PHNPC_AttackCooldown = 60
+        print("[PHNPC][COMBAT] " .. tostring(md.PHNPC_Name) .. " : " .. anim
+              .. " dist=" .. string.format("%.1f", dist))
+    else
+        -- Trop loin : se deplacer vers le zombie
+        startMovingTo(npc, target:getX(), target:getY(), target:getZ())
+    end
+end
+
+-- ============================================================
+-- FUITE NPC : fuir si HP < 30%
+-- Pattern GCHelpersEscape.lua (NPC_Helper_Mod) simplifie
+-- Appele depuis OnTick pour chaque NPC recrute
+-- ============================================================
+local function npcFlightStep(npc, player)
+    local md = npc:getModData()
+    if not md.PHNPC_Recruited then return end
+
+    local hp    = md.PHNPC_Health    or 100
+    local maxHp = md.PHNPC_MaxHealth or 100
+    local ratio = hp / maxHp
+
+    if ratio < (PHNPC.FLEE_HP_RATIO or 0.30) then
+        -- Passer en etat fuite
+        if md.PHNPC_State ~= "fleeing" then
+            md.PHNPC_PrevState = md.PHNPC_State
+            md.PHNPC_State     = "fleeing"
+            pcall(function()
+                npc:Say((md.PHNPC_Name or "?") .. " : Je suis blesse ! Je fuis !")
+            end)
+        end
+
+        -- Chercher zombie le plus proche pour fuir dans la direction opposee
+        local enemy, eDist = findNearestZombie(npc, 20)
+        local nx, ny, nz   = npc:getX(), npc:getY(), npc:getZ()
+        if enemy and eDist < 20 then
+            local ex, ey = enemy:getX(), enemy:getY()
+            local dx, dy = nx - ex, ny - ey
+            local d = math.sqrt(dx * dx + dy * dy)
+            if d > 0 then dx, dy = dx / d, dy / d end
+            local fleeDist = PHNPC.FLEE_DISTANCE or 15
+            startMovingTo(npc, nx + dx * fleeDist, ny + dy * fleeDist, nz)
+        else
+            -- Pas de zombie : se replier vers le joueur
+            local target = player or getPlayer()
+            if target then
+                startMovingTo(npc, target:getX(), target:getY(), target:getZ())
+            end
+            -- Retourner a l'etat precedent
+            md.PHNPC_State = md.PHNPC_PrevState or "following"
+            md.PHNPC_PrevState = nil
+        end
+    else
+        -- HP OK : sortir de l'etat fuite
+        if md.PHNPC_State == "fleeing" then
+            md.PHNPC_State     = md.PHNPC_PrevState or "following"
+            md.PHNPC_PrevState = nil
+            pcall(function()
+                npc:Say((md.PHNPC_Name or "?") .. " : Je peux continuer !")
+            end)
+        end
+    end
+end
+
+-- ============================================================
+-- DIALOGUE IMMEDIAT : bark selon etat courant
+-- (option "Parler" du menu clic-droit)
+-- ============================================================
+local function talkNPC(npc)
+    if not npc then return end
+    local md    = npc:getModData()
+    local state = md.PHNPC_State or "idle"
+    local pool  = PHNPC_BARKS[state] or PHNPC_BARKS["idle"]
+    local bark  = pool[ZombRand(#pool) + 1]
+    pcall(function() npc:Say(bark) end)
+end
+
+-- ============================================================
+-- CALLBACKS DEBUG (appeles via menu clic-droit en mode debug)
+-- ============================================================
+local function dbgForceIdle(npc)
+    npc:getModData().PHNPC_State = "idle"
+    stopMoving(npc)
+end
+local function dbgForceDefending(npc)
+    npc:getModData().PHNPC_State = "defending"
+end
+local function dbgForceFleeing(npc)
+    local md = npc:getModData()
+    md.PHNPC_State  = "fleeing"
+    md.PHNPC_Health = 1
+end
+local function dbgHPFull(npc)
+    local md = npc:getModData()
+    md.PHNPC_Health = md.PHNPC_MaxHealth or 100
+    pcall(function() npc:Say((md.PHNPC_Name or "?") .. " : HP restaures.") end)
+end
+local function dbgToggleCombat(npc)
+    local md = npc:getModData()
+    if md.PHNPC_CombatMode == "off" then
+        md.PHNPC_CombatMode = "auto"
+        pcall(function() npc:Say((md.PHNPC_Name or "?") .. " : Mode combat actif.") end)
+    else
+        md.PHNPC_CombatMode = "off"
+        pcall(function() npc:Say((md.PHNPC_Name or "?") .. " : Mode combat desactive.") end)
+    end
+end
+local function dbgAnimShove(npc)    pcall(function() npc:setBumpType("Shove")       end) end
+local function dbgAnimFrontKick(npc) pcall(function() npc:setBumpType("FrontKick")  end) end
+local function dbgAnimHighKick(npc)  pcall(function() npc:setBumpType("HighKick")   end) end
+local function dbgAnimWaveHi(npc)    pcall(function() npc:setBumpType("WaveHi")     end) end
+local function dbgAnimShrug(npc)     pcall(function() npc:setBumpType("Shrug")      end) end
+local function dbgAnimStagger(npc)   pcall(function() npc:setBumpType("StaggerBack") end) end
+local function dbgAnimYes(npc)       pcall(function() npc:setBumpType("Yes")        end) end
+local function dbgAnimNo(npc)        pcall(function() npc:setBumpType("No")         end) end
+local function dbgDeleteAll(_)
+    local toDelete = {}
+    for npc, _ in pairs(PHNPC.allNPCs) do table.insert(toDelete, npc) end
+    for _, npc in ipairs(toDelete) do deleteNPC(npc) end
+    print("[PHNPC][DEBUG] Tous les NPCs supprimes")
+end
+
+-- ============================================================
 -- INVENTAIRE NPC (GCMenuInventory.lua pattern EXACT)
 -- Injecte le container du NPC dans le loot panel
 -- ============================================================
-
 local function openNPCInventory(npc)
     if not npc then return end
     local md = npc:getModData()
@@ -523,6 +800,10 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
         if square then
             context:addOption("[PHNPC] Appeler un survivant", square, spawnNPC)
         end
+        -- Options debug globales (spawn/delete all) — uniquement en mode debug PZ
+        if isDebugEnabled and isDebugEnabled() then
+            context:addOption("[DEBUG] Supprimer tous les NPCs", player, dbgDeleteAll)
+        end
         return
     end
 
@@ -541,29 +822,58 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
         local subMenu = ISContextMenu:getNew(context)
         context:addSubMenu(menuOpt, subMenu)
 
+        -- "Parler" : bark immediat selon etat (toujours disponible)
+        subMenu:addOption("Parler",                npc, talkNPC)
+
         -- Infos / stats (lecture seule)
-        subMenu:addOption("Afficher l'etat...",   npc, showNPCInfo)
+        subMenu:addOption("Afficher l'etat...",    npc, showNPCInfo)
 
         if not md.PHNPC_Recruited then
-            -- NPC non recrute : unique option de recrutement
-            subMenu:addOption("Rejoins-moi !",    npc, recruitNPC)
+            -- NPC non recrute : recrutement
+            subMenu:addOption("Rejoins-moi !",     npc, recruitNPC)
         else
-            -- NPC recrute : inventaire + sous-menu Ordres
-            subMenu:addOption("Inventaire...",     npc, openNPCInventory)
+            -- NPC recrute : inventaire + sous-menu Ordres + mode combat
+            subMenu:addOption("Inventaire...",      npc, openNPCInventory)
 
             local ordreOpt = subMenu:addOption("Ordres...")
             local ordreSub = ISContextMenu:getNew(subMenu)
             subMenu:addSubMenu(ordreOpt, ordreSub)
 
             if md.PHNPC_State == "following" then
-                ordreSub:addOption("Reste ici.",   npc, stayNPC)
+                ordreSub:addOption("Reste ici.",    npc, stayNPC)
             else
-                ordreSub:addOption("Suis-moi !",   npc, followNPC)
+                ordreSub:addOption("Suis-moi !",    npc, followNPC)
             end
-            ordreSub:addOption("Tu peux partir.",  npc, dismissNPC)
+            ordreSub:addOption("Tu peux partir.",   npc, dismissNPC)
+
+            -- Toggle mode combat auto/off
+            local combatLabel = "Mode combat : " .. (md.PHNPC_CombatMode == "off" and "OFF" or "AUTO")
+            subMenu:addOption(combatLabel,           npc, dbgToggleCombat)
         end
 
-        subMenu:addOption("[Supprimer]",           npc, deleteNPC)
+        -- Section debug (uniquement si mode debug PZ)
+        if isDebugEnabled and isDebugEnabled() then
+            local dbgOpt = subMenu:addOption("[DEBUG]...")
+            local dbgSub = ISContextMenu:getNew(subMenu)
+            subMenu:addSubMenu(dbgOpt, dbgSub)
+
+            -- Etats forces
+            dbgSub:addOption("Forcer : idle",        npc, dbgForceIdle)
+            dbgSub:addOption("Forcer : defending",   npc, dbgForceDefending)
+            dbgSub:addOption("Forcer : fleeing",     npc, dbgForceFleeing)
+            dbgSub:addOption("HP full reset",        npc, dbgHPFull)
+            -- Animations de test
+            dbgSub:addOption("Anim : Shove",         npc, dbgAnimShove)
+            dbgSub:addOption("Anim : FrontKick",     npc, dbgAnimFrontKick)
+            dbgSub:addOption("Anim : HighKick",      npc, dbgAnimHighKick)
+            dbgSub:addOption("Anim : WaveHi",        npc, dbgAnimWaveHi)
+            dbgSub:addOption("Anim : Shrug",         npc, dbgAnimShrug)
+            dbgSub:addOption("Anim : StaggerBack",   npc, dbgAnimStagger)
+            dbgSub:addOption("Anim : Yes",           npc, dbgAnimYes)
+            dbgSub:addOption("Anim : No",            npc, dbgAnimNo)
+        end
+
+        subMenu:addOption("[Supprimer]",             npc, deleteNPC)
     end
 end
 
@@ -630,13 +940,22 @@ Events.OnTick.Add(function()
         if not valid then
             -- NPC mort : nettoyer les tables
             local md = npc:getModData()
-            PHNPC.recruited[npc] = nil
-            PHNPC.allNPCs[npc]   = nil
-            _followTimers[npc]   = nil
+            PHNPC.recruited[npc]  = nil
+            PHNPC.allNPCs[npc]    = nil
+            _followTimers[npc]    = nil
+            _combatTimers[npc]    = nil
+            _attackCooldowns[npc] = nil
             print("[PHNPC] Cleanup mort : " .. tostring(md and md.PHNPC_Name or "?"))
         else
             local md = npc:getModData()
 
+            -- 1. Evaluation fuite (priorite haute : peut overrider tous les etats)
+            pcall(function() npcFlightStep(npc, player) end)
+
+            -- 2. Evaluation combat (si pas en fuite)
+            pcall(function() npcCombatStep(npc) end)
+
+            -- 3. Suivi joueur (seulement si etat "following", pas en combat/fuite)
             if md.PHNPC_State == "following" then
                 local dx   = player:getX() - npc:getX()
                 local dy   = player:getY() - npc:getY()
@@ -654,7 +973,9 @@ Events.OnTick.Add(function()
                     _followTimers[npc] = 0
                 end
             end
-            -- "staying" : rien a faire (setUseless(true) dans enforceNPC freeze le NPC)
+            -- "staying"   : rien a faire (setUseless(false) mais pas de pathfind)
+            -- "defending" : gere par npcCombatStep
+            -- "fleeing"   : gere par npcFlightStep
         end
     end
 end)
@@ -668,10 +989,12 @@ Events.OnGameStart.Add(function()
     PHNPC.recruited      = {}
     _followTimers        = {}
     _openInventoryNPC    = nil
-    print("[PHNPC] Manager v0.4 pret")
+    _combatTimers        = {}
+    _attackCooldowns     = {}
+    print("[PHNPC] Manager v0.5 pret")
 end)
 
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.4 loaded")
+print("[PHNPC] PHNPC_Manager v0.5 loaded")

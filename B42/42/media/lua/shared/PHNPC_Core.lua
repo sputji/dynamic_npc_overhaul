@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Core.lua  v0.3  (shared)
+    PHNPC_Core.lua  v0.4  (shared)
     Etat global + constantes + stats par metier
     Project Humain : Dynamic NPC Overhaul
     Pattern: NPC_Helper_Mod GCCore.lua
@@ -16,6 +16,16 @@ PHNPC.FOLLOW_DISTANCE      = 8    -- tiles : redemarrer le suivi si le joueur es
 PHNPC.FOLLOW_STOP_DISTANCE = 3    -- tiles : s'arreter a cette distance du joueur (pas sur sa case)
 PHNPC.FOLLOW_TICK_RATE  = 20   -- ticks entre deux appels pathToLocationF
 PHNPC.INTERACTION_DIST  = 3    -- tiles : rayon clic droit pour interagir
+
+-- ============================================================
+-- COMBAT IA (GCCombatAI.lua pattern NPC_Helper_Mod)
+-- ============================================================
+PHNPC.COMBAT_RANGE       = 8    -- tiles : rayon detection zombie pour combat auto
+PHNPC.COMBAT_ATTACK_RANGE = 1.5 -- tiles : distance d'attaque melee
+PHNPC.COMBAT_TICK_RATE   = 30   -- ticks entre evaluations combat
+PHNPC.FLEE_HP_RATIO      = 0.30 -- ratio HP pour declencher la fuite (30%)
+PHNPC.FLEE_DISTANCE      = 15   -- tiles : distance cible de fuite depuis le danger
+PHNPC.BARK_TICK_RATE     = 500  -- ticks entre barks auto (~8 sec a 60fps)
 
 -- ============================================================
 -- SANTE
@@ -122,4 +132,4 @@ function PHNPC.getOutfitStats(outfit)
     return PHNPC.OUTFIT_STATS[outfit] or PHNPC.OUTFIT_STATS["Survivor"]
 end
 
-print("[PHNPC] Core v0.3 loaded")
+print("[PHNPC] Core v0.4 loaded")
