@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Manager.lua  v0.2  (client)
+    PHNPC_Manager.lua  v0.3  (client)
     Spawn / Enforce / Suivi / Menu contextuel
     Necessite: PHNPC_Core.lua (shared)
 
@@ -27,7 +27,20 @@ local function startFollowing(npc, player)
         md.PHNPC_Moving = true
         pcall(function() npc:setBumpType("IdleToWalk") end)
     end
-    pcall(function() npc:pathToCharacter(player) end)
+    -- Pathfinder vers un point a FOLLOW_STOP_DISTANCE tiles du joueur (pas sur le joueur)
+    -- Evite le "collant" en ne ciblant jamais la case exacte du joueur
+    pcall(function()
+        local stopDist = PHNPC.FOLLOW_STOP_DISTANCE or 3
+        local px, py, pz = player:getX(), player:getY(), player:getZ()
+        local nx, ny     = npc:getX(), npc:getY()
+        local dx, dy     = px - nx, py - ny
+        local d = math.sqrt(dx*dx + dy*dy)
+        if d > stopDist + 0.5 then
+            local ratio = (d - stopDist) / d
+            npc:pathToLocationF(nx + dx * ratio, ny + dy * ratio, pz)
+        end
+        -- Si deja assez proche, stopMoving sera appele par OnTick
+    end)
 end
 
 local function startMovingTo(npc, x, y, z)
@@ -59,9 +72,7 @@ end
 local function enforceNPC(zombie)
     local md = zombie:getModData()
 
-    -- 1. Habilitar engine zombie (Bandits linea 2001)
-    --    setUseless(false) requis pour que pathToCharacter fonctionne
-    zombie:setUseless(false)
+    -- 1. (setUseless gere en step 7 selon md.PHNPC_Moving — voir ci-dessous)
 
     -- 2. Fix B42 : empeche marche en arriere non souhaitee (Bandits ZAMove.lua 69-74)
     pcall(function() zombie:setAnimatingBackwards(false) end)
@@ -76,10 +87,14 @@ local function enforceNPC(zombie)
     pcall(function() zombie:setFemaleEtc(md.PHNPC_Female or false) end)
     zombie:setSpeedMod(md.PHNPC_SpeedMod or 0.8)
 
-    -- 4. Prevenir comportement zombie (dents + manger cadavre)
+    -- 4. Prevenir comportement zombie (dents + manger cadavre + crawl)
     zombie:setNoTeeth(true)
     pcall(function() zombie:setEatBodyTarget(nil, false) end)
     zombie:setHealth(10000)
+    -- Empecher tout etat "a terre" (falldown/staggerback/crawl) independamment des HP
+    pcall(function() zombie:knockDown(false) end)
+    pcall(function() zombie:setKnockedDown(false) end)
+    pcall(function() zombie:setCanWalk(true) end)
 
     -- 5. Gestion etats d'action (Bandits ManageActionState lineas 318-434)
     local skipSecurity = false
@@ -127,6 +142,18 @@ local function enforceNPC(zombie)
             pcall(function() zombie:clearAggroList() end)
             zombie:setTarget(nil)
             md.PHNPC_Moving = false
+
+        elseif asn == "falldown" or asn == "staggerback" or asn == "down" then
+            -- Empecher pose zombie rampant / animation morsure au sol
+            zombie:changeState(ZombieIdleState.instance())
+            pcall(function() zombie:knockDown(false) end)
+            pcall(function() zombie:setKnockedDown(false) end)
+            pcall(function() zombie:setCanWalk(true) end)
+            md.PHNPC_Moving = false
+
+        elseif asn == "getup" then
+            -- Laisser finir le releve, puis on retombera en idle
+            skipSecurity = true
         end
     end)
 
@@ -137,11 +164,25 @@ local function enforceNPC(zombie)
         pcall(function() zombie:clearAggroList() end)
     end
 
-    -- 7. Freezer le zombie AI si NPC non-recrute
-    --    setUseless(true) = moteur zombie desactive = pas de detection/attaque
-    --    setUseless(false) = moteur zombie actif = pathfinding possible
-    if not md.PHNPC_Recruited then
+    -- 7. Gestion setUseless selon l'etat de mouvement
+    --    setUseless(false) = IA zombie active => pathfinding + animation walk
+    --    setUseless(true)  = IA zombie gelee  => pas de wander zombie, idle humain propre
+    --    CRUCIAL : setUseless(false) inconditionnel reactive l'IA zombie => bras tendus zombie
+    --    => on n'active l'IA que quand le NPC marche vraiment
+    if md.PHNPC_Moving then
+        zombie:setUseless(false)
+    else
         zombie:setUseless(true)
+        -- Reset periodique vers ZombieIdleState (assure Bob_Idle, evite pose zombie residuelle)
+        md.PHNPC_IdleTick = (md.PHNPC_IdleTick or 0) + 1
+        if md.PHNPC_IdleTick >= 60 then
+            md.PHNPC_IdleTick = 0
+            local asn2 = ""
+            pcall(function() asn2 = zombie:getActionStateName() end)
+            if asn2 ~= "bumped" and asn2 ~= "hitreaction" and asn2 ~= "getup" then
+                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+            end
+        end
     end
 
     -- 8. Sons : VoicePrefix genre-based pour activer footsteps, voix zombie supprimees
@@ -309,7 +350,15 @@ local function recruitNPC(npc)
     local md = npc:getModData()
     md.PHNPC_Recruited = true
     md.PHNPC_State     = "following"
+    md.PHNPC_Moving    = false
+    md.PHNPC_IdleTick  = 0
     PHNPC.recruited[npc] = true
+    -- Transition propre vers idle humain (evite bras tendus zombie au moment du recrutement)
+    pcall(function()
+        npc:setUseless(false)
+        npc:changeState(ZombieIdleState.instance())
+        npc:setBumpType("Shrug")
+    end)
     pcall(function() npc:Say(md.PHNPC_Name .. " : D'accord, je vous suis !") end)
     print("[PHNPC] Recrute : " .. tostring(md.PHNPC_Name))
 end
@@ -355,6 +404,26 @@ end
 -- MENU CONTEXTUEL (GCMenuContext.onFillWorldObjectContextMenu EXACT)
 -- ============================================================
 
+-- Affiche l'etat complet du NPC via Say() (visible en jeu)
+local function showNPCInfo(npc)
+    local md    = npc:getModData()
+    local hp    = md.PHNPC_Health    or 0
+    local maxHp = md.PHNPC_MaxHealth or 100
+    local speed = string.format("%.0f%%", (md.PHNPC_SpeedMod or 0.8) * 100)
+    local str   = tostring(md.PHNPC_Strength or "?")
+    local outfit= tostring(md.PHNPC_Outfit or "?")
+    local state = tostring(md.PHNPC_State or "idle")
+    local genre = (md.PHNPC_Female and "F" or "M")
+    -- Ligne 1 : identite
+    pcall(function()
+        npc:Say((md.PHNPC_Name or "?") .. " (" .. genre .. ") — " .. outfit)
+    end)
+    -- Ligne 2 : stats
+    pcall(function()
+        npc:Say("HP:" .. hp .. "/" .. maxHp .. "  Vit:" .. speed .. "  For:" .. str .. "  Etat:" .. state)
+    end)
+end
+
 local function onFillContextMenu(playerIndex, context, worldObjects, test)
     if test then return end
 
@@ -397,23 +466,37 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
         local md    = npc:getModData()
         local name  = md.PHNPC_Name or "Survivant"
         local genre = md.PHNPC_Female and "F" or "M"
-        local label = "[" .. name .. " (" .. genre .. ")]"
+        local hp    = md.PHNPC_Health    or 0
+        local maxHp = md.PHNPC_MaxHealth or 100
+        -- Label avec HP integre pour visibilite immediate
+        local label = string.format("[%s (%s) — %s — HP:%d/%d]",
+                        name, genre, md.PHNPC_Outfit or "?", hp, maxHp)
 
         local menuOpt = context:addOption(label)
         local subMenu = ISContextMenu:getNew(context)
         context:addSubMenu(menuOpt, subMenu)
 
+        -- Infos / stats (lecture seule)
+        subMenu:addOption("Afficher l'etat...",   npc, showNPCInfo)
+
         if not md.PHNPC_Recruited then
-            subMenu:addOption("Rejoins-moi !", npc, recruitNPC)
+            -- NPC non recrute : unique option de recrutement
+            subMenu:addOption("Rejoins-moi !",    npc, recruitNPC)
         else
+            -- NPC recrute : sous-menu Ordres
+            local ordreOpt = subMenu:addOption("Ordres...")
+            local ordreSub = ISContextMenu:getNew(subMenu)
+            subMenu:addSubMenu(ordreOpt, ordreSub)
+
             if md.PHNPC_State == "following" then
-                subMenu:addOption("Reste ici.",       npc, stayNPC)
+                ordreSub:addOption("Reste ici.",   npc, stayNPC)
             else
-                subMenu:addOption("Suis-moi !",       npc, followNPC)
+                ordreSub:addOption("Suis-moi !",   npc, followNPC)
             end
-            subMenu:addOption("Tu peux partir.",  npc, dismissNPC)
+            ordreSub:addOption("Tu peux partir.",  npc, dismissNPC)
         end
-        subMenu:addOption("[Supprimer]",          npc, deleteNPC)
+
+        subMenu:addOption("[Supprimer]",           npc, deleteNPC)
     end
 end
 
@@ -517,10 +600,10 @@ Events.OnGameStart.Add(function()
     PHNPC.allNPCs   = {}
     PHNPC.recruited = {}
     _followTimers   = {}
-    print("[PHNPC] Manager v0.2 pret")
+    print("[PHNPC] Manager v0.3 pret")
 end)
 
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.2 loaded")
+print("[PHNPC] PHNPC_Manager v0.3 loaded")

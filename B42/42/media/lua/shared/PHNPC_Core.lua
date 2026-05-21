@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Core.lua  v0.2  (shared)
+    PHNPC_Core.lua  v0.3  (shared)
     Etat global + constantes + stats par metier
     Project Humain : Dynamic NPC Overhaul
     Pattern: NPC_Helper_Mod GCCore.lua
@@ -12,8 +12,9 @@ PHNPC.recruited = PHNPC.recruited or {}  -- [npcRef] = true  (recrutes : followi
 -- ============================================================
 -- CONFIG IA
 -- ============================================================
-PHNPC.FOLLOW_DISTANCE   = 5    -- tiles : distance min avant d'arreter le suivi (v0.0.5 : etait 3, trop collant)
-PHNPC.FOLLOW_TICK_RATE  = 20   -- ticks entre deux appels pathToCharacter
+PHNPC.FOLLOW_DISTANCE      = 8    -- tiles : redemarrer le suivi si le joueur est plus loin que ca
+PHNPC.FOLLOW_STOP_DISTANCE = 3    -- tiles : s'arreter a cette distance du joueur (pas sur sa case)
+PHNPC.FOLLOW_TICK_RATE  = 20   -- ticks entre deux appels pathToLocationF
 PHNPC.INTERACTION_DIST  = 3    -- tiles : rayon clic droit pour interagir
 
 -- ============================================================
@@ -121,4 +122,4 @@ function PHNPC.getOutfitStats(outfit)
     return PHNPC.OUTFIT_STATS[outfit] or PHNPC.OUTFIT_STATS["Survivor"]
 end
 
-print("[PHNPC] Core v0.2 loaded")
+print("[PHNPC] Core v0.3 loaded")

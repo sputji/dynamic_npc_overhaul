@@ -1,8 +1,13 @@
 --[[
-    PHNPC_Debug.lua  v0.0.5  (client)
+    PHNPC_Debug.lua  v0.0.6  (client)
     Menu de DEBUG_PHNPC pour tester tous les comportements NPC.
 
-    Acces : clic droit -> [DEBUG_PHNPC] -> sous-menu
+    Acces : clic droit -> [DEBUG_PHNPC] -> sous-menu categorie
+
+    Sous-menus :
+      - "Spawn / Gestion"  : spawn, forcer etats, teleport, reset, supprimer
+      - "Infos NPC"        : afficher etat, lister NPCs, stats systeme
+      - "Animations"       : tester toutes les animations via setBumpType
 
     IMPORTANT - Signature callbacks ISContextMenu:
         addOption(texte, target, onselect)  =>  onselect(target)
@@ -323,36 +328,44 @@ local function onFillDebugContextMenu(playerIndex, context, worldObjects, test)
     local sub      = ISContextMenu:getNew(context)
     context:addSubMenu(debugOpt, sub)
 
-    sub:addOption("Spawn NPC ici",               player, dbgSpawnAtPlayer)
-    sub:addOption("---")
-    sub:addOption("Afficher etat NPC proche",    player, dbgShowState)
-    sub:addOption("Lister tous les NPCs",         player, dbgListAll)
-    sub:addOption("Stats systeme",                player, dbgStats)
-    sub:addOption("---")
-    sub:addOption("Forcer FOLLOW (NPC proche)",  player, dbgForceFollow)
-    sub:addOption("Forcer STAY  (NPC proche)",   player, dbgForceStay)
-    sub:addOption("Forcer IDLE  (NPC proche)",   player, dbgForceIdle)
-    sub:addOption("Teleporter NPC au joueur",    player, dbgTeleportToPlayer)
-    sub:addOption("Reset ShowTimer (NPC proche)",player, dbgResetShowTimer)
-    sub:addOption("---")
+    -- ── Spawn / Gestion ──────────────────────────────────────────────
+    local spawnOpt = sub:addOption("Spawn / Gestion...")
+    local spawnSub = ISContextMenu:getNew(sub)
+    sub:addSubMenu(spawnOpt, spawnSub)
 
-    local animOpt = sub:addOption("Tester animations...")
+    spawnSub:addOption("Spawn NPC ici",                player, dbgSpawnAtPlayer)
+    spawnSub:addOption("Forcer FOLLOW (NPC proche)",   player, dbgForceFollow)
+    spawnSub:addOption("Forcer STAY   (NPC proche)",   player, dbgForceStay)
+    spawnSub:addOption("Forcer IDLE   (NPC proche)",   player, dbgForceIdle)
+    spawnSub:addOption("Teleporter NPC au joueur",     player, dbgTeleportToPlayer)
+    spawnSub:addOption("Reset ShowTimer (NPC proche)", player, dbgResetShowTimer)
+    spawnSub:addOption("[!] Supprimer TOUS les NPCs",  player, dbgKillAll)
+
+    -- ── Infos NPC ───────────────────────────────────────────────────
+    local infoOpt = sub:addOption("Infos NPC...")
+    local infoSub = ISContextMenu:getNew(sub)
+    sub:addSubMenu(infoOpt, infoSub)
+
+    infoSub:addOption("Afficher etat NPC proche",  player, dbgShowState)
+    infoSub:addOption("Lister tous les NPCs",       player, dbgListAll)
+    infoSub:addOption("Stats systeme PHNPC",        player, dbgStats)
+
+    -- ── Animations ──────────────────────────────────────────────────
+    local animOpt = sub:addOption("Animations...")
     local animSub = ISContextMenu:getNew(sub)
     sub:addSubMenu(animOpt, animSub)
-    animSub:addOption("WaveHi (salut)",           player, dbgAnimWave)
-    animSub:addOption("Shrug (hausser epaules)",   player, dbgAnimShrug)
-    animSub:addOption("Yes (acquiescer)",           player, dbgAnimYes)
-    animSub:addOption("No (refuser)",               player, dbgAnimNo)
-    animSub:addOption("PainHead (douleur tete)",        player, dbgAnimPainH)
-    animSub:addOption("PainTorso (douleur thoracique)",  player, dbgAnimPainT)
-    animSub:addOption("ZombiePushedBack (reculer)",      player, dbgAnimPushBk)
-    animSub:addOption("Shove (pousser)",            player, dbgAnimShove)
-    animSub:addOption("FrontKick (coup pied avant)",player, dbgAnimKick)
-    animSub:addOption("HighKick (coup pied haut)",  player, dbgAnimHighKick)
-    animSub:addOption("ForceHitReaction",           player, dbgForceHitReaction)
 
-    sub:addOption("---")
-    sub:addOption("[!] Supprimer TOUS les NPCs",  player, dbgKillAll)
+    animSub:addOption("WaveHi  (salut main)",            player, dbgAnimWave)
+    animSub:addOption("Shrug   (hausser epaules)",        player, dbgAnimShrug)
+    animSub:addOption("Yes     (acquiescer)",             player, dbgAnimYes)
+    animSub:addOption("No      (refuser)",                player, dbgAnimNo)
+    animSub:addOption("PainHead  (douleur tete)",         player, dbgAnimPainH)
+    animSub:addOption("PainTorso (douleur thorax)",       player, dbgAnimPainT)
+    animSub:addOption("ZombiePushedBack (reculer)",       player, dbgAnimPushBk)
+    animSub:addOption("Shove     (pousser)",              player, dbgAnimShove)
+    animSub:addOption("FrontKick (coup pied avant)",      player, dbgAnimKick)
+    animSub:addOption("HighKick  (coup pied haut)",       player, dbgAnimHighKick)
+    animSub:addOption("ForceHitReaction (PainHead sim.)", player, dbgForceHitReaction)
 end
 
 -- ============================================================
@@ -361,4 +374,4 @@ end
 
 Events.OnPreFillWorldObjectContextMenu.Add(onFillDebugContextMenu)
 
-print("[PHNPC] PHNPC_Debug v0.0.5 loaded")
+print("[PHNPC] PHNPC_Debug v0.0.6 loaded")
