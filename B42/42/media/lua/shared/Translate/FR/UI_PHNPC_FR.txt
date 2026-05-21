@@ -33,27 +33,36 @@ UI_FR = {
     UI_PHNPC_BarkCombatOn       = "%s : Mode combat actif.",
     UI_PHNPC_BarkCombatOff      = "%s : Mode combat desactive.",
 
-    -- Barks automatiques par etat
-    UI_PHNPC_BarkFollowing1     = "Je suis juste derriere toi !",
-    UI_PHNPC_BarkFollowing2     = "Montre le chemin.",
-    UI_PHNPC_BarkFollowing3     = "Reste pres de moi !",
-    UI_PHNPC_BarkFollowing4     = "Ne m'abandonne pas.",
+    -- Barks automatiques par etat : following (7 phrases)
+    UI_PHNPC_BarkFollowing1     = "Je vous couvre !",
+    UI_PHNPC_BarkFollowing2     = "Je vous suis.",
+    UI_PHNPC_BarkFollowing3     = "Allons-y.",
+    UI_PHNPC_BarkFollowing4     = "Quel endroit sinistre...",
+    UI_PHNPC_BarkFollowing5     = "Restez groupes.",
+    UI_PHNPC_BarkFollowing6     = "J'espere qu'on va trouver un abri.",
+    UI_PHNPC_BarkFollowing7     = "Vous savez ou on va ?",
 
-    UI_PHNPC_BarkStaying1       = "Je surveille le coin.",
-    UI_PHNPC_BarkStaying2       = "Je tiens cette position.",
-    UI_PHNPC_BarkStaying3       = "Je reste ici.",
-    UI_PHNPC_BarkStaying4       = "Ne tarde pas.",
+    -- Barks automatiques par etat : staying (5 phrases)
+    UI_PHNPC_BarkStaying1       = "Je monte la garde ici.",
+    UI_PHNPC_BarkStaying2       = "Je reste ici.",
+    UI_PHNPC_BarkStaying3       = "Soyez prudent.",
+    UI_PHNPC_BarkStaying4       = "Je surveille les alentours.",
+    UI_PHNPC_BarkStaying5       = "Revenez vite.",
 
+    -- Barks automatiques par etat : defending (5 phrases)
     UI_PHNPC_BarkDefending1     = "Zombie en vue !",
     UI_PHNPC_BarkDefending2     = "Je m'en occupe !",
     UI_PHNPC_BarkDefending3     = "Restez derriere moi !",
-    UI_PHNPC_BarkDefending4     = "Attention !",
+    UI_PHNPC_BarkDefending4     = "Reculez, je gere !",
+    UI_PHNPC_BarkDefending5     = "Attention !",
 
+    -- Barks automatiques par etat : fleeing (4 phrases)
     UI_PHNPC_BarkFleeing1       = "Je suis trop blesse !",
     UI_PHNPC_BarkFleeing2       = "Je dois fuir !",
     UI_PHNPC_BarkFleeing3       = "Aidez-moi !",
     UI_PHNPC_BarkFleeing4       = "Trop de zombies !",
 
+    -- Barks automatiques par etat : idle (4 phrases)
     UI_PHNPC_BarkIdle1          = "Y a quelqu'un ?",
     UI_PHNPC_BarkIdle2          = "...",
     UI_PHNPC_BarkIdle3          = "Dieu merci, je suis encore en vie.",
