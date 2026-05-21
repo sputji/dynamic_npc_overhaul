@@ -134,13 +134,22 @@ local function enforceNPC(zombie)
 
         elseif asn == "bumped" then
             -- Laisser les animations bumped (Shove, Pain, etc.) se terminer
-            -- Timeout court : 15 ticks (~0.25s) suffit car nos XMLs overrident les vanilla
+            -- Timeout 30 ticks (pattern NHM GCCoreEnforce.lua safety net)
             skipSecurity = true
             md.PHNPC_BumpTick = (md.PHNPC_BumpTick or 0) + 1
-            if md.PHNPC_BumpTick >= 15 then
+            if md.PHNPC_BumpTick >= 30 then
                 md.PHNPC_BumpTick = 0
                 md.PHNPC_Moving   = false
-                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+                -- CRITIQUE : setBumpType("IdleToWalk") APRES changeState
+                -- Sans setBumpType, l'anim Shrug vanilla zombie ne se termine jamais
+                -- et le NPC reste bloque en bumped indefiniment.
+                -- setBumpType("IdleToWalk") remplace l'anim bloquee par notre XML
+                -- ultra-court (speedScale=3.0 + EarlyTransitionOut=true) qui se
+                -- termine proprement et sort du bumped. (NHM GCCoreEnforce.lua:33-34)
+                pcall(function()
+                    zombie:changeState(ZombieIdleState.instance())
+                    zombie:setBumpType("IdleToWalk")
+                end)
                 skipSecurity = false
             end
 
@@ -198,17 +207,15 @@ local function enforceNPC(zombie)
         pcall(function() zombie:clearAggroList() end)
     end
 
-    -- 7. setUseless(false) TOUJOURS — pattern NHM exact (GCCoreEnforceMain.lua)
-    --    setUseless(true) BLOQUE les AnimSets (PHNPC_IsNPC) et Say() => animations zombie
-    --    Les non-recrutes sont neutralises via setTarget(nil)+clearAggroList (step 6)
-    zombie:setUseless(false)
-    -- Non-recrute : forcer idle regulierement pour eviter reprise locomotion zombie
-    if not md.PHNPC_Recruited then
-        md.PHNPC_IdleTick = (md.PHNPC_IdleTick or 0) + 1
-        if md.PHNPC_IdleTick >= 60 then
-            md.PHNPC_IdleTick = 0
-            pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
-        end
+    -- 7. setUseless selon recrutement (pattern NHM GCCoreEnforceMain.lua exact)
+    --    Recrutes  : setUseless(false) => pathfinding actif (following/combat)
+    --    Non-recrutés : setUseless(true) => figes en place, moteur zombie bloque
+    --    Note : setUseless(true) bloque le pathfind PZ mais PAS les AnimSets
+    --    (NHM confirme : non-recrutes setUseless(true) mais AnimSets custom actifs)
+    if md.PHNPC_Recruited then
+        zombie:setUseless(false)
+    else
+        zombie:setUseless(true)
     end
 
     -- 8. Sons : VoicePrefix genre-based pour activer footsteps, voix zombie supprimees
