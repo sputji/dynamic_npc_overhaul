@@ -1,5 +1,19 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.7b] — 2026-05-28
+
+### Corrections critiques
+- **Animations réparées** : `setUseless(false)` pour **tous** les NPCs (recrutés ET non-recrutés) — `setUseless(true)` bloquait les AnimSets (PHNPC_IsNPC) et `Say()`, causant animations zombie bras-tendus sur les NPCs libres
+- **`Say()` réparé** : découlait du fix animations — `npc:Say()` ne fonctionnait pas avec `setUseless(true)`
+- **Loot après mort** : `deleteNPC()` utilise maintenant `setHealth(1)` au lieu de `removeFromWorld()` — le NPC laisse un corpse lootable avec ses items
+- **Menu simplifié** : suppression "Afficher l'état" (redondant), "Inventaire" → "Échange d'objets", "Mode combat" déplacé dans `[DEBUG]`
+
+### Ajouts
+- **NPC autonome** : comportement idle pour les NPCs non recrutés — patrouille aléatoire toutes les ~300 ticks dans un rayon de 6 tiles + bark idle occasionnel (1/4)
+- **PHNPC_Manager.lua v0.6** : boucle `OnTick` séparée pour non-recrutés (`PHNPC_PatrolTick`), sécurisation de l'itération (liste `deadIdle` pour éviter modification pendant `pairs()`)
+
+---
+
 ## [0.0.7a] — 2026-05-27
 
 ### Ajouts

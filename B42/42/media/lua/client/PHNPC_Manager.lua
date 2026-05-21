@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Manager.lua  v0.5  (client)
+    PHNPC_Manager.lua  v0.6  (client)
     Spawn / Enforce / Suivi / Menu contextuel / Inventaire NPC
     Combat NPC vs zombies / Fuite HP<30% / Dialogue contextuel
     Necessite: PHNPC_Core.lua (shared)
@@ -199,18 +199,12 @@ local function enforceNPC(zombie)
         pcall(function() zombie:clearAggroList() end)
     end
 
-    -- 7. setUseless : pattern EXACT NPC_Helper_Mod (GCCoreEnforceMain.lua fin)
-    --    Recrute  => setUseless(false) TOUJOURS : IA active, pathfinding + animations sans gel
-    --    Non-recr => setUseless(true)  : gele pour empecher errance zombie
-    --    IMPORTANT : l'ancien code "setUseless selon PHNPC_Moving" gelait les animations
-    --    bumped (WalkToIdle, PainHead, IdleToWalk) => NPC bloque en animation bousculade.
-    --    IMPORTANT : setUseless(true) empeche aussi les variables AnimSet (PHNPC_IsNPC)
-    --    d'etre evaluees => animations vanilla zombie (bras tendus) au lieu de Bob_*.
-    if md.PHNPC_Recruited then
-        zombie:setUseless(false)
-    else
-        zombie:setUseless(true)
-        -- Reset periodique pour non-recrutes (evite pose zombie residuelle)
+    -- 7. setUseless(false) TOUJOURS — pattern NHM exact (GCCoreEnforceMain.lua)
+    --    setUseless(true) BLOQUE les AnimSets (PHNPC_IsNPC) et Say() => animations zombie
+    --    Les non-recrutes sont neutralises via setTarget(nil)+clearAggroList (step 6)
+    zombie:setUseless(false)
+    -- Non-recrute : forcer idle regulierement pour eviter reprise locomotion zombie
+    if not md.PHNPC_Recruited then
         md.PHNPC_IdleTick = (md.PHNPC_IdleTick or 0) + 1
         if md.PHNPC_IdleTick >= 60 then
             md.PHNPC_IdleTick = 0
@@ -443,14 +437,17 @@ local function deleteNPC(npc)
     local name = md.PHNPC_Name or "?"
     -- Fermer l'inventaire si c'est ce NPC qui est ouvert
     if _openInventoryNPC == npc then _openInventoryNPC = nil end
-    -- Nettoyer toutes les references avant la suppression
+    -- Nettoyer toutes les references (enforceNPC ne traitera plus ce NPC)
     PHNPC.allNPCs[npc]    = nil
     PHNPC.recruited[npc]  = nil
     _followTimers[npc]    = nil
     _combatTimers[npc]    = nil
     _attackCooldowns[npc] = nil
-    -- Supprimer du monde (removeFromWorld = retire immediatement)
-    pcall(function() npc:removeFromWorld() end)
+    -- Mort naturelle : laisse un corpse lootable (pas removeFromWorld qui efface sans trace)
+    pcall(function()
+        npc:setHealth(1)
+        npc:setFakeDead(false)
+    end)
     print("[PHNPC] Supprime : " .. name)
 end
 
@@ -825,15 +822,12 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
         -- "Parler" : bark immediat selon etat (toujours disponible)
         subMenu:addOption("Parler",                npc, talkNPC)
 
-        -- Infos / stats (lecture seule)
-        subMenu:addOption("Afficher l'etat...",    npc, showNPCInfo)
-
         if not md.PHNPC_Recruited then
             -- NPC non recrute : recrutement
             subMenu:addOption("Rejoins-moi !",     npc, recruitNPC)
         else
-            -- NPC recrute : inventaire + sous-menu Ordres + mode combat
-            subMenu:addOption("Inventaire...",      npc, openNPCInventory)
+            -- NPC recrute : echange d'objets + ordres
+            subMenu:addOption("Echange d'objets...", npc, openNPCInventory)
 
             local ordreOpt = subMenu:addOption("Ordres...")
             local ordreSub = ISContextMenu:getNew(subMenu)
@@ -845,10 +839,6 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
                 ordreSub:addOption("Suis-moi !",    npc, followNPC)
             end
             ordreSub:addOption("Tu peux partir.",   npc, dismissNPC)
-
-            -- Toggle mode combat auto/off
-            local combatLabel = "Mode combat : " .. (md.PHNPC_CombatMode == "off" and "OFF" or "AUTO")
-            subMenu:addOption(combatLabel,           npc, dbgToggleCombat)
         end
 
         -- Section debug (uniquement si mode debug PZ)
@@ -857,6 +847,9 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
             local dbgSub = ISContextMenu:getNew(subMenu)
             subMenu:addSubMenu(dbgOpt, dbgSub)
 
+            -- Toggle mode combat (debug uniquement)
+            local combatLabel = "Mode combat : " .. (md.PHNPC_CombatMode == "off" and "OFF" or "AUTO")
+            dbgSub:addOption(combatLabel,            npc, dbgToggleCombat)
             -- Etats forces
             dbgSub:addOption("Forcer : idle",        npc, dbgForceIdle)
             dbgSub:addOption("Forcer : defending",   npc, dbgForceDefending)
@@ -932,6 +925,7 @@ Events.OnTick.Add(function()
     local player = getPlayer()
     if not player or not PHNPC then return end
 
+    -- ---- NPCs recrutes : fuite + combat + suivi ----
     for npc, _ in pairs(PHNPC.recruited) do
         -- Verifier validite NPC
         local valid = false
@@ -978,6 +972,37 @@ Events.OnTick.Add(function()
             -- "fleeing"   : gere par npcFlightStep
         end
     end
+
+    -- ---- NPCs non recrutes : patrouille autonome ----
+    local deadIdle = {}
+    for npc, _ in pairs(PHNPC.allNPCs) do
+        if not PHNPC.recruited[npc] then
+            local valid = false
+            pcall(function() valid = not npc:isDead() end)
+            if not valid then
+                table.insert(deadIdle, npc)
+            else
+                local md = npc:getModData()
+                -- Patrouille aleatoire toutes les ~300 ticks (~5 secondes a 60fps)
+                md.PHNPC_PatrolTick = (md.PHNPC_PatrolTick or 0) + 1
+                if md.PHNPC_PatrolTick >= 300 then
+                    md.PHNPC_PatrolTick = 0
+                    -- Destination aleatoire dans un rayon de 6 tiles
+                    local nx = npc:getX() + ZombRand(13) - 6
+                    local ny = npc:getY() + ZombRand(13) - 6
+                    pcall(function() npc:pathToLocationF(nx, ny, npc:getZ()) end)
+                    -- Bark idle occasionnel (1 chance sur 4)
+                    if ZombRand(4) == 0 and PHNPC_BARKS then
+                        local pool = PHNPC_BARKS["idle"]
+                        pcall(function() npc:Say(pool[ZombRand(#pool) + 1]) end)
+                    end
+                end
+            end
+        end
+    end
+    for _, npc in ipairs(deadIdle) do
+        PHNPC.allNPCs[npc] = nil
+    end
 end)
 
 -- ============================================================
@@ -991,10 +1016,10 @@ Events.OnGameStart.Add(function()
     _openInventoryNPC    = nil
     _combatTimers        = {}
     _attackCooldowns     = {}
-    print("[PHNPC] Manager v0.5 pret")
+    print("[PHNPC] Manager v0.6 pret")
 end)
 
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.5 loaded")
+print("[PHNPC] PHNPC_Manager v0.6 loaded")
