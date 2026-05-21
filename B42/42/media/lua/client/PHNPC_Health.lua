@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Health.lua  v0.1  (client)
+    PHNPC_Health.lua  v0.2  (client)
     Systeme de sante NPC : degats, animations de douleur, mort
     Project Humain : Dynamic NPC Overhaul
 
@@ -73,21 +73,24 @@ Events.OnHitZombie.Add(function(zombie, character, bodyPart, handWeapon)
         -- ---- MORT NPC ----
         print("[PHNPC][MORT] " .. tostring(md.PHNPC_Name or "?"))
 
-        -- Derniere parole
+        -- Derniere parole (addLineChatElement = bulle visible en B42)
         pcall(function()
-            zombie:Say(tostring(md.PHNPC_Name or "?") .. " : Argh...")
+            zombie:addLineChatElement(tostring(md.PHNPC_Name or "?") .. " : Argh...", 0.9, 0.2, 0.2)
         end)
 
         -- Retirer des registres PHNPC (plus traite par enforceNPC/follow)
+        -- CRITIQUE : PHNPC_IsNPC=nil AVANT setHealth(0)
+        -- Sinon OnZombieUpdate (isNPC check) ressusciterait le NPC (setHealth(10000))
+        md.PHNPC_IsNPC = nil
         PHNPC.allNPCs[zombie]   = nil
         PHNPC.recruited[zombie] = nil
 
-        -- Laisser PZ gerer la mort naturellement
+        -- Mort naturelle via setHealth(0) : PZ cree le corpse avec tout l'inventaire
+        -- setHealth(1) ne tuait PAS le NPC -> pas de corpse -> items perdus
         pcall(function()
-            zombie:setHealth(1)
-            zombie:setFakeDead(false)
+            zombie:setHealth(0)
         end)
     end
 end)
 
-print("[PHNPC] Health v0.1 loaded")
+print("[PHNPC] Health v0.2 loaded")

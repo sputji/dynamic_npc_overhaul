@@ -29,7 +29,7 @@ local function startFollowing(npc, player)
     npc:setUseless(false)
     if not md.PHNPC_Moving then
         md.PHNPC_Moving = true
-        pcall(function() npc:setBumpType("IdleToWalk") end)
+        -- NE PAS appeler setBumpType("IdleToWalk") : le vanilla PZ reprendrait l'anim zombie
     end
     -- Pathfinder vers un point a FOLLOW_STOP_DISTANCE tiles du joueur (pas sur le joueur)
     -- Evite le "collant" en ne ciblant jamais la case exacte du joueur
@@ -52,7 +52,7 @@ local function startMovingTo(npc, x, y, z)
     npc:setUseless(false)
     if not md.PHNPC_Moving then
         md.PHNPC_Moving = true
-        pcall(function() npc:setBumpType("IdleToWalk") end)
+        -- NE PAS appeler setBumpType("IdleToWalk") : le vanilla PZ reprendrait l'anim zombie
     end
     pcall(function() npc:pathToLocationF(x, y, z) end)
 end
@@ -61,8 +61,8 @@ local function stopMoving(npc)
     local md = npc:getModData()
     if md.PHNPC_Moving then
         md.PHNPC_Moving = false
-        pcall(function() npc:setBumpType("WalkToIdle") end)
-        -- Effacer la cible pour eviter lunge/turnalerted apres WalkToIdle
+        -- NE PAS appeler setBumpType("WalkToIdle") : le vanilla PZ reprendrait l'anim zombie
+        -- setTarget(nil) uniquement si pas en pathfind (cf. enforceNPC step 6)
         pcall(function() npc:setTarget(nil) end)
         pcall(function() npc:clearAggroList() end)
     end
@@ -146,10 +146,10 @@ local function enforceNPC(zombie)
 
         elseif asn == "bumped" then
             -- Laisser les animations bumped (Shove, Pain, etc.) se terminer
-            -- Timeout : si bloque en bumped trop longtemps (collision PZ, etc.) → forcer idle
+            -- Timeout court : 15 ticks (~0.25s) suffit car nos XMLs overrident les vanilla
             skipSecurity = true
             md.PHNPC_BumpTick = (md.PHNPC_BumpTick or 0) + 1
-            if md.PHNPC_BumpTick >= 40 then
+            if md.PHNPC_BumpTick >= 15 then
                 md.PHNPC_BumpTick = 0
                 md.PHNPC_Moving   = false
                 pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
@@ -247,7 +247,7 @@ local function enforceNPC(zombie)
             local state = md.PHNPC_State or "idle"
             local barkPool = PHNPC_BARKS[state] or PHNPC_BARKS["idle"]
             local bark = barkPool[ZombRand(#barkPool) + 1]
-            pcall(function() zombie:Say(bark) end)
+            pcall(function() zombie:addLineChatElement(bark, 1.0, 1.0, 1.0) end)
         end
     end
 end
@@ -414,14 +414,14 @@ local function recruitNPC(npc)
         npc:changeState(ZombieIdleState.instance())
         npc:setBumpType("Shrug")
     end)
-    pcall(function() npc:Say(md.PHNPC_Name .. " : D'accord, je vous suis !") end)
+    pcall(function() npc:addLineChatElement(md.PHNPC_Name .. " : D'accord, je vous suis !", 0.2, 0.9, 0.2) end)
     print("[PHNPC] Recrute : " .. tostring(md.PHNPC_Name))
 end
 
 local function followNPC(npc)
     local md = npc:getModData()
     md.PHNPC_State = "following"
-    pcall(function() npc:Say(md.PHNPC_Name .. " : Je vous suis !") end)
+    pcall(function() npc:addLineChatElement(md.PHNPC_Name .. " : Je vous suis !", 0.2, 0.9, 0.2) end)
     print("[PHNPC] Suis le joueur : " .. tostring(md.PHNPC_Name))
 end
 
@@ -429,7 +429,7 @@ local function stayNPC(npc)
     local md = npc:getModData()
     md.PHNPC_State = "staying"
     stopMoving(npc)
-    pcall(function() npc:Say(md.PHNPC_Name .. " : Je reste ici.") end)
+    pcall(function() npc:addLineChatElement(md.PHNPC_Name .. " : Je reste ici.", 0.9, 0.9, 0.2) end)
     print("[PHNPC] Reste ici : " .. tostring(md.PHNPC_Name))
 end
 
@@ -439,13 +439,15 @@ local function dismissNPC(npc)
     md.PHNPC_State     = "idle"
     PHNPC.recruited[npc] = nil
     stopMoving(npc)
-    pcall(function() npc:Say(md.PHNPC_Name .. " : Bonne chance.") end)
+    pcall(function() npc:addLineChatElement(md.PHNPC_Name .. " : Bonne chance.", 0.9, 0.9, 0.2) end)
     print("[PHNPC] Congedie : " .. tostring(md.PHNPC_Name))
 end
 
-local function deleteNPC(npc)
+    -- CRITIQUE : mettre PHNPC_IsNPC=nil AVANT setHealth(0)
+    -- Sinon OnZombieUpdate (isNPC check) ressusciterait le NPC au tick suivant
     local md   = npc:getModData()
     local name = md.PHNPC_Name or "?"
+    md.PHNPC_IsNPC = nil
     -- Fermer l'inventaire si c'est ce NPC qui est ouvert
     if _openInventoryNPC == npc then _openInventoryNPC = nil end
     -- Nettoyer toutes les references (enforceNPC ne traitera plus ce NPC)
@@ -454,10 +456,10 @@ local function deleteNPC(npc)
     _followTimers[npc]    = nil
     _combatTimers[npc]    = nil
     _attackCooldowns[npc] = nil
-    -- Mort naturelle : laisse un corpse lootable (pas removeFromWorld qui efface sans trace)
+    -- Mort naturelle via setHealth(0) : PZ cree un corpse lootable avec tout l'inventaire
+    -- setHealth(1) NE tuait PAS le NPC -> pas de corpse -> bug inventaire
     pcall(function()
-        npc:setHealth(1)
-        npc:setFakeDead(false)
+        npc:setHealth(0)
     end)
     print("[PHNPC] Supprime : " .. name)
 end
@@ -546,10 +548,10 @@ local function npcCombatStep(npc)
     if md.PHNPC_State ~= "defending" then
         md.PHNPC_PrevState = md.PHNPC_State
         md.PHNPC_State = "defending"
-        -- Bark d'alerte (une seule fois au debut du combat)
+        -- Bark de combat (alerte)
         pcall(function()
             local pool = PHNPC_BARKS["defending"]
-            npc:Say(pool[ZombRand(#pool) + 1])
+            npc:addLineChatElement(pool[ZombRand(#pool) + 1], 0.9, 0.2, 0.2)
         end)
     end
 
@@ -593,7 +595,7 @@ local function npcFlightStep(npc, player)
             md.PHNPC_PrevState = md.PHNPC_State
             md.PHNPC_State     = "fleeing"
             pcall(function()
-                npc:Say((md.PHNPC_Name or "?") .. " : Je suis blesse ! Je fuis !")
+                npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Je suis blesse ! Je fuis !", 0.9, 0.2, 0.2)
             end)
         end
 
@@ -623,7 +625,7 @@ local function npcFlightStep(npc, player)
             md.PHNPC_State     = md.PHNPC_PrevState or "following"
             md.PHNPC_PrevState = nil
             pcall(function()
-                npc:Say((md.PHNPC_Name or "?") .. " : Je peux continuer !")
+                npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Je peux continuer !", 0.2, 0.9, 0.2)
             end)
         end
     end
@@ -639,7 +641,7 @@ local function talkNPC(npc)
     local state = md.PHNPC_State or "idle"
     local pool  = PHNPC_BARKS[state] or PHNPC_BARKS["idle"]
     local bark  = pool[ZombRand(#pool) + 1]
-    pcall(function() npc:Say(bark) end)
+    pcall(function() npc:addLineChatElement(bark, 0.9, 0.9, 0.2) end)
 end
 
 -- ============================================================
@@ -660,16 +662,16 @@ end
 local function dbgHPFull(npc)
     local md = npc:getModData()
     md.PHNPC_Health = md.PHNPC_MaxHealth or 100
-    pcall(function() npc:Say((md.PHNPC_Name or "?") .. " : HP restaures.") end)
+    pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : HP restaures.", 0.2, 0.9, 0.2) end)
 end
 local function dbgToggleCombat(npc)
     local md = npc:getModData()
     if md.PHNPC_CombatMode == "off" then
         md.PHNPC_CombatMode = "auto"
-        pcall(function() npc:Say((md.PHNPC_Name or "?") .. " : Mode combat actif.") end)
+        pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Mode combat actif.", 0.2, 0.9, 0.2) end)
     else
         md.PHNPC_CombatMode = "off"
-        pcall(function() npc:Say((md.PHNPC_Name or "?") .. " : Mode combat desactive.") end)
+        pcall(function() npc:addLineChatElement((md.PHNPC_Name or "?") .. " : Mode combat desactive.", 0.9, 0.9, 0.2) end)
     end
 end
 local function dbgAnimShove(npc)    pcall(function() npc:setBumpType("Shove")       end) end
@@ -766,11 +768,11 @@ local function showNPCInfo(npc)
     local genre = (md.PHNPC_Female and "F" or "M")
     -- Ligne 1 : identite
     pcall(function()
-        npc:Say((md.PHNPC_Name or "?") .. " (" .. genre .. ") — " .. outfit)
+        npc:addLineChatElement((md.PHNPC_Name or "?") .. " (" .. genre .. ") — " .. outfit, 0.9, 0.9, 0.2)
     end)
     -- Ligne 2 : stats
     pcall(function()
-        npc:Say("HP:" .. hp .. "/" .. maxHp .. "  Vit:" .. speed .. "  For:" .. str .. "  Etat:" .. state)
+        npc:addLineChatElement("HP:" .. hp .. "/" .. maxHp .. "  Vit:" .. speed .. "  For:" .. str .. "  Etat:" .. state, 0.9, 0.9, 0.2)
     end)
 end
 
@@ -891,10 +893,10 @@ Events.OnZombieUpdate.Add(function(zombie)
     if not PHNPC.isNPC(zombie) then return end
 
     -- IMMEDIAT : neutraliser avant tout traitement
-    -- Pattern GCUpdate.lua : appels INCONDITIONNELS ici, avant enforce
-    -- (setNoTeeth = empeche morsure pendant chargement)
+    -- setNoTeeth : empeche morsure pendant chargement
+    -- setTarget(nil) ICI serait INCONDITIONNEL et tuerait le pathfinding (bug bumped)
+    -- => gere dans enforceNPC step 6 uniquement si pas en pathfind
     pcall(function() zombie:setNoTeeth(true) end)
-    pcall(function() zombie:setTarget(nil) end)
 
     -- Gerer etat mort (fakeDead, knockdown invisible)
     local dead = false
@@ -1005,7 +1007,7 @@ Events.OnTick.Add(function()
                     -- Bark idle occasionnel (1 chance sur 4)
                     if ZombRand(4) == 0 and PHNPC_BARKS then
                         local pool = PHNPC_BARKS["idle"]
-                        pcall(function() npc:Say(pool[ZombRand(#pool) + 1]) end)
+                        pcall(function() npc:addLineChatElement(pool[ZombRand(#pool) + 1], 1.0, 1.0, 1.0) end)
                     end
                 end
             end
@@ -1027,10 +1029,10 @@ Events.OnGameStart.Add(function()
     _openInventoryNPC    = nil
     _combatTimers        = {}
     _attackCooldowns     = {}
-    print("[PHNPC] Manager v0.6 pret")
+    print("[PHNPC] Manager v0.7 pret")
 end)
 
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] PHNPC_Manager v0.6 loaded")
+print("[PHNPC] PHNPC_Manager v0.7 loaded")
