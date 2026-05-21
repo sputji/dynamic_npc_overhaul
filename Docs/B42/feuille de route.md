@@ -114,7 +114,7 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 
 ## Prochaines étapes (par priorité)
 
-### Phase 2.1 — Les sons, AnimSet vanilla et des mods exemples (NPC_Helper_Mod, Bandits, etc.)
+### Phase 0.2.1 — Les sons, AnimSet vanilla et des mods exemples (NPC_Helper_Mod, Bandits, etc.)
 - [ ] Sons de pas (events Footstep dans ZSWalk — déjà en XML, tester)
 - [ ] Sons d'attaque (events Attack dans ZSAttack )
 - [ ] Sons de réaction (events Pain dans ZSPain )
@@ -153,7 +153,7 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 - [ ] Tous les sons et annimations possibles selon les états et les événements (deplacement, actions, réaction, peur, colère, satisfaction, découverte, attaque, blessure, maladie, guérison, vieillissement, reproduction, mémoire, moralité, reputation, faction, profession, patrouille, construction, etc.)
 - [ ] Toutes les animations corespondantes aux sons et actions (deplacement, actions, réaction, peur, colère, satisfaction, découverte, attaque, blessure, maladie, guérison, vieillissement, reproduction, mémoire, moralité, reputation, faction, profession, patrouille, construction, etc.)
 
-### Phase 2.2 — Qualité des interactions
+### Phase 0.2.2 — Qualité des interactions
 - [ ] NPC peut transporter des items dans son inventaire natif (Ne fonctionne pas, inventaire vide, à investiguer)
 - [ ] Dialogue basique (bark texte au-dessus de la tête selon état)
 - [ ] Bark de dialogue (texte au-dessus de la tête selon état : peur, colère, satisfaction, etc.)
@@ -163,7 +163,7 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 - [ ] NPC peut attaquer les Zombies (doMeleeAttack) et réagir (hitreaction)
 - [ ] NPC peut demander de l'aide à un allié ou un ennemi (bark de demande d'aide, peut attaquer ou fuir selon le niveau de colère)
 
-### Phase 2.3 — Qualité des interactions (loot)
+### Phase 0.2.3 — Qualité des interactions (loot)
 - [ ] Fouille de bâtiments (loot)
 - [ ] Système de loot (tables d'items par type de bâtiment)
 - [ ] NPC peut ramasser des items au sol et les transporter dans son inventaire
@@ -172,18 +172,18 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 
 
 
-### Phase 3 — Persistence
+### Phase 0.3.0 — Persistence
 - [ ] Sauvegarder l'état des NPC à OnSave (ModData global)
 - [ ] Recharger les NPC à OnGameStart depuis ModData
 
-### Phase 4.1 — IA avancée
+### Phase 0.4.1 — IA avancée
 - [ ] Système de faction (pas d'attaque entre NPC alliés)
 - [ ] Patrouille de zone (waypoints)
 - [ ] Commerce (échange d'objets avec coût en ressources)
-- [ ] Oorde "construire" (faire construire des barricades, pièges, etc.)
+- [ ] Ordre "construire" (faire construire des barricades, pièges, etc.)
 
 
-### Phase 4.2 — IA avancée (événements et réactions)
+### Phase 0.4.2 — IA avancée (événements et réactions)
 - [ ] Réaction à la météo (pluie → chercher un abrit couvert, bark de plainte)
 - [ ] Réaction à la faim/soif (cherche nourriture/boisson dans l'inventaire ou loot de nouriture/boisson, consomme, bark)
 - [ ] Réaction à la fatigue (ralentit, cherche un lit, dort)
@@ -198,24 +198,24 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 - [ ] Réaction à la découverte d'un joueur (peur +1, =0 ou -1, bark de peur, peut fuir, rien fair ou attaquer selon le niveau de courage)
 - [ ] Réaction à la découverte d'un joueur blessé (peur +2, bark de peur, peut fuir ou attaquer selon le niveau de courage)
 - [ ] Système de commerce (acheter/vendre des items avec le joueur, coût en ressources)
-- [ ] systeme de maladie (les NPC peuvent tomber malades, nécessitant des soins ou pouvant mourir)
-- [ ] systeme de transformation (les NPC mordus peuvent se transformer en zombies après une période d'incubation, avec des symptômes progressifssifs)
+- [ ] système de maladie (les NPC peuvent tomber malades, nécessitant des soins ou pouvant mourir)
+- [ ] système de transformation (les NPC mordus peuvent se transformer en zombies après une période d'incubation, avec des symptômes progressifs)
 
-### Phase 5 — Caractéristiques étendues
+### Phase 0.5.0 — Caractéristiques étendues
 - [ ] Fatigue (endurance diminue à l'effort, récupération au repos)
 - [ ] Faim/soif (consomme items de l'inventaire)
 - [ ] Moral (courage évolue selon les événements)
 - [ ] Historique (journal des actions du NPC)
 
 
-### Phase 6 — Apprentissage et mémoire
+### Phase 0.6.0 — Apprentissage et mémoire
 - [ ] système de quêtes (génération de quêtes, suivi dans un journal, récompenses)
 - [ ] apprentissage (NPC apprend de ses expériences, améliore ses stats ou compétences)
 - [ ] creation de memoires (NPC se souvient des interactions passées avec le joueur et les autres NPC, influence les réactions futures)
 - [ ] creation de metiers (PNJ avec des professions spécifiques, influençant leur comportement, leurs dialogues et leur commerce)
 - [ ] creation de factions (groupes de PNJ avec des relations dynamiques entre eux et le joueur)
 
-### Phase 7 — Cerveau avancé
+### Phase 0.7.0 — Cerveau avancé
 - [ ] creation du cerveau inteligent pour les NPC.
 - [ ] systeme de réputation (le joueur gagne ou perd de la réputation auprès des factions en fonction de ses actions, influençant les interactions futures)
 - [ ] systeme de moralité (le joueur peut faire des choix moraux qui influencent la perception des NPC et les interactions futures)

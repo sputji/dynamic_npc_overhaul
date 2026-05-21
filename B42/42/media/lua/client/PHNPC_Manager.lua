@@ -18,6 +18,8 @@
 -- HELPERS DE DEPLACEMENT (GCCoreActions.lua pattern EXACT)
 -- ============================================================
 
+local _followTimers = {}   -- [npcRef] => ticks depuis dernier pathToCharacter
+
 local function startFollowing(npc, player)
     local md = npc:getModData()
     npc:setUseless(false)
@@ -317,6 +319,18 @@ local function dismissNPC(npc)
     print("[PHNPC] Congedie : " .. tostring(md.PHNPC_Name))
 end
 
+local function deleteNPC(npc)
+    local md   = npc:getModData()
+    local name = md.PHNPC_Name or "?"
+    -- Nettoyer toutes les references avant la suppression
+    PHNPC.allNPCs[npc]   = nil
+    PHNPC.recruited[npc] = nil
+    _followTimers[npc]   = nil
+    -- Supprimer du monde (removeFromWorld = retire immediatement)
+    pcall(function() npc:removeFromWorld() end)
+    print("[PHNPC] Supprime : " .. name)
+end
+
 -- ============================================================
 -- MENU CONTEXTUEL (GCMenuContext.onFillWorldObjectContextMenu EXACT)
 -- ============================================================
@@ -379,6 +393,7 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
             end
             subMenu:addOption("Tu peux partir.",  npc, dismissNPC)
         end
+        subMenu:addOption("[Supprimer]",          npc, deleteNPC)
     end
 end
 
@@ -432,8 +447,6 @@ end)
 -- ============================================================
 -- OnTick : IA Suivi (GCUpdateAI.runAI pattern)
 -- ============================================================
-
-local _followTimers = {}   -- [npcRef] => ticks depuis dernier pathToCharacter
 
 Events.OnTick.Add(function()
     local player = getPlayer()
