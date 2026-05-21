@@ -226,56 +226,15 @@ end
 
 local function dbgSpawnAtPlayer(player)
     if not player then return end
-    local x = player:getX()
-    local y = player:getY()
-    local z = player:getZ()
-    local isFemale     = (ZombRand(2) == 0)
-    local femaleChance = isFemale and 100 or 0
-    local outfit       = PHNPC.OUTFITS[ZombRand(#PHNPC.OUTFITS) + 1]
-    local npcName      = PHNPC.getRandomName(isFemale)
-
-    print("[DEBUG_PHNPC] Spawn test : " .. npcName .. " (" .. outfit .. ")")
-    local ok, err = pcall(function()
-        local zlist = addZombiesInOutfit(x, y, z, 1, outfit, femaleChance)
-        if zlist and zlist:size() > 0 then
-            local zombie = zlist:get(0)
-            if zombie then
-                local md = zombie:getModData()
-                pcall(function() zombie:setNoTeeth(true) end)
-                pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
-                pcall(function() zombie:setVariable("NoLungeTarget", true) end)
-                pcall(function() zombie:setVariable("ZombieHitReaction", "Chainsaw") end)
-                pcall(function() zombie:setVariable("LimpSpeed", 0.80) end)
-                pcall(function() zombie:setVariable("RunSpeed",  0.75) end)
-                pcall(function() zombie:setVariable("WalkSpeed", 1.04) end)
-                -- setWalkType fixe zombieWalkType en interne (PAS setVariable)
-                pcall(function() zombie:setWalkType("Walk") end)
-                -- Genre : Bob (male) ou Kate (female)
-                pcall(function() zombie:setFemaleEtc(isFemale) end)
-                pcall(function() zombie:setDressInRandomOutfit(false) end)
-                pcall(function() zombie:getEmitter():stopAll() end)
-                pcall(function() zombie:setTurnAlertedValues(-5, 5) end)
-                pcall(function() zombie:getDescriptor():setVoicePrefix(isFemale and "FemaleZombie" or "MaleZombie") end)
-                pcall(function() zombie:setPrimaryHandItem(nil) end)
-                pcall(function() zombie:setSecondaryHandItem(nil) end)
-                pcall(function() zombie:resetEquippedHandsModels() end)
-                pcall(function() zombie:setBumpType("Shrug") end)
-                md.PHNPC_IsNPC     = true
-                md.PHNPC_Recruited = false
-                md.PHNPC_State     = "idle"
-                md.PHNPC_Name      = npcName
-                md.PHNPC_Female    = isFemale
-                md.PHNPC_Outfit    = outfit
-                md.PHNPC_Moving    = false
-                md.PHNPC_HitTicks  = 0
-                md.PHNPC_ShowTimer = 5
-                PHNPC.allNPCs[zombie] = true
-                print("[DEBUG_PHNPC] Spawn OK : " .. npcName)
-            end
-        end
-    end)
-    if not ok then
-        print("[DEBUG_PHNPC] Spawn ERREUR : " .. tostring(err))
+    local cell = player:getCell()
+    if not cell then return end
+    local sq = cell:getGridSquare(
+        math.floor(player:getX()),
+        math.floor(player:getY()),
+        player:getZ()
+    )
+    if sq then
+        PHNPC.spawnNPC(sq)
     end
 end
 
