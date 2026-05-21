@@ -76,4 +76,4 @@ function PHNPC.sayBark(npc, state, r, g, b)
     pcall(function() npc:addLineChatElement(bark, r or 0.9, g or 0.9, b or 0.2) end)
 end
 
-print("[PHNPC] Barks v1.0 loaded")
+print("[PHNPC] Barks v0.0.9a loaded")

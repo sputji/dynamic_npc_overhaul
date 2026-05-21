@@ -122,4 +122,4 @@ function PHNPC.toggleCombatNPC(npc)
     end
 end
 
-print("[PHNPC] Orders v1.0 loaded")
+print("[PHNPC] Orders v0.0.9a loaded")

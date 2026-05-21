@@ -177,4 +177,4 @@ function PHNPC.enforceNPC(zombie)
     end
 end
 
-print("[PHNPC] Enforce v1.0 loaded")
+print("[PHNPC] Enforce v0.0.9a loaded")

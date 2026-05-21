@@ -149,4 +149,4 @@ function PHNPC.spawnNPC(square)
     return zombie
 end
 
-print("[PHNPC] Convert v1.0 loaded")
+print("[PHNPC] Convert v0.0.9a loaded")

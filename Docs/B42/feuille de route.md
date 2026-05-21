@@ -185,13 +185,15 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 - [ ] Toutes les animations corespondantes aux sons et actions (deplacement, actions, réaction, peur, colère, satisfaction, découverte, attaque, blessure, maladie, guérison, vieillissement, reproduction, mémoire, moralité, reputation, faction, profession, patrouille, construction, etc.)
 
 ### Phase 0.0.6+ —
-- [ ] Systeme de combat NPC (défendre → attaquer les zombies proches)
-- [ ] Comportement de fuite quand HP < 30%
-- [ ] Dialogue contextuel (le NPC dit quelque chose selon son état)
-- [ ] Utilisation du menu clic-droit pour donner des ordres (parler, rejoindre, suivre, rester, partir, inventaire, commerce, quête, etc.) utilisable en jeux clasique.
-- [ ] Utilisation du menu DEBUG_PHNPC pour tester toutes les fonctionnalités uniquement en debug mode.
+- [X] Dialogue contextuel (le NPC dit quelque chose selon son état)
+- [X] Utilisation du menu clic-droit pour donner des ordres (parler, rejoindre, suivre, rester, partir, inventaire, commerce, quête, etc.) utilisable en jeux clasique.
+- [X] Utilisation du menu DEBUG_PHNPC pour tester toutes les fonctionnalités uniquement en debug mode.
+- [X] Inventaire basique (le NPC peut transporter des items, les échanger avec le joueur.)
 
 ### Phase 0.1.0 — Qualité des interactions
+- [ ] Creer un fichier qui creer et recuper tous les log du mod pour simplifier le debug.
+- [ ] Comportement de fuite quand HP < 30% (a améliorer avec un pathfind vers une zone dégagée, ou vers le joueur si zone dégagée)
+- [ ] Systeme de combat NPC (défendre → attaquer les zombies proches) (a ameliorer avec des attaques variées selon les armes, ou des attaques spéciales selon les professions)
 - [ ] NPC peut transporter des items dans son inventaire natif (Ne fonctionne pas, inventaire vide, à investiguer)
 - [ ] Dialogue basique (bark texte au-dessus de la tête selon état)
 - [ ] Bark de dialogue (texte au-dessus de la tête selon état : peur, colère, satisfaction, etc.)

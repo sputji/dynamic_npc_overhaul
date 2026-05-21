@@ -333,4 +333,4 @@ end
 
 Events.OnPreFillWorldObjectContextMenu.Add(onFillDebugContextMenu)
 
-print("[PHNPC] PHNPC_Debug v0.0.6 loaded")
+print("[PHNPC] Debug v0.0.9a loaded")

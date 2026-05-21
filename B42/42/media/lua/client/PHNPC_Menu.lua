@@ -192,4 +192,4 @@ end
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] Menu v1.0 loaded")
+print("[PHNPC] Menu v0.0.9a loaded")

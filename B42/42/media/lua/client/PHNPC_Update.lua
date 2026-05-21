@@ -157,7 +157,7 @@ Events.OnGameStart.Add(function()
     PHNPC._openInventoryNPC = nil
     PHNPC._combatTimers     = {}
     PHNPC._attackCooldowns  = {}
-    print("[PHNPC] v0.14 pret")
+    print("[PHNPC] v0.0.9a pret")
 end)
 
-print("[PHNPC] Update v1.0 loaded")
+print("[PHNPC] Update v0.0.9a loaded")

@@ -135,4 +135,4 @@ function PHNPC.npcFlightStep(npc, player)
     end
 end
 
-print("[PHNPC] Combat v1.0 loaded")
+print("[PHNPC] Combat v0.0.9a loaded")
