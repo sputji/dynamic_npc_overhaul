@@ -1,8 +1,10 @@
 --[[
-    PHNPC_Core.lua  v0.4  (shared)
+    PHNPC_Core.lua  v0.0.9b  (shared)
     Etat global + constantes + stats par metier
     Project Humain : Dynamic NPC Overhaul
     Pattern: NPC_Helper_Mod GCCore.lua
+    v0.0.9b : FOLLOW_STOP_DISTANCE 3->2, FOLLOW_DISTANCE 8->6,
+              REPEL_DISTANCE ajoute pour anti-sticking joueur
 ]]
 
 PHNPC = PHNPC or {}
@@ -12,8 +14,10 @@ PHNPC.recruited = PHNPC.recruited or {}  -- [npcRef] = true  (recrutes : followi
 -- ============================================================
 -- CONFIG IA
 -- ============================================================
-PHNPC.FOLLOW_DISTANCE      = 8    -- tiles : redemarrer le suivi si le joueur est plus loin que ca
-PHNPC.FOLLOW_STOP_DISTANCE = 3    -- tiles : s'arreter a cette distance du joueur (pas sur sa case)
+PHNPC.FOLLOW_DISTANCE      = 6    -- tiles : redemarrer le suivi si le joueur est plus loin que ca
+PHNPC.FOLLOW_STOP_DISTANCE = 2    -- tiles : s'arreter a cette distance du joueur (pas sur sa case)
+PHNPC.FOLLOW_TARGET_DIST   = 2.5  -- tiles : point cible du pathfind (STOP + 0.5 buffer)
+PHNPC.REPEL_DISTANCE       = 1.5  -- tiles : seuil en-dessous duquel on repousse le NPC
 PHNPC.FOLLOW_TICK_RATE  = 20   -- ticks entre deux appels pathToLocationF
 PHNPC.INTERACTION_DIST  = 3    -- tiles : rayon clic droit pour interagir
 

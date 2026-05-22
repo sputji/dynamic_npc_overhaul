@@ -155,6 +155,7 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
             else
                 ordreSub:addOption("Suis-moi !",             npc, PHNPC.followNPC)
             end
+            ordreSub:addOption("Va la-bas...",               npc, PHNPC.enterGoToMode)
             ordreSub:addOption("Attaque les zombies !",      npc, PHNPC.orderAttackNPC)
             ordreSub:addOption("Mets-toi a l'abri !",        npc, PHNPC.orderFleeNPC)
             local combatLabel = "Mode combat : " .. (md.PHNPC_CombatMode == "off" and "OFF" or "AUTO")
@@ -192,4 +193,4 @@ end
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] Menu v0.0.9a loaded")
+print("[PHNPC] Menu v0.0.9b loaded")

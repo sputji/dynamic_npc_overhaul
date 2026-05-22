@@ -51,5 +51,8 @@
     "UI_PHNPC_InfoLine2": "HP:%d/%d  Spd:%s  Str:%s  State:%s",
     "UI_PHNPC_HpRestored": "%s: HP restored.",
     "UI_PHNPC_FleeHurt": "%s: I'm hurt! I'm running!",
-    "UI_PHNPC_FleeOk": "%s: I can keep going!"
+    "UI_PHNPC_FleeOk": "%s: I can keep going!",
+    "UI_PHNPC_BarkGoTo": "%s: Got it, heading there!",
+    "UI_PHNPC_BarkArrived": "%s: In position.",
+    "UI_PHNPC_OrderGoTo": "Go there..."
 }

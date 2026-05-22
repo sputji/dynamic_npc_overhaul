@@ -1,7 +1,11 @@
 --[[
-    PHNPC_Orders.lua  v1.0  (client)
+    PHNPC_Orders.lua  v0.0.9b  (client)
     Ordres adresses aux NPCs : recruter, suivre, rester, congedier, supprimer,
-    attaquer, fuir.
+    attaquer, fuir, aller la-bas (goTo).
+
+    v0.0.9b : Ajout goToLocation + PHGoToCursor (ISBuildingObject)
+      - enterGoToMode(npc)  : active le curseur tuile verte vanilla
+      - goToLocation(npc,x,y,z) : demarre le deplacement, etat "goingto"
 
     Toutes les fonctions sont dans PHNPC.xxx => accessibles depuis PHNPC_Menu.lua,
     PHNPC_Update.lua, etc.
@@ -122,4 +126,95 @@ function PHNPC.toggleCombatNPC(npc)
     end
 end
 
-print("[PHNPC] Orders v0.0.9a loaded")
+print("[PHNPC] Orders v0.0.9b loaded")
+
+-- ============================================================
+-- "VA LA-BAS" : CURSOR TILE VERTE + ORDRE DE DEPLACEMENT
+-- Pattern GCCompanionPanelGoTo.lua (NPC_Helper_Mod B42.18)
+-- ============================================================
+
+-- Curseur "tuile verte" de selection de destination
+-- Lazy-init : ISBuildingObject peut ne pas etre pret au chargement
+local PHGoToCursor = nil
+
+local function initGoToCursor()
+    if PHGoToCursor then return true end
+    if not ISBuildingObject then return false end
+    PHGoToCursor = ISBuildingObject:derive("PHGoToCursor")
+
+    -- Appele quand le joueur clique sur une tuile valide
+    function PHGoToCursor:create(x, y, z, north, sprite)
+        local npc = self.targetNPC
+        if not npc then return end
+        PHNPC.goToLocation(npc, x + 0.5, y + 0.5, z)
+    end
+
+    function PHGoToCursor:isValid(square)
+        if not square then return false end
+        local ok, result = pcall(function()
+            return square:TreatAsSolidFloor() and not square:isSolid() and not square:isSolidTrans()
+        end)
+        return ok and result == true
+    end
+
+    function PHGoToCursor:render(x, y, z, square)
+        local hc
+        if self:isValid(square) then
+            hc = getCore():getGoodHighlitedColor()
+        else
+            hc = getCore():getBadHighlitedColor()
+        end
+        pcall(function()
+            self:getFloorCursorSprite():RenderGhostTileColor(x, y, z, hc:getR(), hc:getG(), hc:getB(), 0.8)
+        end)
+    end
+
+    function PHGoToCursor:new(character, npc)
+        local o = {}
+        setmetatable(o, self)
+        self.__index = self
+        o:init()
+        o:setSprite("")
+        o:setNorthSprite("")
+        o.character    = character
+        o.player       = character:getPlayerNum()
+        o.noNeedHammer = true
+        o.skipBuildAction = true
+        o.targetNPC    = npc
+        return o
+    end
+
+    print("[PHNPC] PHGoToCursor initialise")
+    return true
+end
+
+-- Tenter l'init a la premiere occasion
+initGoToCursor()
+
+-- enterGoToMode : active le curseur de selection de tuile pour l'ordre "Va la-bas"
+function PHNPC.enterGoToMode(npc)
+    local player = getPlayer()
+    if not player then return end
+    if not initGoToCursor() then
+        print("[PHNPC][GoTo] ISBuildingObject non disponible")
+        return
+    end
+    local cursor = PHGoToCursor:new(player, npc)
+    pcall(function() getCell():setDrag(cursor, player:getPlayerNum()) end)
+    local md = npc:getModData()
+    print("[PHNPC][GoTo] Curseur actif pour : " .. tostring(md.PHNPC_Name))
+end
+
+-- goToLocation : envoyer le NPC vers une coordonnee precise
+function PHNPC.goToLocation(npc, x, y, z)
+    local md = npc:getModData()
+    md.PHNPC_State = "goingto"
+    md.PHNPC_GoToX = x
+    md.PHNPC_GoToY = y
+    md.PHNPC_GoToZ = z or npc:getZ()
+    PHNPC.startMovingTo(npc, x, y, md.PHNPC_GoToZ)
+    pcall(function()
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkGoTo"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
+    end)
+    print("[PHNPC][GoTo] " .. tostring(md.PHNPC_Name) .. " -> " .. tostring(x) .. "," .. tostring(y))
+end

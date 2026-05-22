@@ -51,5 +51,8 @@
     "UI_PHNPC_InfoLine2": "HP:%d/%d  Vit:%s  For:%s  Etat:%s",
     "UI_PHNPC_HpRestored": "%s : HP restaures.",
     "UI_PHNPC_FleeHurt": "%s : Je suis blesse ! Je fuis !",
-    "UI_PHNPC_FleeOk": "%s : Je peux continuer !"
+    "UI_PHNPC_FleeOk": "%s : Je peux continuer !",
+    "UI_PHNPC_BarkGoTo": "%s : D'accord, j'y vais.",
+    "UI_PHNPC_BarkArrived": "%s : Je suis en position.",
+    "UI_PHNPC_OrderGoTo": "Va la-bas..."
 }

@@ -1,16 +1,20 @@
 --[[
-    PHNPC_Update.lua  v1.0  (client)
+    PHNPC_Update.lua  v0.0.9b  (client)
     Boucles de mise a jour principales :
       OnZombieUpdate => enforce comportement NPC chaque tick
       OnTick         => IA suivi + combat + fuite + patrouille non-recrutes
       OnGameStart    => reinitialiser toutes les tables
 
-    FIX v1.0 SUIVI : la zone entre FOLLOW_STOP_DISTANCE et FOLLOW_DISTANCE
-      laisse le NPC finir son chemin en cours au lieu de declencher stopMoving
-      trop tot. stopMoving est declenche UNIQUEMENT en dessous de FOLLOW_STOP_DISTANCE.
+    v0.0.9b :
+      - Anti-sticking joueur : si dist < REPEL_DISTANCE (1.5), repousser le NPC
+      - Suivi : seuil stop passe a FOLLOW_STOP_DISTANCE (2 tiles), cible a FOLLOW_TARGET_DIST (2.5)
+      - Nouvel etat "goingto" : NPC se dirige vers une destination, passe a "staying" a l'arrivee
+      - Patrouille non-recrutes : walkable check + PHNPC_PatrolActive pour debloquer setUseless
+      - Portes : checkAndOpenDoors appele pour les NPCs recrutes en mouvement
+      - Detection blocage : handleStuck appele pour les NPCs recrutes en mouvement
 
     Pattern : NHM GCUpdate.lua + GCUpdateAI.lua
-    Necessite : tous les modules PHNPC_*.lua charges avant (ordre alphabetique PZ)
+    Necessite : tous les modules PHNPC_*.lua charges avant
 ]]
 
 -- ============================================================
@@ -67,12 +71,10 @@ Events.OnTick.Add(function()
 
     -- ---- NPCs recrutes : fuite + combat + suivi ----
     for npc, _ in pairs(PHNPC.recruited) do
-        -- Verifier validite NPC
         local valid = false
         pcall(function() valid = not npc:isDead() end)
 
         if not valid then
-            -- NPC mort : nettoyer les tables
             local md = npc:getModData()
             PHNPC.recruited[npc]         = nil
             PHNPC.allNPCs[npc]           = nil
@@ -83,34 +85,77 @@ Events.OnTick.Add(function()
         else
             local md = npc:getModData()
 
-            -- 1. Evaluation fuite (priorite haute : peut overrider tous les etats)
+            -- Ouvrir portes adjacentes quand en mouvement
+            pcall(function() PHNPC.checkAndOpenDoors(npc) end)
+
+            -- Detection blocage (stuck)
+            pcall(function() PHNPC.handleStuck(npc) end)
+
+            -- 1. Evaluation fuite (priorite haute)
             pcall(function() PHNPC.npcFlightStep(npc, player) end)
 
             -- 2. Evaluation combat (si pas en fuite)
             pcall(function() PHNPC.npcCombatStep(npc) end)
 
-            -- 3. Suivi joueur (seulement si etat "following", pas en combat/fuite)
+            -- 3. Suivi joueur (etat "following")
             if md.PHNPC_State == "following" then
                 local dx   = player:getX() - npc:getX()
                 local dy   = player:getY() - npc:getY()
                 local dist = math.sqrt(dx * dx + dy * dy)
 
-                if dist > PHNPC.FOLLOW_DISTANCE then
-                    -- Joueur trop loin : declencher suivi toutes les FOLLOW_TICK_RATE ticks
+                -- ANTI-STICKING : si trop proche du joueur, repousser le NPC
+                if dist < (PHNPC.REPEL_DISTANCE or 1.5) then
+                    local rx = npc:getX() - player:getX()
+                    local ry = npc:getY() - player:getY()
+                    local rd = math.sqrt(rx * rx + ry * ry)
+                    if rd < 0.05 then rx, ry, rd = 1, 0, 1 end
+                    local repelDist = (PHNPC.FOLLOW_TARGET_DIST or 2.5)
+                    local tx = npc:getX() + (rx / rd) * repelDist
+                    local ty = npc:getY() + (ry / rd) * repelDist
+                    md.PHNPC_Moving = true
+                    pcall(function() npc:setUseless(false); npc:pathToLocationF(tx, ty, npc:getZ()) end)
+                    PHNPC._followTimers[npc] = 0
+
+                elseif dist > (PHNPC.FOLLOW_DISTANCE or 6) then
+                    -- Joueur trop loin : suivre toutes les FOLLOW_TICK_RATE ticks
                     PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
                     if PHNPC._followTimers[npc] >= PHNPC.FOLLOW_TICK_RATE then
                         PHNPC._followTimers[npc] = 0
                         PHNPC.startFollowing(npc, player)
                     end
-                elseif dist <= (PHNPC.FOLLOW_STOP_DISTANCE or 3) then
+
+                elseif dist <= (PHNPC.FOLLOW_STOP_DISTANCE or 2) then
                     -- Dans la zone d'arret : stopper proprement
                     PHNPC.stopMoving(npc)
                     PHNPC._followTimers[npc] = 0
                 end
-                -- Entre FOLLOW_STOP_DISTANCE et FOLLOW_DISTANCE :
-                -- laisser le NPC finir son chemin en cours (pas de stopMoving ici)
+                -- Entre FOLLOW_STOP_DISTANCE et FOLLOW_DISTANCE : NPC finit son chemin en cours
+
+            -- 4. Etat "goingto" : NPC se deplace vers une destination choisie
+            elseif md.PHNPC_State == "goingto" and md.PHNPC_GoToX then
+                local dx   = md.PHNPC_GoToX - npc:getX()
+                local dy   = md.PHNPC_GoToY - npc:getY()
+                local dist = math.sqrt(dx * dx + dy * dy)
+                if dist <= 1.5 then
+                    -- Arrive a destination : passer en "staying"
+                    md.PHNPC_State  = "staying"
+                    md.PHNPC_GoToX  = nil
+                    md.PHNPC_GoToY  = nil
+                    md.PHNPC_GoToZ  = nil
+                    PHNPC.stopMoving(npc)
+                    pcall(function()
+                        npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkArrived"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
+                    end)
+                else
+                    -- Continuer vers la destination, recalculer periodiquement
+                    PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
+                    if PHNPC._followTimers[npc] >= PHNPC.FOLLOW_TICK_RATE then
+                        PHNPC._followTimers[npc] = 0
+                        PHNPC.startMovingTo(npc, md.PHNPC_GoToX, md.PHNPC_GoToY, md.PHNPC_GoToZ or npc:getZ())
+                    end
+                end
             end
-            -- "staying"   : rien a faire (setUseless(false) mais pas de pathfind)
+            -- "staying"   : rien a faire (setUseless(false) dans enforceNPC)
             -- "defending" : gere par npcCombatStep
             -- "fleeing"   : gere par npcFlightStep
         end
@@ -126,17 +171,38 @@ Events.OnTick.Add(function()
                 table.insert(deadIdle, npc)
             else
                 local md = npc:getModData()
-                -- Patrouille aleatoire toutes les ~300 ticks (~5 secondes a 60fps)
+                -- Patrouille aleatoire toutes les ~300 ticks avec cible marchable
                 md.PHNPC_PatrolTick = (md.PHNPC_PatrolTick or 0) + 1
                 if md.PHNPC_PatrolTick >= 300 then
                     md.PHNPC_PatrolTick = 0
-                    -- Destination aleatoire dans un rayon de 6 tiles
-                    local nx = npc:getX() + ZombRand(13) - 6
-                    local ny = npc:getY() + ZombRand(13) - 6
-                    pcall(function() npc:pathToLocationF(nx, ny, npc:getZ()) end)
-                    -- Bark idle occasionnel (1 chance sur 4)
-                    if ZombRand(4) == 0 then
-                        PHNPC.sayBark(npc, "idle", 1.0, 1.0, 1.0)
+                    -- Chercher une case marchable dans un rayon de 6 tiles (5 essais max)
+                    local tx, ty = nil, nil
+                    local cell = nil
+                    pcall(function() cell = getCell() end)
+                    if cell then
+                        for _ = 1, 5 do
+                            local cx = npc:getX() + ZombRand(13) - 6
+                            local cy = npc:getY() + ZombRand(13) - 6
+                            local ok, walkable = pcall(function()
+                                local sq = cell:getGridSquare(math.floor(cx), math.floor(cy), math.floor(npc:getZ()))
+                                return sq and sq:isFree(false)
+                            end)
+                            if ok and walkable then
+                                tx, ty = cx, cy
+                                break
+                            end
+                        end
+                    end
+                    if tx then
+                        -- PHNPC_PatrolActive autorise setUseless(false) dans enforceNPC
+                        md.PHNPC_PatrolActive = 200  -- ~3s de mouvement autorise
+                        pcall(function()
+                            npc:setUseless(false)
+                            npc:pathToLocationF(tx, ty, npc:getZ())
+                        end)
+                        if ZombRand(4) == 0 then
+                            PHNPC.sayBark(npc, "idle", 1.0, 1.0, 1.0)
+                        end
                     end
                 end
             end
@@ -157,7 +223,7 @@ Events.OnGameStart.Add(function()
     PHNPC._openInventoryNPC = nil
     PHNPC._combatTimers     = {}
     PHNPC._attackCooldowns  = {}
-    print("[PHNPC] v0.0.9a pret")
+    print("[PHNPC] v0.0.9b pret")
 end)
 
-print("[PHNPC] Update v0.0.9a loaded")
+print("[PHNPC] Update v0.0.9b loaded")

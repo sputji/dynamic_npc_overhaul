@@ -1,5 +1,32 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9b] — 2026-05-24
+
+### Corrections
+
+- **Anti-sticking NPC** : si le NPC est à moins de `REPEL_DISTANCE (1.5)` tuile du joueur, vecteur répulsif appliqué → `pathToLocationF` à 2.5 tuiles (+ jitter ±0.3) pour éviter la superposition.
+- **Portes et blocages** : `checkAndOpenDoors(npc)` scrute 4 directions (sq + voisins), ouvre `IsoDoor` et `IsoThumpable:isDoor()` non-barricadées/verrouillées. `handleStuck(npc)` détecte l'immobilité sur 30 ticks et cherche une direction libre.
+- **Animations bras tendus zombie** : `setVariable("PHNPC_IsNPC", true)` et `setWalkType("Walk")` déplacés **après tous les `changeState()`** dans `enforceNPC` (step 10). Supprime le reset de variables par `ZombieIdleState`.
+- **Patrouille non-recrutés bloquée** : `setUseless(true)` empêchait le pathfinding. Fix via flag `PHNPC_PatrolActive` (entier countdown décrémenté par enforceNPC) — bypass `setUseless` pendant ~3 s.
+- **Distances de suivi ajustées** : `FOLLOW_DISTANCE=6`, `FOLLOW_STOP_DISTANCE=2`, `FOLLOW_TARGET_DIST=2.5` (nouvelles constantes).
+
+### Nouvelles fonctionnalités
+
+- **Ordre "Va là-bas"** : clic sur une tuile via curseur ISBuildingObject (tuile verte/rouge vanilla). Menu contextuel > Ordres > "Va la-bas..." Active `PHNPC.enterGoToMode(npc)`.
+- **`PHNPC.goToLocation(npc, x, y, z)`** : pose l'état `"goingto"`, bark `UI_PHNPC_BarkGoTo`, recalcul pathfind toutes les 20 ticks, bark d'arrivée `UI_PHNPC_BarkArrived` à 1.5 tuiles.
+- **Nouvelles clés de traduction** : `UI_PHNPC_BarkGoTo`, `UI_PHNPC_BarkArrived`, `UI_PHNPC_OrderGoTo` (EN + FR).
+
+### Fichiers modifiés
+- `shared/PHNPC_Core.lua` : version + constantes FOLLOW/REPEL
+- `client/PHNPC_Actions.lua` : `startFollowing` (jitter), `checkAndOpenDoors`, `handleStuck`
+- `client/PHNPC_Enforce.lua` : step 10 AnimSet, `PHNPC_PatrolActive` countdown
+- `client/PHNPC_Update.lua` : anti-sticking, état `"goingto"`, patrouille améliorée
+- `client/PHNPC_Orders.lua` : `PHGoToCursor`, `enterGoToMode`, `goToLocation`
+- `client/PHNPC_Menu.lua` : option "Va la-bas..." dans sous-menu Ordres
+- `shared/Translate/EN/UI.json` + `shared/Translate/FR/UI.json` : 3 nouvelles clés
+
+---
+
 ## [0.0.9a] — 2026-05-22
 
 ### Corrections
