@@ -1,5 +1,26 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9e] — 2026-05-23
+
+### Corrections de bugs critiques
+
+- **CRASH `PHNPC_Log.lua` ligne 99 : `__add not defined for operands in Add`**
+  - **Cause confirmée** : En Kahlua B42, `Events.OnTick.Add(callback)` passe le numéro de tick (objet Java `Long`) en registre 0 de la callback. La variable locale `_logFlushTick` (upvalue de closure) pouvait se retrouver écrasée par cet argument Java, rendant l'opération `_logFlushTick + 1` invalide (`Long + Number → __add not defined`).
+  - **Fix** : `_logFlushTick` et `_logBuffer` sont maintenant stockés comme champs `PHNPC.Log._flushTick` / `PHNPC.Log._buffer` dans la table globale (pas des upvalues de closure). L'accès via `PHNPC.Log._flushTick` n'est pas un registre local → pas de pollution par l'argument Java.
+  - L'incrémentation utilise `(type(PHNPC.Log._flushTick) == "number" and PHNPC.Log._flushTick or 0) + 1` pour protection supplémentaire.
+  - L'ensemble du handler `Events.OnTick` est wrappé dans `pcall`.
+
+- **NPC tourne en rond / s'accroche au joueur**
+  - **Cause** : `startFollowing` (v0.0.9d) utilisait `pathToLocationF(px, py, pz)` — l'engine calcule un chemin vers une **position fixe**. Quand le joueur bouge entre deux ticks, la destination devenait invalide → le NPC recalculait en permanence et pivotait sur place.
+  - **Fix** : `startFollowing` utilise maintenant `npc:pathToCharacter(player)` — méthode standard `IsoZombie→IsoCharacter` qui suit dynamiquement un personnage en mouvement. Confirmé par NPC_Helper_Mod B42.18 (`GCUpdateAI.lua` ligne 74, `GCCoreActions.lua`).
+  - Nos NPCs sont des `IsoZombie` convertis, pas des `IsoPlayer` → pas de risque de `ClassCastException`.
+
+- **Désynchronisation nom NPC / items d'inventaire (badge "Trent Keen" ≠ NPC "Luc")**
+  - **Cause** : L'outfit `Police` de PZ génère des items de badge avec des noms de personnages PZ prédéfinis (ex: "Officer Badge - Trent Keen") qui ne correspondent pas au nom aléatoire du NPC.
+  - **Fix** : Dans `PHNPC_Stats.lua::initInventory`, après l'ajout des items, tous les items dont le `FullType` contient `Badge`, `Officer`, `IDCard` ou `Wallet` sont renommés via `item:setCustomName(npcName)` pour afficher le nom du NPC.
+
+---
+
 ## [0.0.9d] — 2026-05-22
 
 ### Corrections de bugs

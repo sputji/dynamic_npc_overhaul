@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Log.lua  v0.0.9d  (client)
+    PHNPC_Log.lua  v0.0.9e  (client)
     Systeme de logging centralise pour PH_DynamicNPCOverhaul.
 
     USAGE (depuis n'importe quel module PHNPC) :
@@ -26,9 +26,11 @@
 PHNPC.Log.LEVEL = 0
 
 -- Buffer d'ecriture fichier (vide toutes les ~5 secondes)
-local _logBuffer    = {}
-local _logFlushTick = 0
-local _logSession   = tostring(os.time and os.time() or 0)
+-- IMPORTANT v0.0.9e : stockes dans PHNPC.Log (table globale) et NON pas en variables
+-- locales (upvalues de closure). En Kahlua B42, Events.OnTick passe un arg Java Long
+-- en registre 0 de la callback, ce qui ecrase les upvalues locales => __add crash.
+PHNPC.Log._buffer    = PHNPC.Log._buffer    or {}
+PHNPC.Log._flushTick = PHNPC.Log._flushTick or 0
 
 -- ============================================================
 -- Formatage d'une ligne de log
@@ -52,10 +54,10 @@ end
 local LEVEL_INT = { DEBUG=0, INFO=1, WARN=2, ERROR=3 }
 
 local function _log(level, module, msg)
-    if (LEVEL_INT[level] or 0) < PHNPC.Log.LEVEL then return end
+    if (LEVEL_INT[level] or 0) < (type(PHNPC.Log.LEVEL) == "number" and PHNPC.Log.LEVEL or 0) then return end
     local line = _formatLine(level, module, msg)
     print(line)
-    table.insert(_logBuffer, line)
+    pcall(function() table.insert(PHNPC.Log._buffer, line) end)
 end
 
 -- ============================================================
@@ -96,15 +98,18 @@ end
 -- Flush du buffer vers fichier toutes les ~5 secondes
 -- ============================================================
 Events.OnTick.Add(function()
-    _logFlushTick = _logFlushTick + 1
-    if _logFlushTick < 300 then return end
-    _logFlushTick = 0
-    if #_logBuffer == 0 then return end
-
-    local toWrite = _logBuffer
-    _logBuffer = {}
-
+    -- v0.0.9e : guard type obligatoire — Kahlua B42 peut passer un Long Java
+    -- en arg 0 de la callback et corrompre les upvalues locales.
+    -- Utiliser PHNPC.Log._flushTick (champ de table) evite le probleme.
     pcall(function()
+        PHNPC.Log._flushTick = (type(PHNPC.Log._flushTick) == "number" and PHNPC.Log._flushTick or 0) + 1
+        if PHNPC.Log._flushTick < 300 then return end
+        PHNPC.Log._flushTick = 0
+        if not PHNPC.Log._buffer or #PHNPC.Log._buffer == 0 then return end
+
+        local toWrite = PHNPC.Log._buffer
+        PHNPC.Log._buffer = {}
+
         local writer = getFileWriter("PHNPC_Debug.log", true, false)
         if writer then
             for _, line in ipairs(toWrite) do
@@ -117,12 +122,12 @@ end)
 
 -- Flush final a la fermeture du jeu
 Events.OnGameEnd.Add(function()
-    if #_logBuffer == 0 then return end
     pcall(function()
+        if not PHNPC.Log._buffer or #PHNPC.Log._buffer == 0 then return end
         local writer = getFileWriter("PHNPC_Debug.log", true, false)
         if writer then
             writer:write("[PHNPC][INF][Log] === Session terminee ===\n")
-            for _, line in ipairs(_logBuffer) do
+            for _, line in ipairs(PHNPC.Log._buffer) do
                 writer:write(line .. "\n")
             end
             writer:close()
@@ -132,4 +137,4 @@ Events.OnGameEnd.Add(function()
 end)
 
 PHNPC.Log.info("Log", "=== PHNPC_Log v0.0.9d initialise (LEVEL=" .. tostring(PHNPC.Log.LEVEL) .. ") ===")
-print("[PHNPC] Log v0.0.9d loaded")
+print("[PHNPC] Log v0.0.9e loaded")

@@ -1,14 +1,15 @@
 --[[
-    PHNPC_Actions.lua  v0.0.9d  (client)
+    PHNPC_Actions.lua  v0.0.9e  (client)
     Helpers de deplacement NPC : startFollowing / startMovingTo / stopMoving
     + findNearestZombie + checkAndOpenDoors + handleStuck
 
+    v0.0.9e :
+      - startFollowing utilise pathToCharacter(player) — standard IsoZombie→IsoCharacter
+        confirme par NPC_Helper_Mod B42.18 (GCUpdateAI.lua + GCCoreActions.lua).
+        pathToLocationF ciblait une position FIXE => NPC recalculait vers un point change
+        a chaque tick => tournait en boucle. pathToCharacter suit dynamiquement l'IsoPlayer.
     v0.0.9d :
-      - startFollowing utilise pathToLocationF vers la POSITION EXACTE du joueur.
-        Suppression de l'offset FOLLOW_TARGET_DIST qui causait la rotation :
-        le point cible changeait a chaque tick car le joueur bougeait => NPC tournait.
-        FIX : aller vers (px, py), s'arreter via FOLLOW_STOP_DISTANCE dans Update.lua.
-        Le recalcul n'a lieu QUE si le joueur s'est deplace de FOLLOW_MOVE_THRESHOLD.
+      - pathToLocationF (remplace en v0.0.9e)
     v0.0.9b :
       - checkAndOpenDoors + handleStuck (GCUpdateStuck.lua pattern B42.18)
 
@@ -31,10 +32,13 @@ PHNPC._openInventoryNPC = nil                            -- NPC dont l'inventair
 -- ============================================================
 
 -- startFollowing : faire suivre le NPC vers le joueur
--- v0.0.9d FIX ROTATION : pathToLocationF vers la position EXACTE du joueur.
--- L'arret est gere dans Update.lua (dist <= FOLLOW_STOP_DISTANCE => stopMoving).
--- Ne PAS calculer d'offset : c'etait la cause de la rotation (point cible changeait
--- a chaque tick car le joueur bougeait => NPC zigzaguait en tournant).
+-- v0.0.9e FIX : pathToCharacter(player) — methode standard IsoZombie→IsoCharacter.
+-- Confirme par NPC_Helper_Mod B42.18 (GCUpdateAI.lua ligne 74 + GCUpdate_ORIGINAL.lua).
+-- pathToLocationF ciblait une position FIXE => le NPC recalculait vers un point deplace
+-- a chaque tick => tournait/zigzaguait. pathToCharacter suit l'IsoPlayer dynamiquement.
+-- IMPORTANT : nos NPCs sont des IsoZombie converts, PAS des IsoPlayer => OK pour
+--             pathToCharacter (le crash IsoPlayer/IsoZombie ne concerne que les NPCs
+--             crees comme IsoPlayer, cf. user memory).
 function PHNPC.startFollowing(npc, player)
     local md = npc:getModData()
     npc:setUseless(false)
@@ -42,10 +46,8 @@ function PHNPC.startFollowing(npc, player)
         md.PHNPC_Moving = true
         pcall(function() npc:setBumpType("IdleToWalk") end)
     end
-    -- Cible : position actuelle du joueur
-    local px, py, pz = player:getX(), player:getY(), player:getZ()
-    pcall(function() npc:pathToLocationF(px, py, pz) end)
-    PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> pathTo player (" .. string.format("%.1f,%.1f", px, py) .. ")")
+    pcall(function() npc:pathToCharacter(player) end)
+    PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> pathToCharacter(player)")
 end
 
 -- startMovingTo : deplacer le NPC vers des coordonnees

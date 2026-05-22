@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.9d-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.9e-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -249,6 +249,8 @@ Historique complet des modifications : **[Docs/B42/CHANGELOG.md](https://github.
 
 | Version | Résumé |
 |---------|--------|
+| [v0.0.9e](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009e----2026-05-23) | Fix crash Log (Kahlua upvalue), fix NPC tourne (`pathToCharacter`), fix sync nom NPC/badges |
+| [v0.0.9d](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009d----2026-05-22) | Nouveaux états (free/shelter/attacking), refonte ordres, logging centralisé |
 | [v0.0.9a](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009a----2026-05-22) | Fix StaggerBack NPC, traductions JSON B42.18, tous dialogues via `getText()` |
 | [v0.0.9](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009----2026-05-22) | Refacto 9 modules, fix proximité, fix `getText()` timing, fix anim coupée |
 | [v0.0.8b](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#008b----2026-05-21) | Fix `pathToCharacter`, fix `setHealth` conditionnel |

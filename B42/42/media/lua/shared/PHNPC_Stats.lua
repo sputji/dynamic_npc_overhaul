@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Stats.lua  v0.1  (shared)
+    PHNPC_Stats.lua  v0.0.9e  (shared)
     Initialisation des stats et de l'inventaire par metier
     Project Humain : Dynamic NPC Overhaul
 
@@ -45,6 +45,7 @@ end
 function PHNPC.initInventory(zombie, outfit)
     if not zombie then return end
     local stats = PHNPC.getOutfitStats(outfit)
+    local md    = zombie:getModData()
 
     pcall(function()
         local inv = zombie:getInventory()
@@ -60,7 +61,25 @@ function PHNPC.initInventory(zombie, outfit)
                 print("[PHNPC][INV] Impossible d'ajouter " .. itemType .. " : " .. tostring(err))
             end
         end
+
+        -- v0.0.9e : Synchronisation nom NPC <-> items d'identification
+        -- Les outfits PZ (ex: "Police") incluent des badges dont le nom est
+        -- un personnage PZ predéfini ("Trent Keen", etc.) qui diffère du nom du NPC.
+        -- Solution : renommer tous les items de type Badge/Identification avec setCustomName.
+        local npcName = md.PHNPC_Name or "NPC"
+        local items = inv:getItems()
+        for i = 0, items:size() - 1 do
+            local item = items:get(i)
+            if item then
+                local ft = ""
+                pcall(function() ft = tostring(item:getFullType() or "") end)
+                -- Renommer les badges et items d'identification nommés
+                if ft:find("Badge") or ft:find("Officer") or ft:find("IDCard") or ft:find("Wallet") then
+                    pcall(function() item:setCustomName(npcName) end)
+                end
+            end
+        end
     end)
 end
 
-print("[PHNPC] Stats v0.0.9a loaded")
+print("[PHNPC] Stats v0.0.9e loaded")
