@@ -81,49 +81,50 @@ PHNPC.MAX_HEALTH = 100         -- PV par defaut si outfit inconnu
 -- ============================================================
 PHNPC.OUTFIT_STATS = {
     Farmer  = {
-        speed     = 0.75,
+        speed     = 0.62,
         strength  = 7,
         health    = 90,
         maxWeight = 15.0,
         items     = { "Base.Shovel", "Base.Trowel" },
     },
     Police  = {
-        speed     = 0.85,
+        speed     = 0.70,
         strength  = 8,
         health    = 110,
         maxWeight = 20.0,
-        items     = { "Base.PoliceBaton", "Base.HandTorch" },
+        -- v0.0.9f : essai Base.PoliceBaton puis Base.NightStick (nom variable selon build B42)
+        items     = { {"Base.PoliceBaton", "Base.NightStick"}, "Base.HandTorch" },
     },
     Fireman = {
-        speed     = 0.80,
+        speed     = 0.68,
         strength  = 9,
         health    = 120,
         maxWeight = 25.0,
         items     = { "Base.Axe" },
     },
     Doctor  = {
-        speed     = 0.78,
+        speed     = 0.62,
         strength  = 6,
         health    = 100,
         maxWeight = 15.0,
         items     = { "Base.BandageDirty", "Base.Painkillers" },
     },
     Ranger  = {
-        speed     = 0.90,
+        speed     = 0.75,
         strength  = 7,
         health    = 105,
         maxWeight = 18.0,
         items     = { "Base.HuntingKnife", "Base.HandTorch" },
     },
     Chef    = {
-        speed     = 0.75,
+        speed     = 0.62,
         strength  = 6,
         health    = 90,
         maxWeight = 15.0,
         items     = { "Base.KitchenKnife", "Base.CanOpener" },
     },
     Survivor = {
-        speed     = 0.80,
+        speed     = 0.65,
         strength  = 7,
         health    = 100,
         maxWeight = 18.0,
@@ -140,15 +141,19 @@ PHNPC.OUTFITS = {
 }
 
 -- ============================================================
--- NOMS ALEATOIRES
+-- NOMS ALEATOIRES (v0.0.9f : Prenom + Nom de famille complets)
 -- ============================================================
 PHNPC.NAMES_M = {
-    "Marc", "Thomas", "Pierre", "Jean", "Luc",
-    "Paul", "Alain", "Denis", "Francois", "Michel",
+    "Marc Dupont",    "Thomas Martin",  "Pierre Bernard", "Jean Durand",
+    "Luc Moreau",     "Paul Lambert",   "Alain Simon",    "Denis Leroy",
+    "Francois Garcia","Michel Roux",    "David Legrand",  "Stephane Henry",
+    "Laurent Petit",  "Nicolas Blanc",  "Patrick Renard", "Bruno Girard",
 }
 PHNPC.NAMES_F = {
-    "Marie", "Sophie", "Claire", "Anne", "Julie",
-    "Laura", "Emma", "Chloe", "Sarah", "Lucie",
+    "Marie Dupont",   "Sophie Leclerc", "Claire Fontaine","Anne Renard",
+    "Julie Vidal",    "Laura Bonnet",   "Emma Richard",   "Chloe Morin",
+    "Sarah Lambert",  "Lucie Girard",   "Isabelle Perrin","Valerie Picard",
+    "Cecile Rousseau","Nathalie Faure", "Sandrine Michel","Christine Roy",
 }
 
 function PHNPC.getRandomName(isFemale)

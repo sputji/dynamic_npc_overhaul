@@ -212,17 +212,18 @@ print("[PHNPC] Orders v0.0.9d loaded")
 -- Pattern GCCompanionPanelGoTo.lua (NPC_Helper_Mod B42.18)
 -- ============================================================
 
--- Curseur "tuile verte" de selection de destination
--- Lazy-init : ISBuildingObject peut ne pas etre pret au chargement
-local PHGoToCursor = nil
+-- v0.0.9f FIX KAHLUA UPVALUE : local PHGoToCursor et local initGoToCursor
+-- devenaient nil dans enterGoToMode (meme bug que _log dans PHNPC_Log.lua).
+-- Solution : utiliser des champs PHNPC.* au lieu de variables locales.
+PHNPC._GoToCursor = PHNPC._GoToCursor or nil
 
-local function initGoToCursor()
-    if PHGoToCursor then return true end
+PHNPC._initGoToCursor = function()
+    if PHNPC._GoToCursor then return true end
     if not ISBuildingObject then return false end
-    PHGoToCursor = ISBuildingObject:derive("PHGoToCursor")
+    PHNPC._GoToCursor = ISBuildingObject:derive("PHGoToCursor")
 
     -- Appele quand le joueur clique sur une tuile valide
-    function PHGoToCursor:create(x, y, z, north, sprite)
+    function PHNPC._GoToCursor:create(x, y, z, north, sprite)
         -- Fermer le curseur IMMEDIATEMENT (sinon il reste a l'ecran)
         pcall(function() getCell():setDrag(nil, 0) end)
         local npc = self.targetNPC
@@ -230,7 +231,7 @@ local function initGoToCursor()
         pcall(function() PHNPC.goToLocation(npc, x + 0.5, y + 0.5, z) end)
     end
 
-    function PHGoToCursor:isValid(square)
+    function PHNPC._GoToCursor:isValid(square)
         if not square then return false end
         -- Pas de pcall ici : retour direct comme NPC_Helper_Mod
         local ok, res = pcall(function()
@@ -240,7 +241,7 @@ local function initGoToCursor()
         return res and true or false
     end
 
-    function PHGoToCursor:render(x, y, z, square)
+    function PHNPC._GoToCursor:render(x, y, z, square)
         local hc
         if self:isValid(square) then
             hc = getCore():getGoodHighlitedColor()
@@ -252,7 +253,7 @@ local function initGoToCursor()
         end)
     end
 
-    function PHGoToCursor:new(character, npc)
+    function PHNPC._GoToCursor:new(character, npc)
         local o = {}
         setmetatable(o, self)
         self.__index = self
@@ -272,17 +273,19 @@ local function initGoToCursor()
 end
 
 -- Tenter l'init a la premiere occasion
-initGoToCursor()
+pcall(function() PHNPC._initGoToCursor() end)
 
 -- enterGoToMode : active le curseur de selection de tuile pour l'ordre "Va la-bas"
 function PHNPC.enterGoToMode(npc)
     local player = getPlayer()
     if not player then return end
-    if not initGoToCursor() then
+    -- v0.0.9f : utiliser PHNPC._initGoToCursor (champ table, pas upvalue locale)
+    local ok = pcall(function() PHNPC._initGoToCursor() end)
+    if not ok or not PHNPC._GoToCursor then
         print("[PHNPC][GoTo] ISBuildingObject non disponible")
         return
     end
-    local cursor = PHGoToCursor:new(player, npc)
+    local cursor = PHNPC._GoToCursor:new(player, npc)
     pcall(function() getCell():setDrag(cursor, player:getPlayerNum()) end)
     local md = npc:getModData()
     print("[PHNPC][GoTo] Curseur actif pour : " .. tostring(md.PHNPC_Name))

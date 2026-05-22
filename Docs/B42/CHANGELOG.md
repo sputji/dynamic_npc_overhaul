@@ -1,6 +1,39 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
-## [0.0.9e] — 2026-05-23
+## [0.0.9f] — 2026-05-24
+
+### Corrections de bugs
+
+- **ERRORs `Object tried to call nil in info` (et `debug`, `warn`, `error`)**
+  - **Cause** : En Kahlua B42, les `local function _log`, `local function _formatLine` et `local LEVEL_INT = {}` dans `PHNPC_Log.lua` devenaient `nil` en tant qu'upvalues de closures dans des fonctions globales `PHNPC.*` (rechargement de module, contextes d'exécution multiples).
+  - **Fix** : Toutes ces entités locales déplacées vers des champs de table `PHNPC.Log._log`, `PHNPC.Log._fmt`, `PHNPC.Log.LEVEL_INT`. Les fonctions publiques (`debug/info/warn/error`) wrappées dans `pcall`.
+
+- **Commande "Va là-bas" non fonctionnelle (NPC tourne autour du joueur)**
+  - **Cause** : `local PHGoToCursor = nil` et `local function initGoToCursor()` dans `PHNPC_Orders.lua` devenaient `nil` en upvalue (même règle Kahlua). `PHNPC.enterGoToMode` ne créait jamais le curseur → le NPC restait en état `"following"`.
+  - **Fix** : `PHNPC._GoToCursor` et `PHNPC._initGoToCursor` stockés comme champs de table. `enterGoToMode` wrappé dans `pcall` avec log de diagnostic.
+
+- **Noms NPC incomplets (un seul prénom)**
+  - `PHNPC.NAMES_M` et `PHNPC.NAMES_F` contenaient uniquement des prénoms.
+  - **Fix** : Listes mises à jour avec 16 entrées `"Prénom Nom"` dans `PHNPC_Core.lua`.
+  - **Bonus** : Dans `PHNPC_Convert.lua`, après le spawn de l'outfit PZ, les items `Badge`/`IDCard` du zombie sont lus pour extraire le nom natif PZ (format "AL YI" → capitalisé "Al Yi"). Utilisé en priorité si disponible, sinon fallback vers nos listes.
+
+- **Items manquants (policier sans matraque)**
+  - `Base.PoliceBaton` peut être absent ou avoir un nom différent selon la build B42.
+  - **Fix** : Dans `PHNPC_Core.lua`, les items des OUTFIT_STATS supportent maintenant des groupes alternatifs (table de types) : ex. `{ {"Base.PoliceBaton", "Base.NightStick"}, "Base.HandTorch" }`. Dans `PHNPC_Stats.lua::initInventory`, chaque groupe tente les types dans l'ordre jusqu'au premier succès. Log de diagnostic si aucun ne fonctionne.
+
+- **NPC trop rapide**
+  - `walkSpeed = stats.speed * 1.04` produisait des vitesses supérieures au joueur.
+  - **Fix** : Multiplicateurs réduits dans `PHNPC_Stats.lua` (`0.85` / `0.60` / `0.65`). Vitesses de base également réduites dans `PHNPC_Core.lua` (Police: `0.85→0.70`, Ranger: `0.90→0.75`, etc.).
+
+- **Portes non refermées après déplacement**
+  - `checkAndOpenDoors` ouvrait les portes mais ne les refermait jamais.
+  - **Fix** : Nouvelle fonction `PHNPC.closeNearbyDoors(npc)` dans `PHNPC_Actions.lua` qui referme toutes les `IsoDoor` et `IsoThumpable` ouvertes dans un rayon de 2 tuiles. Appelée automatiquement depuis `stopMoving`.
+
+- **"Mets-toi à l'abri" — NPC revient vers le joueur**
+  - `findClearAreaNear` ne cherchait pas de case à l'intérieur d'un bâtiment et testait un rayon trop faible.
+  - **Fix** : `PHNPC_Pathfind.lua` — radius par défaut `10→15`, système de score avec bonus `-50` pour les cases couvertes (`not sq:isOutside()`). Teste maintenant 12 directions au lieu de 8. Retourne toujours la case avec le meilleur score (couvert + sans zombies).
+
+
 
 ### Corrections de bugs critiques
 

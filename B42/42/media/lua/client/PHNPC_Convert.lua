@@ -118,7 +118,6 @@ function PHNPC.spawnNPC(square)
     local isFemale     = (ZombRand(2) == 0)
     local femaleChance = isFemale and 100 or 0
     local outfit       = PHNPC.OUTFITS[ZombRand(#PHNPC.OUTFITS) + 1]
-    local npcName      = PHNPC.getRandomName(isFemale)
 
     print("[PHNPC][SPAWN] " .. x .. "," .. y .. "," .. z
           .. " outfit=" .. outfit .. " female=" .. tostring(isFemale))
@@ -144,6 +143,35 @@ function PHNPC.spawnNPC(square)
         print("[PHNPC][SPAWN] Erreur : zombie nil apres spawn")
         return nil
     end
+
+    -- v0.0.9f : lire le nom depuis le badge/ID Card de l'outfit PZ
+    -- (PZ genere automatiquement un badge avec un nom type "AL YI")
+    -- Si disponible, ce nom est utilise ; sinon, fallback vers nos listes.
+    local npcName = PHNPC.getRandomName(isFemale)
+    pcall(function()
+        local inv = zombie:getInventory()
+        if not inv then return end
+        local items = inv:getItems()
+        for i = 0, items:size() - 1 do
+            local item = items:get(i)
+            if item then
+                local ft = tostring(item:getFullType() or "")
+                if ft:find("Badge") or ft:find("IDCard") or ft:find("ID_Card") then
+                    local dn = tostring(item:getDisplayName() or "")
+                    -- Format PZ : "Badge: AL YI" -> extraire "AL YI"
+                    local name = dn:match(":%s*(.+)$") or dn
+                    name = name:match("^%s*(.-)%s*$")  -- trim
+                    -- Capitaliser chaque mot : "AL YI" -> "Al Yi"
+                    if name and #name > 2 then
+                        name = name:gsub("(%a)([%a]*)",
+                            function(a, b) return a:upper()..b:lower() end)
+                        npcName = name
+                        print("[PHNPC][SPAWN] Nom badge PZ detecte : " .. name)
+                    end
+                end
+            end
+        end
+    end)
 
     PHNPC.convertToNPC(zombie, outfit, isFemale, npcName)
     return zombie

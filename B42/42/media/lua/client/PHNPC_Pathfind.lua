@@ -88,53 +88,77 @@ function PHNPC.findEscapeDirection(npc, enemy, range)
 end
 
 -- ============================================================
--- findClearAreaNear : cherche une zone avec peu de zombies
--- Utile pour la fuite vers une zone degagee
+-- findClearAreaNear : cherche une zone safe pour "Mets-toi a l'abri"
+-- v0.0.9f : cherche en priorite une case couverte (interieur batiment),
+--           a distance suffisante, avec le moins de zombies possible.
 -- ============================================================
 function PHNPC.findClearAreaNear(x, y, z, radius)
-    radius = radius or 10
+    radius = radius or 15
     local cell = getCell()
     if not cell then return nil, nil end
     z = math.floor(z or 0)
 
-    local bestX, bestY, bestScore = nil, nil, 999
-
-    -- Tester quelques directions
+    -- 12 directions testees (cardinales + diagonales + intermediaires)
     local dirs = {
-        {1,0}, {-1,0}, {0,1}, {0,-1},
-        {1,1}, {1,-1}, {-1,1}, {-1,-1}
+        {1,0},{-1,0},{0,1},{0,-1},
+        {1,1},{1,-1},{-1,1},{-1,-1},
+        {2,1},{-2,1},{1,2},{1,-2},
     }
+
+    local bestX, bestY, bestScore = nil, nil, 9999
+
     for _, d in ipairs(dirs) do
         local tx = math.floor(x + d[1] * radius)
         local ty = math.floor(y + d[2] * radius)
         local ok, sq = pcall(function() return cell:getGridSquare(tx, ty, z) end)
-        if ok and sq and sq:isFree(false) then
-            -- Compter les zombies dans un petit rayon autour de ce point
-            local count = 0
-            for dx = -3, 3 do
-                for dy = -3, 3 do
-                    local ok2, sq2 = pcall(function() return cell:getGridSquare(tx+dx, ty+dy, z) end)
-                    if ok2 and sq2 then
-                        local movObjs = sq2:getMovingObjects()
-                        if movObjs then
-                            for i = 0, movObjs:size() - 1 do
-                                local obj = movObjs:get(i)
-                                if obj and instanceof(obj, "IsoZombie") then
-                                    local md = obj:getModData()
-                                    if not md.PHNPC_IsNPC then count = count + 1 end
+        if ok and sq then
+            local walkable = false
+            pcall(function() walkable = sq:isFree(false) end)
+            if walkable then
+                -- Score : compter les zombies proches (moins = meilleur)
+                local zombieCount = 0
+                pcall(function()
+                    for dx = -3, 3 do
+                        for dy = -3, 3 do
+                            local ok2, sq2 = pcall(function()
+                                return cell:getGridSquare(tx+dx, ty+dy, z)
+                            end)
+                            if ok2 and sq2 then
+                                local movObjs = sq2:getMovingObjects()
+                                if movObjs then
+                                    for i = 0, movObjs:size() - 1 do
+                                        local obj = movObjs:get(i)
+                                        if obj and instanceof(obj, "IsoZombie") then
+                                            local md2 = obj:getModData()
+                                            if not md2.PHNPC_IsNPC then
+                                                zombieCount = zombieCount + 1
+                                            end
+                                        end
+                                    end
                                 end
                             end
                         end
                     end
+                end)
+
+                -- Bonus important si la case est couverte (a l'interieur d'un batiment)
+                local coverBonus = 0
+                pcall(function()
+                    if not sq:isOutside() then coverBonus = -50 end
+                end)
+
+                local score = zombieCount + coverBonus
+                if score < bestScore then
+                    bestScore = score
+                    bestX = tx + 0.5
+                    bestY = ty + 0.5
                 end
-            end
-            if count < bestScore then
-                bestScore = count
-                bestX, bestY = tx + 0.5, ty + 0.5
             end
         end
     end
+
+    -- Fallback : si aucune case trouvee, retourner nil (Update.lua gerera)
     return bestX, bestY
 end
 
-print("[PHNPC] Pathfind v0.0.9c loaded")
+print("[PHNPC] Pathfind v0.0.9f loaded")

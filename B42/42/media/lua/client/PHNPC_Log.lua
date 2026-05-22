@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Log.lua  v0.0.9e  (client)
+    PHNPC_Log.lua  v0.0.9f  (client)
     Systeme de logging centralise pour PH_DynamicNPCOverhaul.
 
     USAGE (depuis n'importe quel module PHNPC) :
@@ -33,54 +33,56 @@ PHNPC.Log._buffer    = PHNPC.Log._buffer    or {}
 PHNPC.Log._flushTick = PHNPC.Log._flushTick or 0
 
 -- ============================================================
--- Formatage d'une ligne de log
+-- v0.0.9f FIX KAHLUA UPVALUE : meme bug que _flushTick/_buffer en v0.0.9e.
+-- En Kahlua B42, les 'local function' dans un module deviennent nil
+-- dans les closures des fonctions globales (PHNPC.Log.*) si le module
+-- est recharge ou dans certains contextes d'execution.
+-- SOLUTION : tout dans PHNPC.Log.* (champs de table globale), jamais de local.
 -- ============================================================
-local function _formatLine(level, module, msg)
+PHNPC.Log.LEVEL_INT = { DBG=0, INF=1, WRN=2, ERR=3 }
+
+function PHNPC.Log._fmt(level, module, msg)
     local t = ""
     if getGameTime then
         pcall(function()
             local gt = getGameTime()
-            if gt then
-                t = string.format("[h%.1f]", gt:getWorldAgeHours())
-            end
+            if gt then t = string.format("[h%.1f]", gt:getWorldAgeHours()) end
         end)
     end
-    return string.format("[PHNPC][%s]%s[%s] %s", level, t, tostring(module), tostring(msg))
+    return string.format("[PHNPC][%s]%s[%s] %s",
+        tostring(level), t, tostring(module), tostring(msg))
 end
 
--- ============================================================
--- Fonction centrale d'ecriture
--- ============================================================
-local LEVEL_INT = { DEBUG=0, INFO=1, WARN=2, ERROR=3 }
-
-local function _log(level, module, msg)
-    if (LEVEL_INT[level] or 0) < (type(PHNPC.Log.LEVEL) == "number" and PHNPC.Log.LEVEL or 0) then return end
-    local line = _formatLine(level, module, msg)
-    print(line)
+function PHNPC.Log._log(level, module, msg)
+    local lvlInt = (PHNPC.Log.LEVEL_INT and PHNPC.Log.LEVEL_INT[level]) or 0
+    local minLvl = (type(PHNPC.Log.LEVEL) == "number") and PHNPC.Log.LEVEL or 0
+    if lvlInt < minLvl then return end
+    local line = ""
+    pcall(function() line = PHNPC.Log._fmt(level, module, msg) end)
+    if line == "" then
+        line = "[PHNPC]["..tostring(level).."]["
+             ..tostring(module).."]	"..tostring(msg)
+    end
+    pcall(function() print(line) end)
     pcall(function() table.insert(PHNPC.Log._buffer, line) end)
 end
 
 -- ============================================================
--- API publique
+-- API publique — wrappees dans pcall pour resister a tout contexte Kahlua
 -- ============================================================
-function PHNPC.Log.debug(module, msg) _log("DBG",  module, msg) end
-function PHNPC.Log.info (module, msg) _log("INF",  module, msg) end
-function PHNPC.Log.warn (module, msg) _log("WRN",  module, msg) end
-function PHNPC.Log.error(module, msg) _log("ERR",  module, msg) end
+function PHNPC.Log.debug(module, msg) pcall(function() PHNPC.Log._log("DBG", module, msg) end) end
+function PHNPC.Log.info (module, msg) pcall(function() PHNPC.Log._log("INF", module, msg) end) end
+function PHNPC.Log.warn (module, msg) pcall(function() PHNPC.Log._log("WRN", module, msg) end) end
+function PHNPC.Log.error(module, msg) pcall(function() PHNPC.Log._log("ERR", module, msg) end) end
 
--- Loguer une action NPC avec son nom (raccourci pratique)
 function PHNPC.Log.npc(npc, level, msg)
     local name = "?"
-    pcall(function()
-        local md = npc:getModData()
-        name = md.PHNPC_Name or "NPC"
-    end)
-    _log(level or "INF", "NPC:" .. name, msg)
+    pcall(function() name = npc:getModData().PHNPC_Name or "NPC" end)
+    pcall(function() PHNPC.Log._log(level or "INF", "NPC:"..name, msg) end)
 end
 
--- Loguer l'état d'un NPC (état, position, HP)
 function PHNPC.Log.npcState(npc)
-    if PHNPC.Log.LEVEL > 0 then return end  -- seulement en DEBUG
+    if PHNPC.Log.LEVEL > 0 then return end
     pcall(function()
         local md = npc:getModData()
         local x  = string.format("%.1f", npc:getX())
@@ -89,8 +91,9 @@ function PHNPC.Log.npcState(npc)
         local maxHp = math.floor(md.PHNPC_MaxHealth or 100)
         local state = tostring(md.PHNPC_State or "?")
         local mov   = tostring(md.PHNPC_Moving or false)
-        _log("DBG", "NPC:" .. tostring(md.PHNPC_Name or "?"),
-            string.format("pos=(%s,%s) hp=%d/%d state=%s moving=%s", x, y, hp, maxHp, state, mov))
+        PHNPC.Log._log("DBG", "NPC:"..tostring(md.PHNPC_Name or "?"),
+            string.format("pos=(%s,%s) hp=%d/%d state=%s moving=%s",
+                x, y, hp, maxHp, state, mov))
     end)
 end
 
@@ -133,8 +136,7 @@ Events.OnGameEnd.Add(function()
             writer:close()
         end
     end)
-    _logBuffer = {}
 end)
 
-PHNPC.Log.info("Log", "=== PHNPC_Log v0.0.9d initialise (LEVEL=" .. tostring(PHNPC.Log.LEVEL) .. ") ===")
-print("[PHNPC] Log v0.0.9e loaded")
+PHNPC.Log.info("Log", "=== PHNPC_Log v0.0.9f initialise (LEVEL=" .. tostring(PHNPC.Log.LEVEL) .. ") ===")
+print("[PHNPC] Log v0.0.9f loaded")

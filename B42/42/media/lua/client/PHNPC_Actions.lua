@@ -71,6 +71,55 @@ function PHNPC.stopMoving(npc)
         pcall(function() npc:setBumpType("WalkToIdle") end)
         pcall(function() npc:setTarget(nil) end)
         pcall(function() npc:clearAggroList() end)
+        -- v0.0.9f : refermer les portes proches apres arret du NPC
+        pcall(function() PHNPC.closeNearbyDoors(npc) end)
+    end
+end
+
+-- ============================================================
+-- FERMETURE DES PORTES (v0.0.9f)
+-- Referme toutes les portes ouvertes dans un rayon de 2 tuiles.
+-- Appele automatiquement depuis stopMoving.
+-- ============================================================
+function PHNPC.closeNearbyDoors(npc)
+    local cell = npc:getCell()
+    if not cell then return end
+    local nx = math.floor(npc:getX())
+    local ny = math.floor(npc:getY())
+    local nz = math.floor(npc:getZ())
+    local dirs = {{0,-1},{0,1},{1,0},{-1,0},{0,0},{1,1},{1,-1},{-1,1},{-1,-1}}
+    for _, off in ipairs(dirs) do
+        pcall(function()
+            local sq = cell:getGridSquare(nx + off[1], ny + off[2], nz)
+            if not sq then return end
+            local objects = sq:getObjects()
+            if objects then
+                for i = 0, objects:size() - 1 do
+                    local obj = objects:get(i)
+                    if obj and instanceof(obj, "IsoDoor") then
+                        local isOpen = false
+                        pcall(function() isOpen = obj:IsOpen() end)
+                        if isOpen then
+                            pcall(function() obj:ToggleDoor(npc) end)
+                        end
+                    end
+                end
+            end
+            local specials = sq:getSpecialObjects()
+            if specials then
+                for i = 0, specials:size() - 1 do
+                    local obj = specials:get(i)
+                    if obj and instanceof(obj, "IsoThumpable") then
+                        local isDoor, isOpen = false, false
+                        pcall(function() isDoor = obj:isDoor() end)
+                        pcall(function() isOpen = obj:IsOpen() end)
+                        if isDoor and isOpen then
+                            pcall(function() obj:ToggleDoor(npc) end)
+                        end
+                    end
+                end
+            end
+        end)
     end
 end
 
