@@ -1,16 +1,17 @@
 --[[
-    PHNPC_Actions.lua  v0.0.9b  (client)
+    PHNPC_Actions.lua  v0.0.9d  (client)
     Helpers de deplacement NPC : startFollowing / startMovingTo / stopMoving
     + findNearestZombie + checkAndOpenDoors + handleStuck
 
+    v0.0.9d :
+      - startFollowing utilise pathToLocationF vers la POSITION EXACTE du joueur.
+        Suppression de l'offset FOLLOW_TARGET_DIST qui causait la rotation :
+        le point cible changeait a chaque tick car le joueur bougeait => NPC tournait.
+        FIX : aller vers (px, py), s'arreter via FOLLOW_STOP_DISTANCE dans Update.lua.
+        Le recalcul n'a lieu QUE si le joueur s'est deplace de FOLLOW_MOVE_THRESHOLD.
     v0.0.9b :
-      - startFollowing utilise FOLLOW_TARGET_DIST (2.5 tiles) avec jitter ±0.3
-        pour eviter que le NPC stagne exactement sur la meme case
-      - checkAndOpenDoors : ouvre portes/IsoThumpable-isDoor dans les 4 directions
-        adjacentes quand le NPC est en mouvement (pattern GCUpdateStuck.lua B42.18)
-      - handleStuck : detecte blocage position et tente ouverture porte / direction libre
+      - checkAndOpenDoors + handleStuck (GCUpdateStuck.lua pattern B42.18)
 
-    Pattern : NHM GCCoreActions.lua + GCUpdateStuck.lua
     Necessite : PHNPC_Core.lua (shared) charge avant ce fichier.
 ]]
 
@@ -30,8 +31,10 @@ PHNPC._openInventoryNPC = nil                            -- NPC dont l'inventair
 -- ============================================================
 
 -- startFollowing : faire suivre le NPC vers le joueur
--- FIX PROXIMITY : cible a FOLLOW_TARGET_DIST (2.5) avec jitter ±0.3 tiles
--- Le jitter empeche le NPC de bloquer toujours sur la meme case
+-- v0.0.9d FIX ROTATION : pathToLocationF vers la position EXACTE du joueur.
+-- L'arret est gere dans Update.lua (dist <= FOLLOW_STOP_DISTANCE => stopMoving).
+-- Ne PAS calculer d'offset : c'etait la cause de la rotation (point cible changeait
+-- a chaque tick car le joueur bougeait => NPC zigzaguait en tournant).
 function PHNPC.startFollowing(npc, player)
     local md = npc:getModData()
     npc:setUseless(false)
@@ -39,19 +42,10 @@ function PHNPC.startFollowing(npc, player)
         md.PHNPC_Moving = true
         pcall(function() npc:setBumpType("IdleToWalk") end)
     end
+    -- Cible : position actuelle du joueur
     local px, py, pz = player:getX(), player:getY(), player:getZ()
-    local dx = px - npc:getX()
-    local dy = py - npc:getY()
-    local d  = math.sqrt(dx * dx + dy * dy)
-    local targetDist = PHNPC.FOLLOW_TARGET_DIST or 2.5
-    if d > targetDist then
-        -- Point cible : targetDist tiles depuis joueur vers NPC + jitter discret
-        local jx = (ZombRand(7) - 3) * 0.1   -- ±0.3 tiles
-        local jy = (ZombRand(7) - 3) * 0.1
-        local tx = px - (dx / d) * targetDist + jx
-        local ty = py - (dy / d) * targetDist + jy
-        pcall(function() npc:pathToLocationF(tx, ty, pz) end)
-    end
+    pcall(function() npc:pathToLocationF(px, py, pz) end)
+    PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> pathTo player (" .. string.format("%.1f,%.1f", px, py) .. ")")
 end
 
 -- startMovingTo : deplacer le NPC vers des coordonnees

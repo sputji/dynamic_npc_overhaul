@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.9a-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.9d-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -103,54 +103,51 @@ Créer le dossier `PH_DynamicNPCOverhaul` dans :
 C:\Users\<VOTRE_NOM>\Zomboid\mods\
 ```
 
-Puis copier le contenu de **`B42/42/`** ET **`B42/common/`** dans ce dossier.
+Puis copier le contenu de **`B42/42/`** ET **`B42/common/`** dans ce dossier **en conservant la structure de sous-dossiers**.
+
+> ⚠️ **Structure obligatoire** : `mod.info` doit être dans le sous-dossier `42/`, pas à la racine.
 
 Résultat attendu :
 
 ```
 C:\Users\<VOTRE_NOM>\Zomboid\mods\PH_DynamicNPCOverhaul\
-├── mod.info
-├── icon.png
-├── poster.png
-├── media\lua\
-│   ├── client\
-│   │   ├── PHNPC_Actions.lua
-│   │   ├── PHNPC_Barks.lua
-│   │   ├── PHNPC_Combat.lua
-│   │   ├── PHNPC_Convert.lua
-│   │   ├── PHNPC_Debug.lua
-│   │   ├── PHNPC_Enforce.lua
-│   │   ├── PHNPC_Health.lua
-│   │   ├── PHNPC_Inventory.lua
-│   │   ├── PHNPC_Manager.lua
-│   │   ├── PHNPC_Menu.lua
-│   │   ├── PHNPC_Orders.lua
-│   │   └── PHNPC_Update.lua
-│   └── shared\
-│       ├── PHNPC_Core.lua
-│       ├── PHNPC_Stats.lua
-│       └── Translate\
-│           ├── EN\
-│           │   ├── UI_PHNPC_EN.txt
-│           │   └── UI.json
-│           └── FR\
-│               ├── UI_PHNPC_FR.txt
-│               └── UI.json
-├── media\textures\
-│   ├── NPC_Icon.png
-│   ├── NPC_base.png
-│   └── ... (58 icônes NPC)
+├── 42\                              ← OBLIGATOIRE (B42 exige ce dossier)
+│   ├── mod.info
+│   ├── icon.png
+│   ├── poster.png
+│   └── media\lua\
+│       ├── client\
+│       │   ├── PHNPC_Actions.lua
+│       │   ├── PHNPC_Barks.lua
+│       │   ├── PHNPC_Combat.lua
+│       │   ├── PHNPC_Convert.lua
+│       │   ├── PHNPC_Danger.lua
+│       │   ├── PHNPC_Debug.lua
+│       │   ├── PHNPC_Enforce.lua
+│       │   ├── PHNPC_Health.lua
+│       │   ├── PHNPC_Inventory.lua
+│       │   ├── PHNPC_Log.lua
+│       │   ├── PHNPC_Manager.lua
+│       │   ├── PHNPC_Menu.lua
+│       │   ├── PHNPC_Orders.lua
+│       │   ├── PHNPC_Pathfind.lua
+│       │   └── PHNPC_Update.lua
+│       └── shared\
+│           ├── PHNPC_Core.lua
+│           ├── PHNPC_Stats.lua
+│           └── Translate\
+│               ├── EN\
+│               │   ├── UI_PHNPC_EN.txt
+│               │   └── UI.json
+│               └── FR\
+│                   ├── UI_PHNPC_FR.txt
+│                   └── UI.json
 └── common\media\
     ├── AnimSets\zombie\
-    │   ├── attack\, bumped\, idle\, lunge\, pathfind\, staggerback\, ...
-    ├── anims_X\Zombie\
-    │   ├── Bob_FrontKick.X
-    │   ├── Bob_HighKick.x
-    │   └── Bob_PushKick.X
-    └── sandbox-options.txt
+    │   └── (jeux d'animations conditionnels)
+    └── anims_X\Zombie\
+        └── (animations Bob/Kate custom)
 ```
-
-> ⚠️ Ne pas copier le dossier `B42/` entier — copier séparément le contenu de `B42/42/` et `B42/common/`.
 
 **3 — Activer le mod**
 

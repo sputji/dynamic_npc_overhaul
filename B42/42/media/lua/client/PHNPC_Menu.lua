@@ -1,6 +1,12 @@
 --[[
-    PHNPC_Menu.lua  v0.0.9c (client)
+    PHNPC_Menu.lua  v0.0.9d (client)
     Menu contextuel clic-droit pour les NPCs et callbacks de debug inline.
+
+    v0.0.9d : refonte complete des ordres
+      - "Attaque les zombies" -> attackOrderNPC (avec retour position)
+      - "Mets-toi a l'abri" -> shelterNPC (cherche zone safe)
+      - "Tu peux partir" -> freeNPC (libre mais dans l'equipe)
+      - "Quitte mon equipe" -> quitTeamNPC (retire definitif)
 
     Pattern : NHM GCMenuContext.onFillWorldObjectContextMenu
     Necessite :
@@ -8,8 +14,9 @@
       PHNPC_Barks.lua    (PHNPC.sayBark)
       PHNPC_Convert.lua  (PHNPC.spawnNPC)
       PHNPC_Inventory.lua (PHNPC.openNPCInventory)
-      PHNPC_Orders.lua   (PHNPC.recruitNPC, followNPC, stayNPC, dismissNPC,
-                           deleteNPC, orderAttackNPC, orderFleeNPC, toggleCombatNPC)
+      PHNPC_Orders.lua   (PHNPC.recruitNPC, followNPC, stayNPC,
+                           attackOrderNPC, shelterNPC, freeNPC,
+                           quitTeamNPC, deleteNPC, toggleCombatNPC)
       PHNPC_Core.lua     (PHNPC.isNPC, PHNPC.INTERACTION_DIST)
 ]]
 
@@ -156,11 +163,12 @@ local function onFillContextMenu(playerIndex, context, worldObjects, test)
                 ordreSub:addOption("Suis-moi !",             npc, PHNPC.followNPC)
             end
             ordreSub:addOption("Va la-bas...",               npc, PHNPC.enterGoToMode)
-            ordreSub:addOption("Attaque les zombies !",      npc, PHNPC.orderAttackNPC)
-            ordreSub:addOption("Mets-toi a l'abri !",        npc, PHNPC.orderFleeNPC)
+            ordreSub:addOption("Attaque les zombies !",      npc, PHNPC.attackOrderNPC)
+            ordreSub:addOption("Mets-toi a l'abri !",        npc, PHNPC.shelterNPC)
             local combatLabel = "Mode combat : " .. (md.PHNPC_CombatMode == "off" and "OFF" or "AUTO")
             ordreSub:addOption(combatLabel,                  npc, PHNPC.toggleCombatNPC)
-            ordreSub:addOption("Tu peux partir.",            npc, PHNPC.dismissNPC)
+            ordreSub:addOption("Tu peux partir.",            npc, PHNPC.freeNPC)
+            ordreSub:addOption("Quitte mon equipe.",         npc, PHNPC.quitTeamNPC)
         end
 
         -- Section debug (uniquement si mode debug PZ)
@@ -193,4 +201,4 @@ end
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] Menu v0.0.9c loaded")
+print("[PHNPC] Menu v0.0.9d loaded")

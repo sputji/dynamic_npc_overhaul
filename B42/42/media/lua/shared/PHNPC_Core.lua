@@ -1,25 +1,52 @@
 --[[
-    PHNPC_Core.lua  v0.0.9c  (shared)
+    PHNPC_Core.lua  v0.0.9d  (shared)
     Etat global + constantes + stats par metier
     Project Humain : Dynamic NPC Overhaul
     Pattern: NPC_Helper_Mod GCCore.lua
-    v0.0.9c : suppression REPEL_DISTANCE (tournait autour joueur),
-              ajout AGGRO_RANGE / NOISE_RADIUS / DANGER_TICK_RATE,
-              ajout FLEE_ESCAPE_TRIES pour fuite multidirectionnelle
+    v0.0.9d : ajout PHNPC.Log minimal (etendu par PHNPC_Log.lua),
+              nouvelles constantes comportement (STAY_RADIUS, etc.),
+              suppression FOLLOW_TARGET_DIST (offset causait la rotation)
+    v0.0.9c : suppression REPEL_DISTANCE, ajout DANGER constants
 ]]
 
 PHNPC = PHNPC or {}
 PHNPC.allNPCs   = PHNPC.allNPCs or {}   -- [npcRef] = true  (tous les NPCs actifs)
-PHNPC.recruited = PHNPC.recruited or {}  -- [npcRef] = true  (recrutes : following ou staying)
+PHNPC.recruited = PHNPC.recruited or {}  -- [npcRef] = true  (recrutes)
+
+-- ============================================================
+-- LOGGING MINIMAL (etendu par client/PHNPC_Log.lua)
+-- Disponible des le chargement de Core (shared, premier fichier charge)
+-- ============================================================
+PHNPC.Log = {
+    LEVEL = 0,  -- 0=DEBUG 1=INFO 2=WARN 3=ERROR (remplace par PHNPC_Log.lua)
+    debug = function(m, s) print("[PHNPC][DBG]["..tostring(m).."] "..tostring(s)) end,
+    info  = function(m, s) print("[PHNPC][INF]["..tostring(m).."] "..tostring(s)) end,
+    warn  = function(m, s) print("[PHNPC][WRN]["..tostring(m).."] "..tostring(s)) end,
+    error = function(m, s) print("[PHNPC][ERR]["..tostring(m).."] "..tostring(s)) end,
+    npc   = function(n, l, s)
+        local nm = "?"
+        pcall(function() nm = n:getModData().PHNPC_Name or "NPC" end)
+        print("[PHNPC]["..tostring(l or "INF").."][NPC:"..nm.."] "..tostring(s))
+    end,
+    npcState = function(_) end,  -- stub, active par PHNPC_Log.lua
+}
 
 -- ============================================================
 -- CONFIG IA
 -- ============================================================
-PHNPC.FOLLOW_DISTANCE      = 6    -- tiles : redemarrer le suivi si le joueur est plus loin que ca
-PHNPC.FOLLOW_STOP_DISTANCE = 2    -- tiles : s'arreter a cette distance du joueur (pas sur sa case)
-PHNPC.FOLLOW_TARGET_DIST   = 2.5  -- tiles : point cible du pathfind (offset derriere le joueur)
-PHNPC.FOLLOW_TICK_RATE  = 20   -- ticks entre deux appels pathToLocationF
-PHNPC.INTERACTION_DIST  = 3    -- tiles : rayon clic droit pour interagir
+PHNPC.FOLLOW_DISTANCE      = 6    -- tiles : redemarrer le suivi si joueur plus loin que ca
+PHNPC.FOLLOW_STOP_DISTANCE = 2    -- tiles : s'arreter a cette distance du joueur
+PHNPC.FOLLOW_MOVE_THRESHOLD = 2   -- tiles : seuil de deplacement joueur pour recalculer pathfind
+PHNPC.FOLLOW_TICK_RATE     = 20   -- ticks entre deux recalculs pathfind (si joueur bouge)
+PHNPC.INTERACTION_DIST     = 3    -- tiles : rayon clic droit pour interagir
+
+-- ============================================================
+-- COMPORTEMENT ZONE (staying / free / shelter)
+-- ============================================================
+PHNPC.STAY_RADIUS          = 5    -- tiles : rayon de la zone "Reste ici" / arrivee "Va la-bas"
+PHNPC.PATROL_RADIUS        = 3    -- tiles : rayon d'exploration libre dans la zone
+PHNPC.FREE_WANDER_DIST     = 10   -- tiles : distance max d'errance en etat "free"
+PHNPC.ZONE_PATROL_TICKS    = 200  -- ticks entre deux mouvements de patrouille dans la zone
 
 -- ============================================================
 -- COMBAT IA (GCCombatAI.lua pattern NPC_Helper_Mod)

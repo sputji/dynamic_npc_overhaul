@@ -1,4 +1,4 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.9c
+# Architecture B42 — Dynamic NPC Overhaul v0.0.9d
 
 ## Structure des fichiers
 
@@ -6,7 +6,7 @@
 B42/
 ├── 42/media/lua/
 │   ├── shared/
-│   │   ├── PHNPC_Core.lua       # Namespace PHNPC, constantes, OUTFIT_STATS, helpers
+│   │   ├── PHNPC_Core.lua       # Namespace PHNPC, constantes, OUTFIT_STATS, PHNPC.Log stub
 │   │   ├── PHNPC_Stats.lua      # initStats() + initInventory() par metier
 │   │   └── Translate/
 │   │       ├── EN/UI_PHNPC_EN.txt   # Traductions EN (format .txt, pré-B42.18)
@@ -15,6 +15,7 @@ B42/
 │   │       └── FR/UI.json           # Traductions FR (format JSON, B42.18+)
 │   └── client/
 │       ├── PHNPC_Actions.lua    # Déplacement NPC (startMovingTo, stopMoving, startFollowing)
+│       │                        # v0.0.9d : startFollowing vers pos exacte joueur (fix rotation)
 │       ├── PHNPC_Barks.lua      # Barks auto (BARK_KEYS, getRandomBark, sayBark)
 │       ├── PHNPC_Combat.lua     # Combat auto vs zombies (npcCombatStep, npcFlightStep)
 │       │                        # v0.0.9c : armes inventaire + NoiseTimer
@@ -25,56 +26,43 @@ B42/
 │       ├── PHNPC_Enforce.lua    # OnZombieUpdate + barks auto toutes 500 ticks
 │       ├── PHNPC_Health.lua     # OnHitZombie → dégâts → mort NPC
 │       ├── PHNPC_Inventory.lua  # Inventaire NPC (openNPCInventory)
+│       ├── PHNPC_Log.lua        # Logging centralisé (niveaux + écriture fichier)
+│       │                        # NEW v0.0.9d : PHNPC.Log.debug/info/warn/error, flush 300 ticks
 │       ├── PHNPC_Manager.lua    # Spawn + registres (allNPCs, recruited, spawnNPC)
 │       ├── PHNPC_Menu.lua       # Menu contextuel clic-droit
-│       ├── PHNPC_Orders.lua     # Ordres joueur (recruit, follow, stay, dismiss, combat…)
-│       │                        # v0.0.9c : fix curseur GoTo (isValid + setDrag)
+│       │                        # v0.0.9d : ordres mis à jour (shelter/free/quitTeam)
+│       ├── PHNPC_Orders.lua     # Ordres joueur (recruit, follow, stay, attack, shelter…)
+│       │                        # v0.0.9d : attackOrderNPC, shelterNPC, freeNPC, quitTeamNPC
 │       ├── PHNPC_Pathfind.lua   # Utilitaires pathfinding
 │       │                        # NEW v0.0.9c : findFreeSquareNear, findEscapeDirection, findClearAreaNear
 │       └── PHNPC_Update.lua     # Boucle OnTick principale
-│                                # v0.0.9c : fix anti-sticking, patrouille via findFreeSquareNear
+│                                # v0.0.9d : recalcul conditionnel (seuil joueur), +4 états
 ├── common/media/
 │   ├── anims_X/Zombie/          # Animations custom (copies depuis NHM)
-│   │   ├── Bob_FrontKick.X      # Coup de pied avant
-│   │   ├── Bob_HighKick.x       # Coup de pied haut
-│   │   └── Bob_PushKick.X       # Coup de pied poussee
-│   └── AnimSets/zombie/
-│       ├── idle/ZSIdle.xml            # PHNPC_IsNPC=true -> Bob_Idle
-│       ├── bumped/ZSWalkToIdle.xml    # PHNPC_IsNPC=true -> Bob_EmoteShrug rapide (SpeedScale=3.0)
-│       ├── bumped/ZSIdleToWalk.xml    # PHNPC_IsNPC=true -> Bob_EmoteShrug rapide (SpeedScale=3.0)
-│       ├── bumped/ZSStaggerBack.xml       # PHNPC_IsNPC=false -> Zombie_ShoveStagger_2m
-│       ├── bumped/ZSNPCStaggerBack.xml    # PHNPC_IsNPC=true  -> Bob_RunStumble
-│       ├── bumped/ZSFrontKick.xml
-│       ├── bumped/ZSHighKick.xml
-│       ├── bumped/ZSPainHead.xml
-│       ├── bumped/ZSPainTorso.xml
-│       ├── bumped/ZSShove.xml
-│       ├── bumped/ZSWaveHi.xml     # m_Looped=true (interruptible via EarlyTransitionOut)
-│       ├── bumped/ZSShrug.xml
-│       ├── bumped/ZSYes.xml
-│       └── bumped/ZSNo.xml
+│   └── AnimSets/zombie/         # Jeux d'animations conditionnels (PHNPC_IsNPC)
 ```
 
 ## Ordre de chargement
 
 PZ charge les fichiers client par **ordre alphabétique** :
 
-1. `shared/PHNPC_Core.lua` — namespace + OUTFIT_STATS
+1. `shared/PHNPC_Core.lua` — namespace + constantes + PHNPC.Log stub minimal
 2. `shared/PHNPC_Stats.lua` — initStats / initInventory
-3. `client/PHNPC_Actions.lua` — startMovingTo, stopMoving, startFollowing
+3. `client/PHNPC_Actions.lua` — startMovingTo, stopMoving, startFollowing (v0.0.9d: fix rotation)
 4. `client/PHNPC_Barks.lua` — BARK_KEYS, getRandomBark, sayBark
 5. `client/PHNPC_Combat.lua` — npcCombatStep, npcFlightStep (v0.0.9c : armes + NoiseTimer)
 6. `client/PHNPC_Convert.lua` — convertToNPC
-7. `client/PHNPC_Danger.lua` — aggroZombiesOnNPC, scan OnTick (NEW v0.0.9c)
+7. `client/PHNPC_Danger.lua` — aggroZombiesOnNPC, scan OnTick (v0.0.9c)
 8. `client/PHNPC_Debug.lua` — dbgSpawnAtPlayer
 9. `client/PHNPC_Enforce.lua` — OnZombieUpdate (enforceNPC), barks auto
 10. `client/PHNPC_Health.lua` — OnHitZombie
 11. `client/PHNPC_Inventory.lua` — openNPCInventory
-12. `client/PHNPC_Manager.lua` — spawnNPC, registres
-13. `client/PHNPC_Menu.lua` — menu contextuel
-14. `client/PHNPC_Orders.lua` — ordres (recruit/follow/stay/dismiss…) + curseur GoTo
-15. `client/PHNPC_Pathfind.lua` — findFreeSquareNear, findEscapeDirection, findClearAreaNear (NEW v0.0.9c)
-16. `client/PHNPC_Update.lua` — OnTick principal
+12. `client/PHNPC_Log.lua` — **PHNPC.Log complet** remplace stubs Core (v0.0.9d NEW)
+13. `client/PHNPC_Manager.lua` — spawnNPC, registres
+14. `client/PHNPC_Menu.lua` — menu contextuel (v0.0.9d: shelter/free/quitTeam)
+15. `client/PHNPC_Orders.lua` — ordres (v0.0.9d: attackOrderNPC/shelterNPC/freeNPC/quitTeamNPC)
+16. `client/PHNPC_Pathfind.lua` — findFreeSquareNear, findEscapeDirection, findClearAreaNear (v0.0.9c)
+17. `client/PHNPC_Update.lua` — OnTick principal (v0.0.9d: 4 nouveaux états comportementaux)
 
 ## Flux de creation d'un NPC
 

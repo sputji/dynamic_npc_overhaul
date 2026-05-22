@@ -54,5 +54,9 @@
     "UI_PHNPC_FleeOk": "%s: I can keep going!",
     "UI_PHNPC_BarkGoTo": "%s: Got it, heading there!",
     "UI_PHNPC_BarkArrived": "%s: In position.",
-    "UI_PHNPC_OrderGoTo": "Go there..."
+    "UI_PHNPC_OrderGoTo": "Go there...",
+    "UI_PHNPC_BarkShelter": "%s: Looking for cover...",
+    "UI_PHNPC_BarkFree": "%s: I'll manage on my own. Stay safe.",
+    "UI_PHNPC_BarkQuitTeam": "%s: Going solo. Good luck out there.",
+    "UI_PHNPC_BarkAttackAll": "%s: On it! Clearing the area."
 }

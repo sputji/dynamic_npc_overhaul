@@ -19,114 +19,193 @@
 -- ORDRES : RECRUTER / SUIVRE / RESTER / CONGEDIER / SUPPRIMER
 -- ============================================================
 
+--[[
+    PHNPC_Orders.lua  v0.0.9d  (client)
+    Ordres adresses aux NPCs.
+
+    v0.0.9d : Refonte complete des ordres pour correspondre aux etats
+      followNPC     : "following" — suit le joueur
+      stayNPC       : "staying"   — reste dans une zone memorisee
+      goToLocation  : "goingto"   — va a une destination, puis staying
+      attackOrderNPC: "attacking" — attaque puis retour base
+      shelterNPC    : "shelter"   — cherche zone safe, puis staying
+      freeNPC       : "free"      — libre mais dans l'equipe
+      quitTeamNPC   : dismissed   — quitte definitivement l'equipe
+      toggleCombatNPC : AUTO/OFF
+
+    Necessite :
+      PHNPC_Actions.lua (PHNPC.stopMoving, PHNPC.startMovingTo)
+      PHNPC_Core.lua    (PHNPC.recruited, PHNPC.allNPCs)
+      PHNPC_Log.lua     (PHNPC.Log.*)
+]]
+
+-- ============================================================
+-- RECRUTEMENT / EQUIPE
+-- ============================================================
+
 function PHNPC.recruitNPC(npc)
     local md = npc:getModData()
-    md.PHNPC_Recruited = true
-    md.PHNPC_State     = "following"
-    md.PHNPC_Moving    = false
-    md.PHNPC_IdleTick  = 0
+    md.PHNPC_Recruited  = true
+    md.PHNPC_State      = "following"
+    md.PHNPC_Moving     = false
+    md.PHNPC_IdleTick   = 0
+    md.PHNPC_CombatMode = md.PHNPC_CombatMode or "auto"
     PHNPC.recruited[npc] = true
-    -- Transition propre vers idle humain (evite bras tendus zombie au recrutement)
     pcall(function()
         npc:setUseless(false)
         npc:changeState(ZombieIdleState.instance())
         npc:setBumpType("Shrug")
     end)
-    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkRecruit"), md.PHNPC_Name), 0.2, 0.9, 0.2) end)
-    print("[PHNPC] Recrute : " .. tostring(md.PHNPC_Name))
+    pcall(function()
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkRecruit"), md.PHNPC_Name), 0.2, 0.9, 0.2)
+    end)
+    PHNPC.Log.info("Orders", "Recrute : " .. tostring(md.PHNPC_Name))
 end
+
+-- ============================================================
+-- SUIVI JOUEUR
+-- ============================================================
 
 function PHNPC.followNPC(npc)
     local md = npc:getModData()
-    md.PHNPC_State = "following"
-    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkFollow"), md.PHNPC_Name), 0.2, 0.9, 0.2) end)
-    print("[PHNPC] Suis le joueur : " .. tostring(md.PHNPC_Name))
+    md.PHNPC_State  = "following"
+    md.PHNPC_ZoneX  = nil  -- effacer la zone precedente
+    md.PHNPC_ZoneY  = nil
+    md.PHNPC_LastPX = nil  -- forcer un recalcul immediat
+    md.PHNPC_LastPY = nil
+    pcall(function()
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkFollow"), md.PHNPC_Name or "?"), 0.2, 0.9, 0.2)
+    end)
+    PHNPC.Log.info("Orders", tostring(md.PHNPC_Name) .. " -> following")
 end
+
+-- ============================================================
+-- RESTE ICI (zone libre autour de la position actuelle)
+-- ============================================================
 
 function PHNPC.stayNPC(npc)
     local md = npc:getModData()
     md.PHNPC_State = "staying"
+    md.PHNPC_ZoneX = npc:getX()
+    md.PHNPC_ZoneY = npc:getY()
+    md.PHNPC_ZoneZ = npc:getZ()
+    md.PHNPC_ZoneR = PHNPC.STAY_RADIUS or 5
     PHNPC.stopMoving(npc)
-    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkStay"), md.PHNPC_Name), 0.9, 0.9, 0.2) end)
-    print("[PHNPC] Reste ici : " .. tostring(md.PHNPC_Name))
+    pcall(function()
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkStay"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
+    end)
+    PHNPC.Log.info("Orders", tostring(md.PHNPC_Name) .. " -> staying at (" .. string.format("%.1f,%.1f", md.PHNPC_ZoneX, md.PHNPC_ZoneY) .. ")")
 end
 
-function PHNPC.dismissNPC(npc)
+-- ============================================================
+-- ATTAQUE LES ZOMBIES (combat actif + retour base)
+-- ============================================================
+
+function PHNPC.attackOrderNPC(npc)
+    local md = npc:getModData()
+    md.PHNPC_CombatMode   = "auto"
+    md.PHNPC_AttackReturn = true
+    md.PHNPC_ZoneX        = npc:getX()
+    md.PHNPC_ZoneY        = npc:getY()
+    md.PHNPC_ZoneZ        = npc:getZ()
+    md.PHNPC_ZoneR        = PHNPC.STAY_RADIUS or 5
+    md.PHNPC_State        = "attacking"
+    pcall(function()
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkAttack"), md.PHNPC_Name or "?"), 0.9, 0.2, 0.2)
+    end)
+    PHNPC.Log.info("Orders", tostring(md.PHNPC_Name) .. " -> attacking")
+end
+
+-- ============================================================
+-- METS-TOI A L'ABRI (zone safe via findClearAreaNear)
+-- ============================================================
+
+function PHNPC.shelterNPC(npc)
+    local md = npc:getModData()
+    md.PHNPC_State = "shelter"
+    md.PHNPC_ZoneX = nil  -- sera calcule par Update.lua
+    md.PHNPC_ZoneY = nil
+    pcall(function()
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkShelter"), md.PHNPC_Name or "?"), 0.2, 0.9, 0.9)
+    end)
+    PHNPC.Log.info("Orders", tostring(md.PHNPC_Name) .. " -> shelter")
+end
+
+-- ============================================================
+-- TU PEUX PARTIR (libre mais dans l'equipe)
+-- ============================================================
+
+function PHNPC.freeNPC(npc)
+    local md = npc:getModData()
+    md.PHNPC_State = "free"
+    md.PHNPC_ZoneX = nil
+    md.PHNPC_ZoneY = nil
+    pcall(function()
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkFree"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
+    end)
+    PHNPC.Log.info("Orders", tostring(md.PHNPC_Name) .. " -> free (dans equipe)")
+end
+
+-- ============================================================
+-- QUITTE MON EQUIPE (definitif : retire de recruited)
+-- ============================================================
+
+function PHNPC.quitTeamNPC(npc)
     local md = npc:getModData()
     md.PHNPC_Recruited = false
     md.PHNPC_State     = "idle"
-    PHNPC.recruited[npc] = nil
-    PHNPC.stopMoving(npc)
-    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkDismiss"), md.PHNPC_Name), 0.9, 0.9, 0.2) end)
-    print("[PHNPC] Congedie : " .. tostring(md.PHNPC_Name))
-end
-
-function PHNPC.deleteNPC(npc)
-    -- CRITIQUE : mettre PHNPC_IsNPC=nil AVANT setHealth(0)
-    -- Sinon OnZombieUpdate (isNPC check) ressusciterait le NPC au tick suivant
-    local md   = npc:getModData()
-    local name = md.PHNPC_Name or "?"
-    md.PHNPC_IsNPC = nil
-    -- Fermer l'inventaire si c'est ce NPC qui est ouvert
-    if PHNPC._openInventoryNPC == npc then PHNPC._openInventoryNPC = nil end
-    -- Nettoyer toutes les references (enforceNPC ne traitera plus ce NPC)
-    PHNPC.allNPCs[npc]           = nil
+    md.PHNPC_ZoneX     = nil
+    md.PHNPC_ZoneY     = nil
     PHNPC.recruited[npc]         = nil
     PHNPC._followTimers[npc]     = nil
     PHNPC._combatTimers[npc]     = nil
     PHNPC._attackCooldowns[npc]  = nil
-    -- Mort naturelle via setHealth(0) : PZ cree un corpse lootable avec tout l'inventaire
+    PHNPC.stopMoving(npc)
     pcall(function()
-        npc:setHealth(0)
+        npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkQuitTeam"), md.PHNPC_Name or "?"), 0.9, 0.4, 0.1)
     end)
-    print("[PHNPC] Supprime : " .. name)
+    PHNPC.Log.info("Orders", tostring(md.PHNPC_Name) .. " quitte l'equipe")
 end
 
 -- ============================================================
--- ORDRES COMBAT
+-- MODE COMBAT AUTO / OFF
 -- ============================================================
-
-function PHNPC.orderAttackNPC(npc)
-    local md = npc:getModData()
-    md.PHNPC_CombatMode = "auto"
-    if md.PHNPC_State ~= "defending" then
-        md.PHNPC_PrevState = md.PHNPC_State
-        md.PHNPC_State     = "defending"
-    end
-    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkAttack"), md.PHNPC_Name or "?"), 0.9, 0.2, 0.2) end)
-end
-
-function PHNPC.orderFleeNPC(npc)
-    local md = npc:getModData()
-    md.PHNPC_State = "staying"   -- s'arrete apres la fuite (evite la boucle npcFlightStep)
-    local enemy, eDist = PHNPC.findNearestZombie(npc, 20)
-    local nx, ny, nz = npc:getX(), npc:getY(), npc:getZ()
-    if enemy and eDist < 20 then
-        local ex, ey = enemy:getX(), enemy:getY()
-        local dx = nx - ex
-        local dy = ny - ey
-        local d = math.sqrt(dx * dx + dy * dy)
-        if d > 0 then dx, dy = dx / d, dy / d end
-        PHNPC.startMovingTo(npc, nx + dx * 15, ny + dy * 15, nz)
-    else
-        local player = getPlayer()
-        if player then PHNPC.startMovingTo(npc, player:getX(), player:getY(), player:getZ()) end
-    end
-    pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkFlee"), md.PHNPC_Name or "?"), 0.9, 0.4, 0.2) end)
-end
 
 function PHNPC.toggleCombatNPC(npc)
     local md = npc:getModData()
     if md.PHNPC_CombatMode == "off" then
         md.PHNPC_CombatMode = "auto"
-        pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkCombatOn"), md.PHNPC_Name or "?"), 0.2, 0.9, 0.2) end)
+        pcall(function()
+            npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkCombatOn"), md.PHNPC_Name or "?"), 0.2, 0.9, 0.2)
+        end)
     else
         md.PHNPC_CombatMode = "off"
-        pcall(function() npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkCombatOff"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2) end)
+        pcall(function()
+            npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkCombatOff"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
+        end)
     end
+    PHNPC.Log.info("Orders", tostring(md.PHNPC_Name) .. " combatMode -> " .. tostring(md.PHNPC_CombatMode))
 end
 
-print("[PHNPC] Orders v0.0.9c loaded")
+-- ============================================================
+-- SUPPRESSION DEFINITIVE
+-- ============================================================
+
+function PHNPC.deleteNPC(npc)
+    local md   = npc:getModData()
+    local name = md.PHNPC_Name or "?"
+    md.PHNPC_IsNPC = nil
+    if PHNPC._openInventoryNPC == npc then PHNPC._openInventoryNPC = nil end
+    PHNPC.allNPCs[npc]           = nil
+    PHNPC.recruited[npc]         = nil
+    PHNPC._followTimers[npc]     = nil
+    PHNPC._combatTimers[npc]     = nil
+    PHNPC._attackCooldowns[npc]  = nil
+    pcall(function() npc:setHealth(0) end)
+    PHNPC.Log.info("Orders", "Supprime : " .. name)
+end
+
+print("[PHNPC] Orders v0.0.9d loaded")
 
 -- ============================================================
 -- "VA LA-BAS" : CURSOR TILE VERTE + ORDRE DE DEPLACEMENT

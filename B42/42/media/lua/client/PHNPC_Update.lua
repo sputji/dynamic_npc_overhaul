@@ -1,19 +1,20 @@
 --[[
-    PHNPC_Update.lua  v0.0.9c  (client)
+    PHNPC_Update.lua  v0.0.9d  (client)
     Boucles de mise a jour principales :
       OnZombieUpdate => enforce comportement NPC chaque tick
-      OnTick         => IA suivi + combat + fuite + patrouille non-recrutes
+      OnTick         => IA suivi + etats comportement + patrouille
       OnGameStart    => reinitialiser toutes les tables
 
+    v0.0.9d :
+      - following : recalcul pathfind SEULEMENT si joueur bouge de FOLLOW_MOVE_THRESHOLD (2t)
+        => elimine la rotation (le NPC ne recalcule plus en boucle vers un point changeant)
+      - staying   : deplace libre dans un rayon STAY_RADIUS autour d'une zone memorisee
+      - free      : errance autonome sur FREE_WANDER_DIST, NPC reste dans l'equipe
+      - shelter   : cherche zone safe (findClearAreaNear) puis passe en staying
+      - attacking : attaque active puis retour position de base
     v0.0.9c :
-      - Suppression anti-sticking repulsif (le NPC tournait autour du joueur).
-        Nouveau comportement : arret si dist <= FOLLOW_STOP_DISTANCE,
-        reprise si dist > FOLLOW_DISTANCE, rien au milieu.
-      - Integration PHNPC_Danger.lua : NoiseTimer mis a jour selon l'etat
-      - Integration PHNPC_Pathfind.lua : patrouille via findFreeSquareNear
-    v0.0.9b :
-      - Suivi : seuil stop a FOLLOW_STOP_DISTANCE (2 tiles)
-      - Etat "goingto" + portes + stuck detection
+      - Suppression anti-sticking repulsif
+      - Integration PHNPC_Danger.lua + PHNPC_Pathfind.lua
 ]]
 
 -- ============================================================
@@ -103,54 +104,137 @@ Events.OnTick.Add(function()
                 local dist = math.sqrt(dx * dx + dy * dy)
 
                 if dist <= (PHNPC.FOLLOW_STOP_DISTANCE or 2) then
-                    -- Dans la zone d'arret : stopper
+                    -- Assez proche : stopper
                     if md.PHNPC_Moving then
                         PHNPC.stopMoving(npc)
                     end
                     PHNPC._followTimers[npc] = 0
 
                 elseif dist > (PHNPC.FOLLOW_DISTANCE or 6) then
-                    -- Joueur trop loin : suivre toutes les FOLLOW_TICK_RATE ticks
+                    -- Joueur trop loin : recalculer pathfind SEULEMENT si le joueur
+                    -- s'est vraiment deplace (evite la rotation a chaque tick)
                     PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
-                    if PHNPC._followTimers[npc] >= PHNPC.FOLLOW_TICK_RATE then
+                    if PHNPC._followTimers[npc] >= (PHNPC.FOLLOW_TICK_RATE or 20) then
                         PHNPC._followTimers[npc] = 0
-                        PHNPC.startFollowing(npc, player)
+                        local cpx, cpy = player:getX(), player:getY()
+                        local lpx = md.PHNPC_LastPX or -999
+                        local lpy = md.PHNPC_LastPY or -999
+                        local movedSq = (cpx - lpx)^2 + (cpy - lpy)^2
+                        local threshold = PHNPC.FOLLOW_MOVE_THRESHOLD or 2
+                        if movedSq >= (threshold * threshold) then
+                            md.PHNPC_LastPX = cpx
+                            md.PHNPC_LastPY = cpy
+                            PHNPC.startFollowing(npc, player)
+                        end
                     end
-
-                elseif dist <= (PHNPC.FOLLOW_STOP_DISTANCE or 2) then
-                    -- Dans la zone d'arret : stopper proprement
-                    PHNPC.stopMoving(npc)
-                    PHNPC._followTimers[npc] = 0
                 end
                 -- Entre FOLLOW_STOP_DISTANCE et FOLLOW_DISTANCE : NPC finit son chemin
 
-            -- 4. Etat "goingto" : NPC se deplace vers une destination choisie
+            -- 4. Etat "goingto" : NPC se deplace vers une destination designee
             elseif md.PHNPC_State == "goingto" and md.PHNPC_GoToX then
-                local dx   = md.PHNPC_GoToX - npc:getX()
-                local dy   = md.PHNPC_GoToY - npc:getY()
-                local dist = math.sqrt(dx * dx + dy * dy)
-                if dist <= 1.5 then
-                    -- Arrive a destination : passer en "staying"
+                local gdx  = md.PHNPC_GoToX - npc:getX()
+                local gdy  = md.PHNPC_GoToY - npc:getY()
+                local dist = math.sqrt(gdx * gdx + gdy * gdy)
+                if dist <= (PHNPC.FOLLOW_STOP_DISTANCE or 2) then
+                    -- Arrive : passer en "staying" autour de la destination
                     md.PHNPC_State  = "staying"
+                    md.PHNPC_ZoneX  = md.PHNPC_GoToX
+                    md.PHNPC_ZoneY  = md.PHNPC_GoToY
+                    md.PHNPC_ZoneZ  = md.PHNPC_GoToZ or npc:getZ()
+                    md.PHNPC_ZoneR  = PHNPC.STAY_RADIUS or 5
                     md.PHNPC_GoToX  = nil
                     md.PHNPC_GoToY  = nil
                     md.PHNPC_GoToZ  = nil
                     PHNPC.stopMoving(npc)
+                    PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " arrive a destination -> staying")
                     pcall(function()
                         npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkArrived"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
                     end)
                 else
-                    -- Continuer vers la destination, recalculer periodiquement
                     PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
-                    if PHNPC._followTimers[npc] >= PHNPC.FOLLOW_TICK_RATE then
+                    if PHNPC._followTimers[npc] >= (PHNPC.FOLLOW_TICK_RATE or 20) then
                         PHNPC._followTimers[npc] = 0
                         PHNPC.startMovingTo(npc, md.PHNPC_GoToX, md.PHNPC_GoToY, md.PHNPC_GoToZ or npc:getZ())
                     end
                 end
+
+            -- 5. Etat "staying" : rester dans une zone, deplacement libre dans le rayon
+            elseif md.PHNPC_State == "staying" and md.PHNPC_ZoneX then
+                local zx, zy = md.PHNPC_ZoneX, md.PHNPC_ZoneY
+                local zdx, zdy = npc:getX() - zx, npc:getY() - zy
+                local distZone = math.sqrt(zdx * zdx + zdy * zdy)
+                local zoneR = md.PHNPC_ZoneR or (PHNPC.STAY_RADIUS or 5)
+
+                if distZone > zoneR then
+                    -- Hors zone : retourner au centre
+                    PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
+                    if PHNPC._followTimers[npc] >= (PHNPC.FOLLOW_TICK_RATE or 20) then
+                        PHNPC._followTimers[npc] = 0
+                        PHNPC.startMovingTo(npc, zx, zy, md.PHNPC_ZoneZ or npc:getZ())
+                    end
+                else
+                    -- Dans la zone : patrouille courte et libre
+                    PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
+                    if PHNPC._followTimers[npc] >= (PHNPC.ZONE_PATROL_TICKS or 200) then
+                        PHNPC._followTimers[npc] = 0
+                        if not md.PHNPC_Moving and PHNPC.findFreeSquareNear then
+                            local pr = PHNPC.PATROL_RADIUS or 3
+                            local tx, ty = PHNPC.findFreeSquareNear(zx, zy, npc:getZ(), pr, 4)
+                            if tx then PHNPC.startMovingTo(npc, tx, ty, npc:getZ()) end
+                        end
+                    end
+                end
+
+            -- 6. Etat "free" : NPC libre mais dans l'equipe, errance autonome
+            elseif md.PHNPC_State == "free" then
+                PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
+                if PHNPC._followTimers[npc] >= 300 then
+                    PHNPC._followTimers[npc] = 0
+                    if PHNPC.findFreeSquareNear then
+                        local wd = PHNPC.FREE_WANDER_DIST or 10
+                        local tx, ty = PHNPC.findFreeSquareNear(npc:getX(), npc:getY(), npc:getZ(), wd, 6)
+                        if tx then PHNPC.startMovingTo(npc, tx, ty, npc:getZ()) end
+                    end
+                end
+
+            -- 7. Etat "shelter" : chercher une zone safe, puis staying
+            elseif md.PHNPC_State == "shelter" then
+                if not md.PHNPC_ZoneX then
+                    -- Chercher la zone safe une seule fois
+                    local sx, sy
+                    if PHNPC.findClearAreaNear then
+                        sx, sy = PHNPC.findClearAreaNear(npc:getX(), npc:getY(), npc:getZ(), 15)
+                    end
+                    if not sx then sx, sy = npc:getX(), npc:getY() end
+                    md.PHNPC_ZoneX = sx
+                    md.PHNPC_ZoneY = sy
+                    md.PHNPC_ZoneZ = npc:getZ()
+                    md.PHNPC_ZoneR = PHNPC.STAY_RADIUS or 5
+                    PHNPC.startMovingTo(npc, sx, sy, npc:getZ())
+                    PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " -> shelter (" .. string.format("%.1f,%.1f", sx, sy) .. ")")
+                else
+                    local sdx = npc:getX() - md.PHNPC_ZoneX
+                    local sdy = npc:getY() - md.PHNPC_ZoneY
+                    if (sdx * sdx + sdy * sdy) < 4 then
+                        md.PHNPC_State = "staying"  -- arrivee : passer en staying
+                    end
+                end
+
+            -- 8. Etat "attacking" : attaquer, puis retourner a la position de base
+            elseif md.PHNPC_State == "attacking" then
+                local atarget = PHNPC.findNearestZombie and PHNPC.findNearestZombie(npc, PHNPC.COMBAT_RANGE or 8)
+                if not atarget and md.PHNPC_ZoneX then
+                    -- Plus de cibles : retourner a la position de base
+                    local rdx = npc:getX() - md.PHNPC_ZoneX
+                    local rdy = npc:getY() - md.PHNPC_ZoneY
+                    if (rdx * rdx + rdy * rdy) > 4 then
+                        PHNPC.startMovingTo(npc, md.PHNPC_ZoneX, md.PHNPC_ZoneY, md.PHNPC_ZoneZ or npc:getZ())
+                    else
+                        PHNPC.stopMoving(npc)
+                    end
+                end
+                -- npcCombatStep (appel precedent) gere l'attaque effective
             end
-            -- "staying"   : rien a faire (setUseless(false) dans enforceNPC)
-            -- "defending" : gere par npcCombatStep
-            -- "fleeing"   : gere par npcFlightStep
         end
     end
 
@@ -216,7 +300,7 @@ Events.OnGameStart.Add(function()
     PHNPC._openInventoryNPC = nil
     PHNPC._combatTimers     = {}
     PHNPC._attackCooldowns  = {}
-    print("[PHNPC] v0.0.9c pret")
+    print("[PHNPC] v0.0.9d pret")
 end)
 
-print("[PHNPC] Update v0.0.9c loaded")
+print("[PHNPC] Update v0.0.9d loaded")

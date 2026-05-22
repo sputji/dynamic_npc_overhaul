@@ -1,6 +1,82 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
-## [0.0.9c] — 2026-05-25
+## [0.0.9d] — 2026-05-22
+
+### Corrections de bugs
+
+- **BUG CRITIQUE : NPC tournait en rond en suivant le joueur** (v0.0.9a → v0.0.9c)
+  - **Cause** : `startFollowing` calculait un point cible à `FOLLOW_TARGET_DIST (2.5)` tuiles du joueur en direction du NPC. Quand le joueur bougeait, ce point changeait à chaque recalcul (toutes les `FOLLOW_TICK_RATE` ticks) → direction cible instable → NPC zigzaguait/tournait.
+  - **Fix** : `startFollowing` utilise maintenant `pathToLocationF(px, py, pz)` vers la **position exacte** du joueur. L'arrêt est géré par `FOLLOW_STOP_DISTANCE` dans `Update.lua`.
+  - **Optimisation** : le recalcul du pathfind n'a lieu que si le joueur s'est déplacé de plus de `FOLLOW_MOVE_THRESHOLD (2 tuiles)` depuis le dernier calcul. Constante `FOLLOW_TARGET_DIST` supprimée.
+
+- **Doublon `elseif` dans `PHNPC_Update.lua`** : un second bloc `elseif dist <= FOLLOW_STOP_DISTANCE` subsistait après le bloc principal → supprimé.
+
+- **Sémantique incorrecte des ordres** (v0.0.9b → v0.0.9c) :
+  - `dismissNPC` (« Tu peux partir ») retirait le NPC de l'équipe → remplacé par `freeNPC` (garde dans l'équipe, état `"free"`) et `quitTeamNPC` (retire définitivement de l'équipe).
+  - `orderFleeNPC` mappé à « Mets-toi à l'abri » → remplacé par `shelterNPC` (état `"shelter"` avec recherche de zone safe via `findClearAreaNear`).
+  - `stayNPC` ne mémorisait pas la zone → corrigé : mémorise `ZoneX/ZoneY/ZoneZ/ZoneR` à la position actuelle du NPC.
+  - `orderAttackNPC` n'avait pas de position de retour → corrigé : mémorise `ZoneX/ZoneY/ZoneZ` + état `"attacking"`.
+
+### Nouvelles fonctionnalités
+
+- **Système de logging centralisé : `PHNPC_Log.lua`** (nouveau fichier, position alphabétique L)
+  - Niveaux : `DEBUG (0)`, `INFO (1)`, `WARN (2)`, `ERROR (3)`. `PHNPC.Log.LEVEL = 0` (tout en dev).
+  - Écriture différée vers `PHNPC_Debug.log` toutes les ~300 ticks via `getFileWriter`.
+  - API : `PHNPC.Log.debug/info/warn/error(module, msg)`, `PHNPC.Log.npc(npc, level, msg)`, `PHNPC.Log.npcState(npc)`.
+  - Stub minimal initialisé dans `PHNPC_Core.lua` (shared) pour éviter nil-call dans les fichiers A→K.
+
+- **Nouveaux états comportementaux dans `PHNPC_Update.lua`** :
+  - `"staying"` (amélioré) : le NPC patrouille librement dans un rayon `STAY_RADIUS (5)` autour de sa zone mémorisée, toutes les `ZONE_PATROL_TICKS (200)` ticks. Si hors zone, retour au centre.
+  - `"free"` (nouveau) : NPC reste dans l'équipe (`PHNPC_Recruited = true`) mais erre librement jusqu'à `FREE_WANDER_DIST (10)` tuiles. Il peut encore recevoir des ordres.
+  - `"shelter"` (nouveau) : cherche une zone safe via `findClearAreaNear`, s'y déplace, puis passe en `"staying"` à l'arrivée.
+  - `"attacking"` (nouveau) : combat actif. Si plus de zombies à portée, retourne à `ZoneX/ZoneY` mémorisée au moment de l'ordre.
+
+- **Nouveaux ordres dans `PHNPC_Orders.lua`** :
+  - `PHNPC.attackOrderNPC(npc)` : `"attacking"` + mémorise position de retour.
+  - `PHNPC.shelterNPC(npc)` : `"shelter"` + bark `UI_PHNPC_BarkShelter`.
+  - `PHNPC.freeNPC(npc)` : `"free"` + bark `UI_PHNPC_BarkFree` (NPC garde `PHNPC_Recruited = true`).
+  - `PHNPC.quitTeamNPC(npc)` : `PHNPC_Recruited = false` + bark `UI_PHNPC_BarkQuitTeam` (retire définitivement de `recruited`).
+
+- **Menu mis à jour (`PHNPC_Menu.lua`)** :
+  - « Attaque les zombies ! » → `PHNPC.attackOrderNPC`
+  - « Mets-toi à l'abri ! » → `PHNPC.shelterNPC`
+  - « Tu peux partir. » → `PHNPC.freeNPC`
+  - « Quitte mon equipe. » (nouvelle option) → `PHNPC.quitTeamNPC`
+
+- **Destination "Va là-bas" améliorée** : à l'arrivée, le NPC passe en `"staying"` dans une zone centrée sur la destination (mémorise `ZoneX/ZoneY/ZoneR`).
+
+### Nouvelles constantes (`PHNPC_Core.lua`)
+
+| Constante | Valeur | Description |
+|-----------|--------|-------------|
+| `PHNPC.STAY_RADIUS` | 5 | Rayon (tuiles) de la zone staying/free |
+| `PHNPC.PATROL_RADIUS` | 3 | Rayon d'exploration libre dans la zone |
+| `PHNPC.FREE_WANDER_DIST` | 10 | Distance max d'errance en état free |
+| `PHNPC.ZONE_PATROL_TICKS` | 200 | Ticks entre deux mouvements de patrouille |
+| `PHNPC.FOLLOW_MOVE_THRESHOLD` | 2 | Seuil mouvement joueur pour recalcul pathfind |
+
+### Nouvelles clés de traduction (EN + FR)
+
+| Clé | EN | FR |
+|-----|----|----|
+| `UI_PHNPC_BarkShelter` | Looking for cover... | Je cherche un abri... |
+| `UI_PHNPC_BarkFree` | I'll manage on my own. Stay safe. | Je me débrouille seul. Sois prudent. |
+| `UI_PHNPC_BarkQuitTeam` | Going solo. Good luck out there. | Je pars seul. Bonne chance. |
+| `UI_PHNPC_BarkAttackAll` | On it! Clearing the area. | Compris ! Je nettoie la zone. |
+
+### Fichiers modifiés
+- `shared/PHNPC_Core.lua` : v0.0.9d — PHNPC.Log stub minimal, +5 nouvelles constantes, suppression FOLLOW_TARGET_DIST
+- `client/PHNPC_Actions.lua` : v0.0.9d — fix startFollowing (pathToLocationF direct, sans offset)
+- `client/PHNPC_Update.lua` : v0.0.9d — fix recalcul conditionnel (seuil mouvement joueur), +4 nouveaux états comportementaux, suppression doublon
+- `client/PHNPC_Orders.lua` : v0.0.9d — refonte complète : attackOrderNPC, shelterNPC, freeNPC, quitTeamNPC, stayNPC avec zone
+- `client/PHNPC_Menu.lua` : v0.0.9d — nouveaux ordres, option "Quitte mon equipe"
+- `client/PHNPC_Log.lua` : **NOUVEAU** — système logging centralisé (niveaux + fichier)
+- `shared/Translate/EN/UI.json` : +4 nouvelles clés
+- `shared/Translate/FR/UI.json` : +4 nouvelles clés
+
+---
+
+## [0.0.9c] — 2026-05-21
 
 ### Corrections de bugs
 
