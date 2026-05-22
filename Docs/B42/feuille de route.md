@@ -193,10 +193,10 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 ### Phase 0.1.0 — Qualité des interactions
 - [ ] Creer un fichier qui creer et recuper tous les log du mod pour simplifier le debug.
 - [ ] Comportement de fuite quand HP < 30% (a améliorer avec un pathfind vers une zone dégagée, ou vers le joueur si zone dégagée)
-- [ ] Systeme de combat NPC (défendre → attaquer les zombies proches) (a ameliorer avec des attaques variées selon les armes, ou des attaques spéciales selon les professions)
-- [ ] NPC peut transporter des items dans son inventaire natif (Ne fonctionne pas, inventaire vide, à investiguer)
+- [ ] Systeme de combat NPC (défendre → attaquer les zombies proches) (a ameliorer avec des attaques variées selon les armes, ou des attaques spéciales selon les professions, peut utiliser les objets de sont inventaire.)
+- [X] NPC peut transporter des items dans son inventaire natif. (poids max + items de départ selon le métier) ✅ v0.0.5
 - [ ] Dialogue basique (bark texte au-dessus de la tête selon état)
-- [ ] Bark de dialogue (texte au-dessus de la tête selon état : peur, colère, satisfaction, etc.)
+- [/] Bark de dialogue (texte au-dessus de la tête selon état : peur, colère, satisfaction, etc.)
 - [ ] Ordre "Va là-bas" (click droit sur une tuile cible)
 - [ ] Ordre "recolte' (faire cueillir des plantes ou fouiller des containers, loot, etc.)
 - [ ] NPC peut etre attaquer par des Zombies (doMeleeAttack) et réagir (hitreaction)

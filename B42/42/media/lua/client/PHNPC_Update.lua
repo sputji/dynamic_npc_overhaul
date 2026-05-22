@@ -1,20 +1,19 @@
 --[[
-    PHNPC_Update.lua  v0.0.9b  (client)
+    PHNPC_Update.lua  v0.0.9c  (client)
     Boucles de mise a jour principales :
       OnZombieUpdate => enforce comportement NPC chaque tick
       OnTick         => IA suivi + combat + fuite + patrouille non-recrutes
       OnGameStart    => reinitialiser toutes les tables
 
+    v0.0.9c :
+      - Suppression anti-sticking repulsif (le NPC tournait autour du joueur).
+        Nouveau comportement : arret si dist <= FOLLOW_STOP_DISTANCE,
+        reprise si dist > FOLLOW_DISTANCE, rien au milieu.
+      - Integration PHNPC_Danger.lua : NoiseTimer mis a jour selon l'etat
+      - Integration PHNPC_Pathfind.lua : patrouille via findFreeSquareNear
     v0.0.9b :
-      - Anti-sticking joueur : si dist < REPEL_DISTANCE (1.5), repousser le NPC
-      - Suivi : seuil stop passe a FOLLOW_STOP_DISTANCE (2 tiles), cible a FOLLOW_TARGET_DIST (2.5)
-      - Nouvel etat "goingto" : NPC se dirige vers une destination, passe a "staying" a l'arrivee
-      - Patrouille non-recrutes : walkable check + PHNPC_PatrolActive pour debloquer setUseless
-      - Portes : checkAndOpenDoors appele pour les NPCs recrutes en mouvement
-      - Detection blocage : handleStuck appele pour les NPCs recrutes en mouvement
-
-    Pattern : NHM GCUpdate.lua + GCUpdateAI.lua
-    Necessite : tous les modules PHNPC_*.lua charges avant
+      - Suivi : seuil stop a FOLLOW_STOP_DISTANCE (2 tiles)
+      - Etat "goingto" + portes + stuck detection
 ]]
 
 -- ============================================================
@@ -103,17 +102,11 @@ Events.OnTick.Add(function()
                 local dy   = player:getY() - npc:getY()
                 local dist = math.sqrt(dx * dx + dy * dy)
 
-                -- ANTI-STICKING : si trop proche du joueur, repousser le NPC
-                if dist < (PHNPC.REPEL_DISTANCE or 1.5) then
-                    local rx = npc:getX() - player:getX()
-                    local ry = npc:getY() - player:getY()
-                    local rd = math.sqrt(rx * rx + ry * ry)
-                    if rd < 0.05 then rx, ry, rd = 1, 0, 1 end
-                    local repelDist = (PHNPC.FOLLOW_TARGET_DIST or 2.5)
-                    local tx = npc:getX() + (rx / rd) * repelDist
-                    local ty = npc:getY() + (ry / rd) * repelDist
-                    md.PHNPC_Moving = true
-                    pcall(function() npc:setUseless(false); npc:pathToLocationF(tx, ty, npc:getZ()) end)
+                if dist <= (PHNPC.FOLLOW_STOP_DISTANCE or 2) then
+                    -- Dans la zone d'arret : stopper
+                    if md.PHNPC_Moving then
+                        PHNPC.stopMoving(npc)
+                    end
                     PHNPC._followTimers[npc] = 0
 
                 elseif dist > (PHNPC.FOLLOW_DISTANCE or 6) then
@@ -129,7 +122,7 @@ Events.OnTick.Add(function()
                     PHNPC.stopMoving(npc)
                     PHNPC._followTimers[npc] = 0
                 end
-                -- Entre FOLLOW_STOP_DISTANCE et FOLLOW_DISTANCE : NPC finit son chemin en cours
+                -- Entre FOLLOW_STOP_DISTANCE et FOLLOW_DISTANCE : NPC finit son chemin
 
             -- 4. Etat "goingto" : NPC se deplace vers une destination choisie
             elseif md.PHNPC_State == "goingto" and md.PHNPC_GoToX then
@@ -175,27 +168,27 @@ Events.OnTick.Add(function()
                 md.PHNPC_PatrolTick = (md.PHNPC_PatrolTick or 0) + 1
                 if md.PHNPC_PatrolTick >= 300 then
                     md.PHNPC_PatrolTick = 0
-                    -- Chercher une case marchable dans un rayon de 6 tiles (5 essais max)
-                    local tx, ty = nil, nil
-                    local cell = nil
-                    pcall(function() cell = getCell() end)
-                    if cell then
-                        for _ = 1, 5 do
-                            local cx = npc:getX() + ZombRand(13) - 6
-                            local cy = npc:getY() + ZombRand(13) - 6
-                            local ok, walkable = pcall(function()
-                                local sq = cell:getGridSquare(math.floor(cx), math.floor(cy), math.floor(npc:getZ()))
-                                return sq and sq:isFree(false)
-                            end)
-                            if ok and walkable then
-                                tx, ty = cx, cy
-                                break
+                    -- Utiliser findFreeSquareNear (PHNPC_Pathfind.lua) si disponible
+                    local tx, ty
+                    if PHNPC.findFreeSquareNear then
+                        tx, ty = PHNPC.findFreeSquareNear(npc:getX(), npc:getY(), npc:getZ(), 6, 6)
+                    else
+                        local cell
+                        pcall(function() cell = getCell() end)
+                        if cell then
+                            for _ = 1, 5 do
+                                local cx = npc:getX() + ZombRand(13) - 6
+                                local cy = npc:getY() + ZombRand(13) - 6
+                                local ok, walkable = pcall(function()
+                                    local sq = cell:getGridSquare(math.floor(cx), math.floor(cy), math.floor(npc:getZ()))
+                                    return sq and sq:isFree(false)
+                                end)
+                                if ok and walkable then tx, ty = cx, cy ; break end
                             end
                         end
                     end
                     if tx then
-                        -- PHNPC_PatrolActive autorise setUseless(false) dans enforceNPC
-                        md.PHNPC_PatrolActive = 200  -- ~3s de mouvement autorise
+                        md.PHNPC_PatrolActive = 200
                         pcall(function()
                             npc:setUseless(false)
                             npc:pathToLocationF(tx, ty, npc:getZ())
@@ -223,7 +216,7 @@ Events.OnGameStart.Add(function()
     PHNPC._openInventoryNPC = nil
     PHNPC._combatTimers     = {}
     PHNPC._attackCooldowns  = {}
-    print("[PHNPC] v0.0.9b pret")
+    print("[PHNPC] v0.0.9c pret")
 end)
 
-print("[PHNPC] Update v0.0.9b loaded")
+print("[PHNPC] Update v0.0.9c loaded")

@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Menu.lua  v1.0  (client)
+    PHNPC_Menu.lua  v0.0.9c (client)
     Menu contextuel clic-droit pour les NPCs et callbacks de debug inline.
 
     Pattern : NHM GCMenuContext.onFillWorldObjectContextMenu
@@ -193,4 +193,4 @@ end
 -- Enregistrer le menu contextuel
 Events.OnPreFillWorldObjectContextMenu.Add(onFillContextMenu)
 
-print("[PHNPC] Menu v0.0.9b loaded")
+print("[PHNPC] Menu v0.0.9c loaded")

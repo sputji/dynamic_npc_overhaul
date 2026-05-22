@@ -1,4 +1,4 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.9a
+# Architecture B42 — Dynamic NPC Overhaul v0.0.9c
 
 ## Structure des fichiers
 
@@ -17,7 +17,10 @@ B42/
 │       ├── PHNPC_Actions.lua    # Déplacement NPC (startMovingTo, stopMoving, startFollowing)
 │       ├── PHNPC_Barks.lua      # Barks auto (BARK_KEYS, getRandomBark, sayBark)
 │       ├── PHNPC_Combat.lua     # Combat auto vs zombies (npcCombatStep, npcFlightStep)
+│       │                        # v0.0.9c : armes inventaire + NoiseTimer
 │       ├── PHNPC_Convert.lua    # Conversion zombie → NPC (convertToNPC)
+│       ├── PHNPC_Danger.lua     # Sons NPC → agro zombies (aggroZombiesOnNPC)
+│       │                        # NEW v0.0.9c : PHNPC_NoiseTimer + scan DANGER_TICK_RATE
 │       ├── PHNPC_Debug.lua      # Menu DEBUG_PHNPC (dbgSpawnAtPlayer)
 │       ├── PHNPC_Enforce.lua    # OnZombieUpdate + barks auto toutes 500 ticks
 │       ├── PHNPC_Health.lua     # OnHitZombie → dégâts → mort NPC
@@ -25,7 +28,11 @@ B42/
 │       ├── PHNPC_Manager.lua    # Spawn + registres (allNPCs, recruited, spawnNPC)
 │       ├── PHNPC_Menu.lua       # Menu contextuel clic-droit
 │       ├── PHNPC_Orders.lua     # Ordres joueur (recruit, follow, stay, dismiss, combat…)
+│       │                        # v0.0.9c : fix curseur GoTo (isValid + setDrag)
+│       ├── PHNPC_Pathfind.lua   # Utilitaires pathfinding
+│       │                        # NEW v0.0.9c : findFreeSquareNear, findEscapeDirection, findClearAreaNear
 │       └── PHNPC_Update.lua     # Boucle OnTick principale
+│                                # v0.0.9c : fix anti-sticking, patrouille via findFreeSquareNear
 ├── common/media/
 │   ├── anims_X/Zombie/          # Animations custom (copies depuis NHM)
 │   │   ├── Bob_FrontKick.X      # Coup de pied avant
@@ -56,16 +63,18 @@ PZ charge les fichiers client par **ordre alphabétique** :
 2. `shared/PHNPC_Stats.lua` — initStats / initInventory
 3. `client/PHNPC_Actions.lua` — startMovingTo, stopMoving, startFollowing
 4. `client/PHNPC_Barks.lua` — BARK_KEYS, getRandomBark, sayBark
-5. `client/PHNPC_Combat.lua` — npcCombatStep, npcFlightStep
+5. `client/PHNPC_Combat.lua` — npcCombatStep, npcFlightStep (v0.0.9c : armes + NoiseTimer)
 6. `client/PHNPC_Convert.lua` — convertToNPC
-7. `client/PHNPC_Debug.lua` — dbgSpawnAtPlayer
-8. `client/PHNPC_Enforce.lua` — OnZombieUpdate (enforceNPC), barks auto
-9. `client/PHNPC_Health.lua` — OnHitZombie
-10. `client/PHNPC_Inventory.lua` — openNPCInventory
-11. `client/PHNPC_Manager.lua` — spawnNPC, registres
-12. `client/PHNPC_Menu.lua` — menu contextuel
-13. `client/PHNPC_Orders.lua` — ordres (recruit/follow/stay/dismiss…)
-14. `client/PHNPC_Update.lua` — OnTick principal
+7. `client/PHNPC_Danger.lua` — aggroZombiesOnNPC, scan OnTick (NEW v0.0.9c)
+8. `client/PHNPC_Debug.lua` — dbgSpawnAtPlayer
+9. `client/PHNPC_Enforce.lua` — OnZombieUpdate (enforceNPC), barks auto
+10. `client/PHNPC_Health.lua` — OnHitZombie
+11. `client/PHNPC_Inventory.lua` — openNPCInventory
+12. `client/PHNPC_Manager.lua` — spawnNPC, registres
+13. `client/PHNPC_Menu.lua` — menu contextuel
+14. `client/PHNPC_Orders.lua` — ordres (recruit/follow/stay/dismiss…) + curseur GoTo
+15. `client/PHNPC_Pathfind.lua` — findFreeSquareNear, findEscapeDirection, findClearAreaNear (NEW v0.0.9c)
+16. `client/PHNPC_Update.lua` — OnTick principal
 
 ## Flux de creation d'un NPC
 

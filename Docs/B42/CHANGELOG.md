@@ -1,5 +1,48 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9c] — 2026-05-25
+
+### Corrections de bugs
+
+- **Anti-sticking NPC** (bug v0.0.9b) : Suppression complète du vecteur répulsif. À chaque tick le vecteur changeait (joueur mobile) → NPC tournait en rond. Fix : deux transitions simples uniquement (`stop` si dist ≤ 2, `startFollowing` si dist > 6). Constante `REPEL_DISTANCE` supprimée.
+- **Curseur "Va là-bas" ne se fermait pas** (bug v0.0.9b) : `create()` dans `PHGoToCursor` n'appelait pas `getCell():setDrag(nil, 0)` → curseur restait à l'écran après le clic. Fix : `setDrag(nil, 0)` ajouté en première ligne de `create()`. De plus, `isValid()` utilisait `result == true` (trop strict) → corrigé en `res and true or false`.
+- **Doublon dans la boucle "following"** : un second bloc `elseif dist <= FOLLOW_STOP_DISTANCE` restait après la suppression du REPEL. Supprimé.
+
+### Nouvelles fonctionnalités
+
+- **PHNPC_Pathfind.lua** (nouveau fichier) : Utilitaires de pathfinding.
+  - `PHNPC.findFreeSquareNear(x, y, z, radius, maxTries)` : trouve une tuile libre dans un rayon (ZombRand), utilisée par la patrouille des non-recrutés.
+  - `PHNPC.findEscapeDirection(npc, enemy, range)` : teste 8 angles autour de la direction opposée à l'ennemi, retourne la première tuile libre. Utilisée par `npcFlightStep`.
+  - `PHNPC.findClearAreaNear(x, y, z, radius)` : cherche la zone avec le moins de zombies dans 8 directions. Utilisée comme priorité de fuite.
+- **PHNPC_Danger.lua** (nouveau fichier) : Les sons et actions des NPCs attirent les zombies.
+  - `PHNPC.aggroZombiesOnNPC(npc, radius)` : force `zombie:setTarget(npc)` + `addAggro(npc,1)` sur les zombies normaux dans le rayon. Pattern Bandits 42.16.
+  - `OnTick` scan toutes les `DANGER_TICK_RATE (80)` ticks. NPCs bruyants (`PHNPC_NoiseTimer > 0`) → agro dans `NOISE_RADIUS (12)` tuiles. NPCs en déplacement → agro passif dans 5 tuiles.
+  - `PHNPC_NoiseTimer` posé par `PHNPC_Combat.lua` après chaque attaque (valeur 150–200).
+- **PHNPC_Combat.lua amélioré** :
+  - `npcCombatStep` : détecte et équipe l'arme de l'inventaire NPC (batte, hache, couteau, pied-de-biche, pelle, marteau…). Animation d'attaque adaptée selon le type d'arme. Pose `PHNPC_NoiseTimer` après chaque attaque.
+  - `npcFlightStep` : utilise `findEscapeDirection` (8 angles) puis `findClearAreaNear` pour fuir intelligemment. Si la destination est trop loin du joueur (> 30 tuiles), se rapproche du joueur.
+- **Patrouille non-recrutés améliorée** : `PHNPC_Update.lua` utilise `PHNPC.findFreeSquareNear` (si disponible) au lieu du fallback ZombRand brut.
+
+### Nouvelles constantes (PHNPC_Core.lua)
+
+| Constante | Valeur | Description |
+|-----------|--------|-------------|
+| `PHNPC.AGGRO_RANGE` | 10 | Rayon (tuiles) d'agro zombies vers le NPC |
+| `PHNPC.NOISE_RADIUS` | 12 | Rayon d'agro en cas de bruit NPC |
+| `PHNPC.DANGER_TICK_RATE` | 80 | Ticks entre chaque scan de danger |
+| `PHNPC.FLEE_ESCAPE_TRIES` | 8 | Tentatives max dans findEscapeDirection |
+
+### Fichiers modifiés
+- `shared/PHNPC_Core.lua` : version 0.0.9c, +4 constantes DANGER, suppression REPEL_DISTANCE
+- `client/PHNPC_Update.lua` : fix anti-sticking, suppression doublon stop, patrouille via findFreeSquareNear
+- `client/PHNPC_Orders.lua` : fix isValid() + setDrag(nil, 0) dans PHGoToCursor.create()
+- `client/PHNPC_Combat.lua` : armes inventaire, NoiseTimer, findEscapeDirection, findClearAreaNear
+- `client/PHNPC_Menu.lua` : version 0.0.9c
+- `client/PHNPC_Pathfind.lua` : **NOUVEAU** — findFreeSquareNear, findEscapeDirection, findClearAreaNear
+- `client/PHNPC_Danger.lua` : **NOUVEAU** — aggroZombiesOnNPC, scan OnTick
+
+---
+
 ## [0.0.9b] — 2026-05-24
 
 ### Corrections

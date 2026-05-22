@@ -126,7 +126,7 @@ function PHNPC.toggleCombatNPC(npc)
     end
 end
 
-print("[PHNPC] Orders v0.0.9b loaded")
+print("[PHNPC] Orders v0.0.9c loaded")
 
 -- ============================================================
 -- "VA LA-BAS" : CURSOR TILE VERTE + ORDRE DE DEPLACEMENT
@@ -144,17 +144,21 @@ local function initGoToCursor()
 
     -- Appele quand le joueur clique sur une tuile valide
     function PHGoToCursor:create(x, y, z, north, sprite)
+        -- Fermer le curseur IMMEDIATEMENT (sinon il reste a l'ecran)
+        pcall(function() getCell():setDrag(nil, 0) end)
         local npc = self.targetNPC
         if not npc then return end
-        PHNPC.goToLocation(npc, x + 0.5, y + 0.5, z)
+        pcall(function() PHNPC.goToLocation(npc, x + 0.5, y + 0.5, z) end)
     end
 
     function PHGoToCursor:isValid(square)
         if not square then return false end
-        local ok, result = pcall(function()
+        -- Pas de pcall ici : retour direct comme NPC_Helper_Mod
+        local ok, res = pcall(function()
             return square:TreatAsSolidFloor() and not square:isSolid() and not square:isSolidTrans()
         end)
-        return ok and result == true
+        if not ok then return false end
+        return res and true or false
     end
 
     function PHGoToCursor:render(x, y, z, square)

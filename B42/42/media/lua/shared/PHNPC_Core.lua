@@ -1,10 +1,11 @@
 --[[
-    PHNPC_Core.lua  v0.0.9b  (shared)
+    PHNPC_Core.lua  v0.0.9c  (shared)
     Etat global + constantes + stats par metier
     Project Humain : Dynamic NPC Overhaul
     Pattern: NPC_Helper_Mod GCCore.lua
-    v0.0.9b : FOLLOW_STOP_DISTANCE 3->2, FOLLOW_DISTANCE 8->6,
-              REPEL_DISTANCE ajoute pour anti-sticking joueur
+    v0.0.9c : suppression REPEL_DISTANCE (tournait autour joueur),
+              ajout AGGRO_RANGE / NOISE_RADIUS / DANGER_TICK_RATE,
+              ajout FLEE_ESCAPE_TRIES pour fuite multidirectionnelle
 ]]
 
 PHNPC = PHNPC or {}
@@ -16,20 +17,27 @@ PHNPC.recruited = PHNPC.recruited or {}  -- [npcRef] = true  (recrutes : followi
 -- ============================================================
 PHNPC.FOLLOW_DISTANCE      = 6    -- tiles : redemarrer le suivi si le joueur est plus loin que ca
 PHNPC.FOLLOW_STOP_DISTANCE = 2    -- tiles : s'arreter a cette distance du joueur (pas sur sa case)
-PHNPC.FOLLOW_TARGET_DIST   = 2.5  -- tiles : point cible du pathfind (STOP + 0.5 buffer)
-PHNPC.REPEL_DISTANCE       = 1.5  -- tiles : seuil en-dessous duquel on repousse le NPC
+PHNPC.FOLLOW_TARGET_DIST   = 2.5  -- tiles : point cible du pathfind (offset derriere le joueur)
 PHNPC.FOLLOW_TICK_RATE  = 20   -- ticks entre deux appels pathToLocationF
 PHNPC.INTERACTION_DIST  = 3    -- tiles : rayon clic droit pour interagir
 
 -- ============================================================
 -- COMBAT IA (GCCombatAI.lua pattern NPC_Helper_Mod)
 -- ============================================================
-PHNPC.COMBAT_RANGE       = 8    -- tiles : rayon detection zombie pour combat auto
-PHNPC.COMBAT_ATTACK_RANGE = 1.5 -- tiles : distance d'attaque melee
-PHNPC.COMBAT_TICK_RATE   = 30   -- ticks entre evaluations combat
-PHNPC.FLEE_HP_RATIO      = 0.30 -- ratio HP pour declencher la fuite (30%)
-PHNPC.FLEE_DISTANCE      = 15   -- tiles : distance cible de fuite depuis le danger
-PHNPC.BARK_TICK_RATE     = 500  -- ticks entre barks auto (~8 sec a 60fps)
+PHNPC.COMBAT_RANGE        = 8    -- tiles : rayon detection zombie pour combat auto
+PHNPC.COMBAT_ATTACK_RANGE = 1.5  -- tiles : distance d'attaque melee
+PHNPC.COMBAT_TICK_RATE    = 30   -- ticks entre evaluations combat
+PHNPC.FLEE_HP_RATIO       = 0.30 -- ratio HP pour declencher la fuite (30%)
+PHNPC.FLEE_DISTANCE       = 15   -- tiles : distance cible de fuite
+PHNPC.FLEE_ESCAPE_TRIES   = 8    -- nombre de directions testees pour trouver une fuite libre
+PHNPC.BARK_TICK_RATE      = 500  -- ticks entre barks auto (~8 sec a 60fps)
+
+-- ============================================================
+-- DANGER : sons NPC + agro zombies (PHNPC_Danger.lua)
+-- ============================================================
+PHNPC.AGGRO_RANGE       = 10   -- tiles : rayon dans lequel les zombies peuvent cibler le NPC
+PHNPC.NOISE_RADIUS      = 12   -- tiles : rayon du bruit (bark/attaque) qui attire les zombies
+PHNPC.DANGER_TICK_RATE  = 80   -- ticks entre chaque scan d'agro zombies
 
 -- ============================================================
 -- SANTE
