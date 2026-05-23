@@ -1,4 +1,4 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.9d
+# Architecture B42 — Dynamic NPC Overhaul v0.0.9g
 
 ## Structure des fichiers
 
@@ -6,7 +6,7 @@
 B42/
 ├── 42/media/lua/
 │   ├── shared/
-│   │   ├── PHNPC_Core.lua       # Namespace PHNPC, constantes, OUTFIT_STATS, PHNPC.Log stub
+│   │   ├── PHNPC_Core.lua       # Namespace PHNPC, constantes, OUTFIT_STATS (47 outfits), PHNPC.Log stub
 │   │   ├── PHNPC_Stats.lua      # initStats() + initInventory() par metier
 │   │   └── Translate/
 │   │       ├── EN/UI_PHNPC_EN.txt   # Traductions EN (format .txt, pré-B42.18)
@@ -15,7 +15,8 @@ B42/
 │   │       └── FR/UI.json           # Traductions FR (format JSON, B42.18+)
 │   └── client/
 │       ├── PHNPC_Actions.lua    # Déplacement NPC (startMovingTo, stopMoving, startFollowing)
-│       │                        # v0.0.9d : startFollowing vers pos exacte joueur (fix rotation)
+│       │                        # v0.0.9g : checkAndOpenDoors reécrit (ToggleDoorSilent + recalc pathfind)
+│       │                        # v0.0.9g : closeNearbyDoors reécrit (ToggleDoorSilent)
 │       ├── PHNPC_Barks.lua      # Barks auto (BARK_KEYS, getRandomBark, sayBark)
 │       ├── PHNPC_Combat.lua     # Combat auto vs zombies (npcCombatStep, npcFlightStep)
 │       │                        # v0.0.9c : armes inventaire + NoiseTimer
@@ -32,7 +33,7 @@ B42/
 │       ├── PHNPC_Menu.lua       # Menu contextuel clic-droit
 │       │                        # v0.0.9d : ordres mis à jour (shelter/free/quitTeam)
 │       ├── PHNPC_Orders.lua     # Ordres joueur (recruit, follow, stay, attack, shelter…)
-│       │                        # v0.0.9d : attackOrderNPC, shelterNPC, freeNPC, quitTeamNPC
+│       │                        # v0.0.9g : hardening nil-guard sur toutes les fonctions d'ordre
 │       ├── PHNPC_Pathfind.lua   # Utilitaires pathfinding
 │       │                        # NEW v0.0.9c : findFreeSquareNear, findEscapeDirection, findClearAreaNear
 │       └── PHNPC_Update.lua     # Boucle OnTick principale
@@ -48,9 +49,9 @@ PZ charge les fichiers client par **ordre alphabétique** :
 
 1. `shared/PHNPC_Core.lua` — namespace + constantes + PHNPC.Log stub minimal
 2. `shared/PHNPC_Stats.lua` — initStats / initInventory
-3. `client/PHNPC_Actions.lua` — startMovingTo, stopMoving, startFollowing (v0.0.9d: fix rotation)
+3. `client/PHNPC_Actions.lua` — startMovingTo, stopMoving, startFollowing, checkAndOpenDoors (v0.0.9g: ToggleDoorSilent)
 4. `client/PHNPC_Barks.lua` — BARK_KEYS, getRandomBark, sayBark
-5. `client/PHNPC_Combat.lua` — npcCombatStep, npcFlightStep (v0.0.9c : armes + NoiseTimer)
+5. `client/PHNPC_Combat.lua` — npcCombatStep, npcFlightStep
 6. `client/PHNPC_Convert.lua` — convertToNPC
 7. `client/PHNPC_Danger.lua` — aggroZombiesOnNPC, scan OnTick (v0.0.9c)
 8. `client/PHNPC_Debug.lua` — dbgSpawnAtPlayer
@@ -60,7 +61,7 @@ PZ charge les fichiers client par **ordre alphabétique** :
 12. `client/PHNPC_Log.lua` — **PHNPC.Log complet** remplace stubs Core (v0.0.9d NEW)
 13. `client/PHNPC_Manager.lua` — spawnNPC, registres
 14. `client/PHNPC_Menu.lua` — menu contextuel (v0.0.9d: shelter/free/quitTeam)
-15. `client/PHNPC_Orders.lua` — ordres (v0.0.9d: attackOrderNPC/shelterNPC/freeNPC/quitTeamNPC)
+15. `client/PHNPC_Orders.lua` — ordres (v0.0.9g: hardening nil-guard toutes fonctions)
 16. `client/PHNPC_Pathfind.lua` — findFreeSquareNear, findEscapeDirection, findClearAreaNear (v0.0.9c)
 17. `client/PHNPC_Update.lua` — OnTick principal (v0.0.9d: 4 nouveaux états comportementaux)
 
@@ -92,14 +93,18 @@ Events.OnZombieUpdate (chaque tick)                          [PHNPC_Enforce.lua]
 
 Events.OnTick (chaque trame)                                 [PHNPC_Update.lua]
   └── [NPCs recrutés]
-        ├── npcFlightStep(npc, player)    [PHNPC_Combat.lua] -- fuite si HP < 30%
-        ├── npcCombatStep(npc)            [PHNPC_Combat.lua] -- attaque zombie le plus proche
-        └── State == "following"?
-              ├── dist > FOLLOW_STOP_DISTANCE (3)? startFollowing() -> pathToLocationF
-              └── non: stopMoving()
-        -- "staying"   : pas de pathfind
-        -- "defending" : géré par npcCombatStep
-        -- "fleeing"   : géré par npcFlightStep
+        ├── checkAndOpenDoors(npc)        [PHNPC_Actions.lua] -- ouvre portes adjacentes (ToggleDoorSilent)
+        ├── handleStuck(npc)              [PHNPC_Actions.lua] -- détection blocage
+        ├── npcFlightStep(npc, player)    [PHNPC_Combat.lua]  -- fuite si HP < 30%
+        ├── npcCombatStep(npc)            [PHNPC_Combat.lua]  -- attaque zombie le plus proche
+        └── États comportement :
+              -- "following"  : pathToCharacter si joueur s'éloigne (seuil FOLLOW_MOVE_THRESHOLD)
+              -- "goingto"    : pathToLocationF vers destination désignée
+              -- "staying"    : patrouille dans STAY_RADIUS autour de la zone mémorisée
+              -- "free"       : errance autonome jusqu'à FREE_WANDER_DIST
+              -- "shelter"    : findClearAreaNear → staying
+              -- "attacking"  : attaque active → retour position de base
+              -- "fleeing"    : géré par npcFlightStep
 
 Events.OnHitZombie (quand joueur frappe)                     [PHNPC_Health.lua]
   └── PHNPC.isNPC(zombie)?
@@ -149,7 +154,7 @@ npc:setHealth(0)         ← crée le corpse lootable
 |----------|------|-------------|
 | PHNPC_IsNPC | bool | Marque NPC (aussi variable AnimSet) |
 | PHNPC_Recruited | bool | Recruté ou non |
-| PHNPC_State | string | "idle"/"following"/"staying"/"defending"/"fleeing" |
+| PHNPC_State | string | "idle"/"following"/"staying"/"goingto"/"free"/"shelter"/"attacking"/"fleeing" |
 | PHNPC_Moving | bool | En déplacement |
 | PHNPC_Health | number | PV actuels (système PHNPC) |
 | PHNPC_MaxHealth | number | PV max |
@@ -182,5 +187,7 @@ npc:setHealth(0)         ← crée le corpse lootable
 3. **setUseless(false) avant setBumpType** — requis pour animations haute priorité (FrontKick, Shove)
 4. **BumpAnimFinished** — tous les bumped XMLs ont cet event à End → retour idle auto
 5. **setHealth(10000)** — empêche mort vanilla ; mort gérée via md.PHNPC_Health
-6. **pcall sur tout** — aucun crash possible même si API PZ change
-7. **getText() lazy** — les clés de traduction sont stockées comme strings, `getText()` appelé à l'utilisation (après chargement des traductions)
+6. **ToggleDoorSilent() pour les portes** — `ToggleDoor(npc)` est invalide en B42 (mauvaise signature). Séquence correcte : `DirtySlice()` → `RecalcLightTime = -1.0` → `InvalidateSpecialObjectPaths()` → `ToggleDoorSilent()` → `RecalcProperties()` → `syncIsoObject()`. Puis `ReCalculateCollide` + `ReCalculatePathFind` sur rayon 2 tuiles pour invalider le cache du pathfinder zombie.
+7. **pcall sur tout** — aucun crash possible même si API PZ change
+8. **getText() lazy** — les clés de traduction sont stockées comme strings, `getText()` appelé à l'utilisation (après chargement des traductions)
+9. **nil-guard en tête de chaque ordre** — toutes les fonctions `PHNPC.*Orders` vérifient `if not npc then return end` + `if not md then return end` avant tout traitement

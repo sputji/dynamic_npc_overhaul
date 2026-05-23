@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.9e-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.9g-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,31 +20,37 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.9a**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.9g**.
 
 ---
 
-## Fonctionnalités actuelles (v0.0.9a)
+## Fonctionnalités actuelles (v0.0.9g)
 
 ### PNJ & Professions
 
-7 professions disponibles, chacune avec ses propres statistiques, vitesse et équipement de départ :
+**47 professions** disponibles (toutes issues de `clothing.xml` PZ 42.18), chacune avec ses propres statistiques, vitesse et équipement de départ. Quelques exemples représentatifs :
 
 | Profession | Vitesse | PV | Poids max | Équipement de départ |
 |------------|---------|-----|-----------|----------------------|
-| 👨‍🌾 Fermier | 0.75 | 90 | 15 kg | Pelle, Truelle |
-| 👮 Police | 0.85 | 110 | 20 kg | Matraque, Lampe torche |
-| 🚒 Pompier | 0.80 | 120 | 25 kg | Hache |
-| 🩺 Médecin | 0.78 | 100 | 15 kg | Bandage, Analgésiques |
-| 🌲 Ranger | 0.90 | 105 | 18 kg | Couteau de chasse, Lampe torche |
-| 👨‍🍳 Chef | 0.75 | 90 | 15 kg | Couteau de cuisine, Ouvre-boîte |
-| 🧍 Survivant | 0.80 | 100 | 18 kg | Pied-de-biche |
+| 👮 Police | 0.70 | 110 | 20 kg | Matraque, Lampe torche |
+| 👨‍👩‍👧 Sheriff / Détective / Sécurité / Garde | 0.68–0.70 | 100–110 | 18–20 kg | Matraque, Lampe torche |
+| ⚔️ Vétéran / Militaire | 0.72 | 110–115 | 22–25 kg | Couteau, Lampe torche |
+| 🚒 Pompier | 0.68 | 120 | 25 kg | Hache |
+| 🩺 Médecin / Infirmière / Pharmacien | 0.62 | 90–100 | 15 kg | Bandage, Analgésiques |
+| 🔧 Mécanicien / Maçon / Métallurgiste | 0.65 | 100–105 | 20–22 kg | Marteau / Clé, Lampe torche |
+| 🌲 Ranger / Chasseur / Pêcheur | 0.65–0.75 | 90–105 | 18–20 kg | Couteau de chasse, Lampe torche |
+| 👨‍🌾 Fermier | 0.62 | 90 | 15 kg | Pelle, Truelle |
+| 👨‍🍳 Chef | 0.62 | 90 | 15 kg | Couteau de cuisine, Ouvre-boîte |
+| 🧙 Civil (enseignant / étudiant / retraité…) | 0.55–0.65 | 80–85 | 12–15 kg | Variable |
+
+Liste complète dans `PHNPC_Core.lua` → `PHNPC.OUTFIT_STATS`.
 
 ### Interactions joueur
 
 - **Recruter** un PNJ via clic droit → il vous suit
-- **Ordonner** : *Suis-moi*, *Reste ici*, *Attaque les zombies !*, *Mets-toi à l'abri*, *Tu peux partir*
-- Distance de suivi réaliste — le PNJ s'arrête à 3 tiles du joueur
+- **Ordonner** : *Suis-moi*, *Reste ici*, *Attaque les zombies !*, *Mets-toi à l'abri*, *Va là-bas*, *Tu peux partir*
+- Distance de suivi réaliste — le PNJ s'arrête à 2 tiles du joueur, recalcul uniquement si le joueur s'éloigne vraiment (pas de rotation)
+- **Ouverture automatique des portes** : le PNJ ouvre (et referme) les portes sur son passage (double portes, portes garage comprises)
 - **Échange d'inventaire** : accès à l'inventaire du PNJ via le menu
 - **Dialogue localisé** : toutes les bulles de texte passent par le système de traduction PZ (`getText()`), EN et FR supportés (B42.18+)
 
@@ -223,7 +229,10 @@ Dynamic_NPC_Overhaul/
 | v0.0.8b | Fix pathToCharacter, fix setHealth conditionnel | ✅ |
 | v0.0.9 | Refacto 9 modules, fix proximité, fix getText() timing, fix anim coupée | ✅ |
 | v0.0.9a | Traductions B42.18 (JSON), fix StaggerBack NPC, tous dialogues via getText() | ✅ |
-| v0.1.0 | Dialogue avancé, ordre "Va là-bas", réaction aux zombies | 🔜 |
+| v0.0.9d | États comportement complets (free/shelter/attacking/goingto), ordres étendus | ✅ |
+| v0.0.9f | Fix Kahlua upvalue, noms complets, vitesse, items alternatifs | ✅ |
+| v0.0.9g | 47 outfits B42, ouverture portes correcte (ToggleDoorSilent), hardening ordres | ✅ |
+| v0.1.0 | Dialogue avancé, réaction aux zombies améliorée | 🔜 |
 | v0.1.1 | Loot de bâtiments, échange d'items amélioré | 🔜 |
 | v0.1.5 | Persistance (sauvegarde/rechargement des PNJ) | 🔜 |
 | v0.2.0 | Factions, patrouille, commerce | 🔜 |
@@ -249,6 +258,8 @@ Historique complet des modifications : **[Docs/B42/CHANGELOG.md](https://github.
 
 | Version | Résumé |
 |---------|--------|
+| [v0.0.9g](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009g----2026-05-23) | 47 outfits PZ B42, fix ouverture portes NPCs (ToggleDoorSilent + recalc pathfind), hardening toutes commandes |
+| [v0.0.9f](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009f----2026-05-24) | Fix upvalues Kahlua (Log/GoTo), noms complets, vitesse, items, portes, shelter |
 | [v0.0.9e](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009e----2026-05-23) | Fix crash Log (Kahlua upvalue), fix NPC tourne (`pathToCharacter`), fix sync nom NPC/badges |
 | [v0.0.9d](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009d----2026-05-22) | Nouveaux états (free/shelter/attacking), refonte ordres, logging centralisé |
 | [v0.0.9a](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009a----2026-05-22) | Fix StaggerBack NPC, traductions JSON B42.18, tous dialogues via `getText()` |

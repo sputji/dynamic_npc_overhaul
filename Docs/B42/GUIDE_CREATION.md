@@ -1,8 +1,9 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.0.8a_
+_Version 0.0.9g_
 
-> Ce guide explique le fonctionnement du systeme NPC tel qu'implemente en v0.0.8a.
-> Pattern copie EXACTEMENT depuis NPC_Helper_Mod (GCCoreConvert + GCCoreEnforceMain + GCCoreSpawn + GCUpdate).
+> Ce guide explique le fonctionnement du système NPC tel qu'implémenté en v0.0.9g.
+> Pattern copié EXACTEMENT depuis NPC_Helper_Mod (GCCoreConvert + GCCoreEnforceMain + GCCoreSpawn + GCUpdate),
+> enrichi avec les corrections B42.18 (portes, outfits, Kahlua upvalue).
 
 ---
 
@@ -28,8 +29,23 @@ local zombie = zombieList:get(0)
 convertToNPC(zombie, outfit, isFemale, npcName)
 ```
 
-### Outfits disponibles
-`"Police"`, `"Fireman"`, `"Doctor"`, `"Ranger"`, `"Chef"`, `"Farmer"`, `"Survivor"`
+### Outfits disponibles (v0.0.9g — 47 métiers)
+
+Liste complète issue de `clothing.xml` (PZ 42.18) :
+
+**Forces de l'ordre / Militaire** : `"Police"`, `"Sheriff_Deputy"`, `"Detective"`, `"Security"`, `"MallSecurity"`, `"PrisonGuard"`, `"Veteran"`, `"ArmyCamoGreen"`, `"ArmyCamoDesert"`, `"PrivateMilitia"`, `"BountyHunter"`
+
+**Services d'urgence / Santé** : `"Fireman"`, `"Doctor"`, `"Nurse"`, `"AmbulanceDriver"`, `"Pharmacist"`
+
+**Travailleurs / Artisans** : `"Farmer"`, `"Chef"`, `"Mechanic"`, `"ConstructionWorker"`, `"Trucker"`, `"Woodcut"`, `"MetalWorker"`, `"Sanitation"`, `"Postal"`, `"Foreman"`
+
+**Nature / Plein air** : `"Ranger"`, `"Hunter"`, `"Fisherman"`, `"Camper"`, `"Survivalist"`
+
+**Civils** : `"Teacher"`, `"IT"`, `"OfficeWorker"`, `"Resident"`, `"Retiree"`, `"Student"`, `"Tourist"`, `"Biker"`, `"Redneck"`, `"Hobbo"`, `"Inmate"`, `"Priest"`, `"FitnessInstructor"`
+
+**Génériques** : `"Generic01"` à `"Generic05"`
+
+> ⚠️ `"Survivor"` (ancienne valeur) est conservé comme alias rétrocompat dans `OUTFIT_STATS`, mais n'est plus dans la liste de spawn. Le nom B42 correct est `"Survivalist"`.
 
 ---
 
@@ -91,7 +107,7 @@ zombie:getHumanVisual():removeBlood()
 local md = zombie:getModData()
 md.PHNPC_IsNPC      = true
 md.PHNPC_Recruited  = false
-md.PHNPC_State      = "idle"     -- "idle" | "following" | "staying"
+md.PHNPC_State      = "idle"     -- "idle" | "following" | "staying" | "goingto" | "free" | "shelter" | "attacking" | "fleeing"
 md.PHNPC_Name       = npcName
 md.PHNPC_Female     = isFemale
 md.PHNPC_Outfit     = outfit
@@ -331,3 +347,7 @@ B42/
 | **NPC mort sans corpse / items perdus** | `setHealth(1)` ne tue pas l'IsoZombie | **Utiliser `setHealth(0)` uniquement — crée le corpse lootable** |
 | **Bulle de dialogue invisible** | `zombie:Say()` ne crée pas de bulle sur IsoZombie en B42 | **Utiliser `zombie:addLineChatElement(text, r, g, b)`** |
 | **NPC bloqué en animation bumped** | XMLs `ZSWalkToIdle.xml`/`ZSIdleToWalk.xml` absents → vanilla PZ sans condition `PHNPC_IsNPC` | **Ces XMLs doivent exister avec `PHNPC_IsNPC=true` + `SpeedScale=3.0` + `EarlyTransitionOut=true`** |
+| **NPC tape les portes** | `ToggleDoor(npc)` invalide en B42 — aucun recalcul du cache pathfinder zombie | **Séquence : `DirtySlice()` → `RecalcLightTime=-1.0` → `InvalidateSpecialObjectPaths()` → `ToggleDoorSilent()` → `RecalcProperties()` → `syncIsoObject()` → puis `ReCalculatePathFind()` sur rayon 2 tiles** |
+| **NPC ouvre une double porte mais bloque sur l'autre battant** | `ToggleDoorSilent()` n'ouvre qu'une moitié de double porte | **Vérifier `IsoDoor.getDoubleDoorIndex(obj) > -1` → utiliser `IsoDoor.toggleDoubleDoor(obj, true)`** |
+| **Crash `function PHNPC.X` appelle nil** | Variable/fonction `local` utilisée comme upvalue dans une closure `PHNPC.*` en Kahlua B42 | **Stocker comme `PHNPC.X` (champ de table) au lieu de `local X`** |
+| **Crash dans ordre NPC si NPC est nil** | `npc:getModData()` appelé sans vérification préalable | **Toujours `if not npc then return end` + `if not md then return end` en tête de chaque fonction d'ordre** |
