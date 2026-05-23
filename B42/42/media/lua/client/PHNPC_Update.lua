@@ -85,8 +85,9 @@ Events.OnTick.Add(function()
         else
             local md = npc:getModData()
 
-            -- Ouvrir portes adjacentes quand en mouvement
+            -- Ouvrir portes et fenetres adjacentes quand en mouvement
             pcall(function() PHNPC.checkAndOpenDoors(npc) end)
+            pcall(function() PHNPC.checkAndOpenWindows(npc) end)
 
             -- Detection blocage (stuck)
             pcall(function() PHNPC.handleStuck(npc) end)
@@ -135,7 +136,10 @@ Events.OnTick.Add(function()
                 local gdx  = md.PHNPC_GoToX - npc:getX()
                 local gdy  = md.PHNPC_GoToY - npc:getY()
                 local dist = math.sqrt(gdx * gdx + gdy * gdy)
-                if dist <= (PHNPC.FOLLOW_STOP_DISTANCE or 2) then
+                -- v0.0.9h : seuil dedie GOTO_ARRIVE_DISTANCE (=1) au lieu de
+                -- FOLLOW_STOP_DISTANCE (=3) qui faisait arriver immediatement.
+                local arriveDist = PHNPC.GOTO_ARRIVE_DISTANCE or 1
+                if dist <= arriveDist then
                     -- Arrive : passer en "staying" autour de la destination
                     md.PHNPC_State  = "staying"
                     md.PHNPC_ZoneX  = md.PHNPC_GoToX
@@ -151,6 +155,8 @@ Events.OnTick.Add(function()
                         npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkArrived"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
                     end)
                 else
+                    -- v0.0.9h : recalculer path plus souvent pendant goingto pour passer
+                    -- les obstacles. Recalcul toutes les FOLLOW_TICK_RATE ticks.
                     PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
                     if PHNPC._followTimers[npc] >= (PHNPC.FOLLOW_TICK_RATE or 20) then
                         PHNPC._followTimers[npc] = 0
@@ -205,7 +211,15 @@ Events.OnTick.Add(function()
                     if PHNPC.findClearAreaNear then
                         sx, sy = PHNPC.findClearAreaNear(npc:getX(), npc:getY(), npc:getZ(), 15)
                     end
-                    if not sx then sx, sy = npc:getX(), npc:getY() end
+                    -- v0.0.9h : si pas de zone safe ou trop proche, choisir un
+                    -- point aleatoire a 8 tuiles pour bouger quand meme.
+                    local nx0, ny0 = npc:getX(), npc:getY()
+                    if not sx or ((sx - nx0)^2 + (sy - ny0)^2) < 4 then
+                        local ang = math.random() * 2 * math.pi
+                        sx = nx0 + math.cos(ang) * 8
+                        sy = ny0 + math.sin(ang) * 8
+                        PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " shelter fallback aleatoire")
+                    end
                     md.PHNPC_ZoneX = sx
                     md.PHNPC_ZoneY = sy
                     md.PHNPC_ZoneZ = npc:getZ()
@@ -217,6 +231,15 @@ Events.OnTick.Add(function()
                     local sdy = npc:getY() - md.PHNPC_ZoneY
                     if (sdx * sdx + sdy * sdy) < 4 then
                         md.PHNPC_State = "staying"  -- arrivee : passer en staying
+                        PHNPC.stopMoving(npc)
+                        PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " shelter atteint -> staying")
+                    else
+                        -- v0.0.9h : retry path toutes FOLLOW_TICK_RATE ticks pour passer obstacles
+                        PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
+                        if PHNPC._followTimers[npc] >= (PHNPC.FOLLOW_TICK_RATE or 20) then
+                            PHNPC._followTimers[npc] = 0
+                            PHNPC.startMovingTo(npc, md.PHNPC_ZoneX, md.PHNPC_ZoneY, md.PHNPC_ZoneZ or npc:getZ())
+                        end
                     end
                 end
 
@@ -300,7 +323,7 @@ Events.OnGameStart.Add(function()
     PHNPC._openInventoryNPC = nil
     PHNPC._combatTimers     = {}
     PHNPC._attackCooldowns  = {}
-    print("[PHNPC] v0.0.9d pret")
+    print("[PHNPC] v0.0.9h pret")
 end)
 
-print("[PHNPC] Update v0.0.9d loaded")
+print("[PHNPC] Update v0.0.9h loaded")

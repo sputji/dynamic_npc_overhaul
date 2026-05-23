@@ -35,8 +35,9 @@ PHNPC.Log = {
 -- CONFIG IA
 -- ============================================================
 PHNPC.FOLLOW_DISTANCE      = 6    -- tiles : redemarrer le suivi si joueur plus loin que ca
-PHNPC.FOLLOW_STOP_DISTANCE = 2    -- tiles : s'arreter a cette distance du joueur
+PHNPC.FOLLOW_STOP_DISTANCE = 3    -- v0.0.9h : 2 -> 3 (le NPC collait au joueur)
 PHNPC.FOLLOW_MOVE_THRESHOLD = 2   -- tiles : seuil de deplacement joueur pour recalculer pathfind
+PHNPC.GOTO_ARRIVE_DISTANCE = 1    -- v0.0.9h : tiles pour considerer "Va la-bas" comme arrive
 PHNPC.FOLLOW_TICK_RATE     = 20   -- ticks entre deux recalculs pathfind (si joueur bouge)
 PHNPC.INTERACTION_DIST     = 3    -- tiles : rayon clic droit pour interagir
 
@@ -82,17 +83,17 @@ PHNPC.MAX_HEALTH = 100         -- PV par defaut si outfit inconnu
 PHNPC.OUTFIT_STATS = {
     -- ---- FORCES DE L'ORDRE / MILITAIRE ----
     Police          = { speed=0.70, strength=8,  health=110, maxWeight=20.0,
-                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+                        items={"Base.Nightstick","Base.HandTorch"} },
     Sheriff_Deputy  = { speed=0.70, strength=8,  health=108, maxWeight=20.0,
-                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+                        items={"Base.Nightstick","Base.HandTorch"} },
     Detective       = { speed=0.68, strength=7,  health=100, maxWeight=18.0,
                         items={"Base.HandTorch"} },
     Security        = { speed=0.68, strength=7,  health=100, maxWeight=18.0,
-                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+                        items={"Base.Nightstick","Base.HandTorch"} },
     MallSecurity    = { speed=0.68, strength=7,  health=100, maxWeight=18.0,
-                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+                        items={"Base.Nightstick","Base.HandTorch"} },
     PrisonGuard     = { speed=0.70, strength=9,  health=110, maxWeight=20.0,
-                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+                        items={"Base.Nightstick","Base.HandTorch"} },
     Veteran         = { speed=0.72, strength=9,  health=110, maxWeight=22.0,
                         items={"Base.HuntingKnife","Base.HandTorch"} },
     ArmyCamoGreen   = { speed=0.72, strength=9,  health=115, maxWeight=25.0,
@@ -243,4 +244,4 @@ function PHNPC.getOutfitStats(outfit)
     return PHNPC.OUTFIT_STATS[outfit] or PHNPC.OUTFIT_STATS["Survivor"]
 end
 
-print("[PHNPC] Core v0.0.9a loaded")
+print("[PHNPC] Core v0.0.9h loaded")

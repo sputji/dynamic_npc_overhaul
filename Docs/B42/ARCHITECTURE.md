@@ -1,4 +1,4 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.9g
+# Architecture B42 — Dynamic NPC Overhaul v0.0.9h
 
 ## Structure des fichiers
 
@@ -16,8 +16,8 @@ B42/
 │   └── client/
 │       ├── PHNPC_Actions.lua    # Déplacement NPC (startMovingTo, stopMoving, startFollowing)
 │       │                        # v0.0.9g : checkAndOpenDoors reécrit (ToggleDoorSilent + recalc pathfind)
-│       │                        # v0.0.9g : closeNearbyDoors reécrit (ToggleDoorSilent)
-│       ├── PHNPC_Barks.lua      # Barks auto (BARK_KEYS, getRandomBark, sayBark)
+│       │                        # v0.0.9g : closeNearbyDoors reécrit (ToggleDoorSilent)│       │                        # NEW v0.0.9h : checkAndOpenWindows / closeNearbyWindows (pattern Bandits ZAOpenWindow)
+│       │                        # FIX v0.0.9h : startFollowing utilise pathToLocationF offset (bug NPC qui colle)│       ├── PHNPC_Barks.lua      # Barks auto (BARK_KEYS, getRandomBark, sayBark)
 │       ├── PHNPC_Combat.lua     # Combat auto vs zombies (npcCombatStep, npcFlightStep)
 │       │                        # v0.0.9c : armes inventaire + NoiseTimer
 │       ├── PHNPC_Convert.lua    # Conversion zombie → NPC (convertToNPC)
@@ -29,6 +29,7 @@ B42/
 │       ├── PHNPC_Inventory.lua  # Inventaire NPC (openNPCInventory)
 │       ├── PHNPC_Log.lua        # Logging centralisé (niveaux + écriture fichier)
 │       │                        # NEW v0.0.9d : PHNPC.Log.debug/info/warn/error, flush 300 ticks
+       │                        # FIX v0.0.9h : guard Events.OnGameEnd (n'existe plus en B42.18)
 │       ├── PHNPC_Manager.lua    # Spawn + registres (allNPCs, recruited, spawnNPC)
 │       ├── PHNPC_Menu.lua       # Menu contextuel clic-droit
 │       │                        # v0.0.9d : ordres mis à jour (shelter/free/quitTeam)

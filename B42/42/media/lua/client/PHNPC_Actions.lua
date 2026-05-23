@@ -32,8 +32,11 @@ PHNPC._openInventoryNPC = nil                            -- NPC dont l'inventair
 -- ============================================================
 
 -- startFollowing : faire suivre le NPC vers le joueur
--- v0.0.9e FIX : pathToCharacter(player) — methode standard IsoZombie→IsoCharacter.
+-- v0.0.9h FIX BUG 4 : remplace pathToCharacter par pathToLocationF avec
+--   un point cible decale (joueur - direction * FOLLOW_STOP_DISTANCE) pour
+--   eviter que le NPC se colle litteralement sur la case du joueur.
 -- v0.0.9g : checkAndOpenDoors AVANT le pathfind.
+-- v0.0.9h : + checkAndOpenWindows.
 function PHNPC.startFollowing(npc, player)
     local md = npc:getModData()
     npc:setUseless(false)
@@ -41,26 +44,41 @@ function PHNPC.startFollowing(npc, player)
         md.PHNPC_Moving = true
         pcall(function() npc:setBumpType("IdleToWalk") end)
     end
-    -- Ouvrir les portes AVANT le pathfind
+    -- Ouvrir les portes et fenetres AVANT le pathfind
     pcall(function() PHNPC.checkAndOpenDoors(npc) end)
-    pcall(function() npc:pathToCharacter(player) end)
-    PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> pathToCharacter(player)")
+    pcall(function() PHNPC.checkAndOpenWindows(npc) end)
+
+    -- v0.0.9h : cible decalee (eviter de coller le joueur)
+    local px, py, pz = player:getX(), player:getY(), player:getZ()
+    local dx = px - npc:getX()
+    local dy = py - npc:getY()
+    local d  = math.sqrt(dx*dx + dy*dy)
+    local stopDist = (PHNPC.FOLLOW_STOP_DISTANCE or 3)
+    if d > stopDist + 0.1 then
+        local nx, ny = dx / d, dy / d
+        local tx = px - nx * stopDist
+        local ty = py - ny * stopDist
+        pcall(function() npc:pathToLocationF(tx, ty, pz) end)
+        PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> pathToLocationF offset (" .. string.format("%.1f,%.1f", tx, ty) .. ")")
+    else
+        -- Deja assez proche : arret propre, ne pas re-pathfinder
+        PHNPC.stopMoving(npc)
+    end
 end
 
 -- startMovingTo : deplacer le NPC vers des coordonnees
--- v0.0.9g : checkAndOpenDoors AVANT le pathfind pour eviter que le
--- pathfinder zombie traite les portes comme obstacles a taper.
+-- v0.0.9h : + checkAndOpenWindows AVANT le pathfind.
 function PHNPC.startMovingTo(npc, x, y, z)
     local md = npc:getModData()
     npc:setUseless(false)
     if not md.PHNPC_Moving then
         md.PHNPC_Moving = true
-        -- Transition Idle->Walk (NHM GCCoreActions pattern)
         pcall(function() npc:setBumpType("IdleToWalk") end)
     end
-    -- Ouvrir les portes AVANT de lancer le pathfind (sinon le pathfinder zombie frappe la porte)
     pcall(function() PHNPC.checkAndOpenDoors(npc) end)
+    pcall(function() PHNPC.checkAndOpenWindows(npc) end)
     pcall(function() npc:pathToLocationF(x, y, z) end)
+    PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> pathToLocationF(" .. string.format("%.1f,%.1f", x, y) .. ")")
 end
 
 -- stopMoving : arreter le deplacement du NPC proprement
@@ -74,6 +92,8 @@ function PHNPC.stopMoving(npc)
         pcall(function() npc:clearAggroList() end)
         -- v0.0.9f : refermer les portes proches apres arret du NPC
         pcall(function() PHNPC.closeNearbyDoors(npc) end)
+        -- v0.0.9h : refermer aussi les fenetres ouvertes a portee
+        pcall(function() PHNPC.closeNearbyWindows(npc) end)
     end
 end
 
@@ -357,4 +377,57 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.9b loaded")
+print("[PHNPC] Actions v0.0.9h loaded")
+
+-- ============================================================
+-- FENETRES (v0.0.9h NEW — Bug 6)
+-- Pattern Bandits B42.18 ZAOpenWindow.lua : window:ToggleWindow(zombie)
+-- ============================================================
+function PHNPC.checkAndOpenWindows(npc)
+    local cell = npc:getCell()
+    if not cell then return end
+    local nx = math.floor(npc:getX())
+    local ny = math.floor(npc:getY())
+    local nz = math.floor(npc:getZ())
+    local dirs = {{0,-1},{0,1},{1,0},{-1,0},{0,0}}
+    for _, off in ipairs(dirs) do
+        pcall(function()
+            local sq = cell:getGridSquare(nx + off[1], ny + off[2], nz)
+            if not sq then return end
+            local window
+            pcall(function() window = sq:getWindow() end)
+            if not window then return end
+            local isOpen, smashed, perma, barricaded = false, false, false, false
+            pcall(function() isOpen = window:IsOpen() end)
+            if isOpen then return end
+            pcall(function() smashed = window:isSmashed() end)
+            pcall(function() perma = window:isPermaLocked() end)
+            pcall(function() barricaded = window:isBarricaded() end)
+            if smashed or perma or barricaded then return end
+            pcall(function() window:ToggleWindow(npc) end)
+            pcall(function() npc:playSound("OpenWindow") end)
+        end)
+    end
+end
+
+function PHNPC.closeNearbyWindows(npc)
+    local cell = npc:getCell()
+    if not cell then return end
+    local nx = math.floor(npc:getX())
+    local ny = math.floor(npc:getY())
+    local nz = math.floor(npc:getZ())
+    local dirs = {{0,-1},{0,1},{1,0},{-1,0},{0,0},{1,1},{1,-1},{-1,1},{-1,-1}}
+    for _, off in ipairs(dirs) do
+        pcall(function()
+            local sq = cell:getGridSquare(nx + off[1], ny + off[2], nz)
+            if not sq then return end
+            local window
+            pcall(function() window = sq:getWindow() end)
+            if not window then return end
+            local isOpen = false
+            pcall(function() isOpen = window:IsOpen() end)
+            if not isOpen then return end
+            pcall(function() window:ToggleWindow(npc) end)
+        end)
+    end
+end

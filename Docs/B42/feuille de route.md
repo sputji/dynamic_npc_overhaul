@@ -1,5 +1,6 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
+> Mise a jour : 23 mai 2026 | Version **0.0.9h** | Fix 7 bugs (Events.OnGameEnd guard, Nightstick, follow offset, goingto, shelter retry, fenêtres, T-pose). v0.0.9g : 47 outfits + checkAndOpenDoors réécrit.
 > Mise a jour : 27 mai 2026 | Version **0.0.7a** | Combat NPC auto, fuite HP<30%, dialogue contextuel, menu complet.
 
 ---
@@ -191,13 +192,13 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 - [X] Inventaire basique (le NPC peut transporter des items, les échanger avec le joueur.)
 
 ### Phase 0.1.0 — Qualité des interactions
-- [ ] Creer un fichier qui creer et recuper tous les log du mod pour simplifier le debug.
+- [x] Creer un fichier qui creer et recuper tous les log du mod pour simplifier le debug. (v0.0.9d : PHNPC_Log.lua / v0.0.9h : guard Events.OnGameEnd)
 - [ ] Comportement de fuite quand HP < 30% (a améliorer avec un pathfind vers une zone dégagée, ou vers le joueur si zone dégagée)
 - [ ] Systeme de combat NPC (défendre → attaquer les zombies proches) (a ameliorer avec des attaques variées selon les armes, ou des attaques spéciales selon les professions, peut utiliser les objets de sont inventaire.)
 - [X] NPC peut transporter des items dans son inventaire natif. (poids max + items de départ selon le métier) ✅ v0.0.5
 - [ ] Dialogue basique (bark texte au-dessus de la tête selon état)
 - [/] Bark de dialogue (texte au-dessus de la tête selon état : peur, colère, satisfaction, etc.)
-- [ ] Ordre "Va là-bas" (click droit sur une tuile cible)
+- [x] Ordre "Va là-bas" (click droit sur une tuile cible) (v0.0.9f : enterGoToMode / v0.0.9h : seuil arrivee GOTO_ARRIVE_DISTANCE)
 - [ ] Ordre "recolte' (faire cueillir des plantes ou fouiller des containers, loot, etc.)
 - [ ] NPC peut etre attaquer par des Zombies (doMeleeAttack) et réagir (hitreaction)
 - [ ] NPC peut attaquer les Zombies (doMeleeAttack) et réagir (hitreaction)

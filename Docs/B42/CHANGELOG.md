@@ -1,5 +1,46 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9h] — 2026-05-23
+
+### Corrections de bugs (rapport de test joueur)
+
+- **BUG 1 — `ERROR` au lancement (`Events.OnGameEnd.Add` de table nulle)**
+  - **Cause** : `Events.OnGameEnd` n'existe **plus** en B42.18 (l'API d'événements Lua a été nettoyée côté Java ; aucun `Events.lua` côté `media/lua` ne le déclare). `PHNPC_Log.lua` enregistrait un flush final via `Events.OnGameEnd.Add(...)` → `attempted index: Add of non-table: null` au démarrage.
+  - **Fix** : utiliser un fallback `Events.OnGameStop or Events.OnPreSave or Events.OnGameEnd` avec garde `if _onEndEvent and _onEndEvent.Add then ... end`. Plus aucun crash au lancement.
+
+- **BUG 7 — Items d'inventaire introuvables (`Base.PoliceBaton` / `Base.NightStick`)**
+  - **Cause** : noms invalides en B42.18. Le vrai identifiant en B42 est `Base.Nightstick` (s minuscule, un seul mot). `Base.PoliceBaton` n'existe pas.
+  - **Fix** : remplacement dans les 6 outfits concernés (Police, Sheriff_Deputy, Detective, Security, MallSecurity, PrisonGuard) de `{{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"}` par `{"Base.Nightstick","Base.HandTorch"}`. Plus d'erreur `ItemContainer.AddItem: can't find ...`.
+
+- **BUG 4 — Le NPC se colle au joueur en suivi**
+  - **Cause** : `npc:pathToCharacter(player)` route le pathfinder vers la **case exacte** du joueur ; le NPC essayait donc d'occuper la même tile et venait coller sa hitbox.
+  - **Fix** : `startFollowing` calcule maintenant un point cible décalé de `FOLLOW_STOP_DISTANCE` (porté de 2 à 3 tuiles) dans la direction opposée au NPC, puis appelle `pathToLocationF(tx, ty, pz)`. Quand le NPC est déjà à portée, il s'arrête proprement au lieu de re-pathfinder.
+
+- **BUG 2 — Ordre « Va là-bas » : le NPC reste à côté du joueur**
+  - **Cause** : l'état `goingto` considérait l'arrivée dès que `dist <= FOLLOW_STOP_DISTANCE (=3)` — donc validait immédiatement la destination quand le NPC était à 3 tuiles du joueur.
+  - **Fix** : nouveau seuil dédié `PHNPC.GOTO_ARRIVE_DISTANCE = 1`. L'arrivée n'est validée que quand le NPC est réellement sur la zone cliquée.
+
+- **BUG 5 — Ordre « Mets-toi à l'abri » : le NPC ne bouge pas**
+  - **Cause** : l'état `shelter` ne configurait `PHNPC_ZoneX/Y` qu'une fois (au premier tick), n'appelait `startMovingTo` qu'une seule fois et ne rappelait jamais le pathfind. Si l'abri était à 0 tuile (`findClearAreaNear` retournait la position actuelle), le NPC ne bougeait pas du tout.
+  - **Fix** : (1) si `findClearAreaNear` rend un point trop proche (< 2 tuiles), fallback aléatoire à 8 tuiles ; (2) ajout d'un retry `startMovingTo` toutes les `FOLLOW_TICK_RATE` ticks comme pour `goingto` ; (3) log explicite « shelter atteint -> staying ».
+
+- **BUG 6 — Les NPC ne savent pas ouvrir/refermer les fenêtres**
+  - **Cause** : aucune logique de gestion des fenêtres dans le mod.
+  - **Fix** : nouvelle fonction `PHNPC.checkAndOpenWindows(npc)` (4 directions + case courante) basée sur le pattern Bandits B42.18 `ZAOpenWindow.lua` : `square:getWindow():ToggleWindow(npc)` + `playSound("OpenWindow")`. Les fenêtres barricadées, brisées ou permaverrouillées sont ignorées. Ajout symétrique de `closeNearbyWindows` (9 directions) appelée dans `stopMoving`. Branchement dans `startMovingTo`, `startFollowing` et la boucle `OnTick` de `PHNPC_Update`.
+
+- **BUG 3 — Bug d'animations / T-pose lors des chutes**
+  - **Cause probable** : la transition `falldown/staggerback/down → ZombieIdleState` ne réinitialisait ni la posture (`setOnFloor`) ni le modèle 3D. Le NPC restait parfois bloqué en T-pose côté client.
+  - **Fix défensif** : nouvel ordre d'opérations dans `PHNPC_Enforce.lua` : `setOnFloor(false)` → `knockDown(false)` → `setKnockedDown(false)` → `setCanWalk(true)` → `setAnimatingBackwards(false)` → `resetModel()` → `changeState(ZombieIdleState)` → `setBumpType("Shrug")`.
+
+### Détails techniques
+
+- `PHNPC.FOLLOW_STOP_DISTANCE` : 2 → 3 tuiles.
+- Nouveau réglage : `PHNPC.GOTO_ARRIVE_DISTANCE = 1` tuile (anciennement = `FOLLOW_STOP_DISTANCE`).
+- Nouveaux helpers : `PHNPC.checkAndOpenWindows(npc)`, `PHNPC.closeNearbyWindows(npc)`.
+- Bannière `[PHNPC] ... v0.0.9h loaded` sur Log, Core, Stats, Actions, Update, Orders, Enforce.
+
+---
+
 ## [0.0.9g] — 2026-05-25
 
 ### Nouvelles fonctionnalités

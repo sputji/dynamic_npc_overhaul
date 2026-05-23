@@ -1,7 +1,7 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
 _Version 0.0.9g_
 
-> Ce guide explique le fonctionnement du système NPC tel qu'implémenté en v0.0.9g.
+> Ce guide explique le fonctionnement du système NPC tel qu'implémenté en v0.0.9h.
 > Pattern copié EXACTEMENT depuis NPC_Helper_Mod (GCCoreConvert + GCCoreEnforceMain + GCCoreSpawn + GCUpdate),
 > enrichi avec les corrections B42.18 (portes, outfits, Kahlua upvalue).
 

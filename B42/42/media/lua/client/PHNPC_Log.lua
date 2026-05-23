@@ -124,19 +124,24 @@ Events.OnTick.Add(function()
 end)
 
 -- Flush final a la fermeture du jeu
-Events.OnGameEnd.Add(function()
-    pcall(function()
-        if not PHNPC.Log._buffer or #PHNPC.Log._buffer == 0 then return end
-        local writer = getFileWriter("PHNPC_Debug.log", true, false)
-        if writer then
-            writer:write("[PHNPC][INF][Log] === Session terminee ===\n")
-            for _, line in ipairs(PHNPC.Log._buffer) do
-                writer:write(line .. "\n")
+-- v0.0.9h FIX BUG 1 : Events.OnGameEnd n'existe PAS en B42.18 (etait B41 only).
+-- Sans guard => attempted index: Add of non-table: null => ERROR au lancement.
+local _onEndEvent = Events.OnGameStop or Events.OnPreSave or Events.OnGameEnd
+if _onEndEvent and _onEndEvent.Add then
+    _onEndEvent.Add(function()
+        pcall(function()
+            if not PHNPC.Log._buffer or #PHNPC.Log._buffer == 0 then return end
+            local writer = getFileWriter("PHNPC_Debug.log", true, false)
+            if writer then
+                writer:write("[PHNPC][INF][Log] === Session terminee ===\n")
+                for _, line in ipairs(PHNPC.Log._buffer) do
+                    writer:write(line .. "\n")
+                end
+                writer:close()
             end
-            writer:close()
-        end
+        end)
     end)
-end)
+end
 
-PHNPC.Log.info("Log", "=== PHNPC_Log v0.0.9f initialise (LEVEL=" .. tostring(PHNPC.Log.LEVEL) .. ") ===")
-print("[PHNPC] Log v0.0.9f loaded")
+PHNPC.Log.info("Log", "=== PHNPC_Log v0.0.9h initialise (LEVEL=" .. tostring(PHNPC.Log.LEVEL) .. ") ===")
+print("[PHNPC] Log v0.0.9h loaded")

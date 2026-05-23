@@ -108,10 +108,16 @@ function PHNPC.enforceNPC(zombie)
             md.PHNPC_Moving = false
 
         elseif asn == "falldown" or asn == "staggerback" or asn == "down" then
-            zombie:changeState(ZombieIdleState.instance())
+            -- v0.0.9h FIX BUG 3 : T-pose lors de la transition falldown -> idle.
+            -- L'ordre est critique : d'abord lever le NPC, puis reset model, puis changeState.
+            pcall(function() zombie:setOnFloor(false) end)
             pcall(function() zombie:knockDown(false) end)
             pcall(function() zombie:setKnockedDown(false) end)
             pcall(function() zombie:setCanWalk(true) end)
+            pcall(function() zombie:setAnimatingBackwards(false) end)
+            pcall(function() zombie:resetModel() end)
+            zombie:changeState(ZombieIdleState.instance())
+            pcall(function() zombie:setBumpType("Shrug") end)
             md.PHNPC_Moving = false
 
         elseif asn == "getup" then
@@ -166,4 +172,4 @@ function PHNPC.enforceNPC(zombie)
     zombie:setWalkType("Walk")
 end
 
-print("[PHNPC] Enforce v0.0.9b loaded")
+print("[PHNPC] Enforce v0.0.9h loaded")
