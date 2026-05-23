@@ -33,12 +33,7 @@ PHNPC._openInventoryNPC = nil                            -- NPC dont l'inventair
 
 -- startFollowing : faire suivre le NPC vers le joueur
 -- v0.0.9e FIX : pathToCharacter(player) — methode standard IsoZombie→IsoCharacter.
--- Confirme par NPC_Helper_Mod B42.18 (GCUpdateAI.lua ligne 74 + GCUpdate_ORIGINAL.lua).
--- pathToLocationF ciblait une position FIXE => le NPC recalculait vers un point deplace
--- a chaque tick => tournait/zigzaguait. pathToCharacter suit l'IsoPlayer dynamiquement.
--- IMPORTANT : nos NPCs sont des IsoZombie converts, PAS des IsoPlayer => OK pour
---             pathToCharacter (le crash IsoPlayer/IsoZombie ne concerne que les NPCs
---             crees comme IsoPlayer, cf. user memory).
+-- v0.0.9g : checkAndOpenDoors AVANT le pathfind.
 function PHNPC.startFollowing(npc, player)
     local md = npc:getModData()
     npc:setUseless(false)
@@ -46,11 +41,15 @@ function PHNPC.startFollowing(npc, player)
         md.PHNPC_Moving = true
         pcall(function() npc:setBumpType("IdleToWalk") end)
     end
+    -- Ouvrir les portes AVANT le pathfind
+    pcall(function() PHNPC.checkAndOpenDoors(npc) end)
     pcall(function() npc:pathToCharacter(player) end)
     PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> pathToCharacter(player)")
 end
 
 -- startMovingTo : deplacer le NPC vers des coordonnees
+-- v0.0.9g : checkAndOpenDoors AVANT le pathfind pour eviter que le
+-- pathfinder zombie traite les portes comme obstacles a taper.
 function PHNPC.startMovingTo(npc, x, y, z)
     local md = npc:getModData()
     npc:setUseless(false)
@@ -59,6 +58,8 @@ function PHNPC.startMovingTo(npc, x, y, z)
         -- Transition Idle->Walk (NHM GCCoreActions pattern)
         pcall(function() npc:setBumpType("IdleToWalk") end)
     end
+    -- Ouvrir les portes AVANT de lancer le pathfind (sinon le pathfinder zombie frappe la porte)
+    pcall(function() PHNPC.checkAndOpenDoors(npc) end)
     pcall(function() npc:pathToLocationF(x, y, z) end)
 end
 
@@ -125,41 +126,76 @@ end
 
 -- ============================================================
 -- PORTES : ouvrir les portes dans les 4 directions adjacentes
--- Pattern GCUpdateStuck.lua (NPC_Helper_Mod B42.18)
--- Appeler quand le NPC est en mouvement pour debarrasser les passages
+-- v0.0.9g REFONTE : pattern Bandits 42.18 (BanditUpdate.lua)
+--   - ToggleDoorSilent() au lieu de ToggleDoor(npc)
+--   - Support doubles portes (IsoDoor.toggleDoubleDoor)
+--   - Support portes garage (IsoDoor.toggleGarageDoor)
+--   - Recalcul pathfind apres ouverture (sinon le zombie continue de taper)
+--   - Appele AVANT pathfind dans startMovingTo/startFollowing
+--   - ET en continu dans OnTick via PHNPC_Update.lua (pour les mouvements longs)
 -- ============================================================
 function PHNPC.checkAndOpenDoors(npc)
-    local md = npc:getModData()
-    if not md.PHNPC_Moving then return end
     local cell = npc:getCell()
     if not cell then return end
     local nx = math.floor(npc:getX())
     local ny = math.floor(npc:getY())
     local nz = math.floor(npc:getZ())
     local dirs = {{0,-1},{0,1},{1,0},{-1,0}}
+    local anyOpened = false
+
     for _, off in ipairs(dirs) do
         pcall(function()
             local sq = cell:getGridSquare(nx + off[1], ny + off[2], nz)
             if not sq then return end
-            -- Objets normaux (IsoDoor classique)
+
+            -- Objets normaux : IsoDoor (portes du jeu de base)
             local objects = sq:getObjects()
             if objects then
                 for i = 0, objects:size() - 1 do
                     local obj = objects:get(i)
                     if obj and instanceof(obj, "IsoDoor") then
-                        local locked = false
-                        pcall(function() locked = obj:isLocked() end)
-                        local barricaded = false
-                        pcall(function() barricaded = obj:isBarricaded() end)
                         local isOpen = false
                         pcall(function() isOpen = obj:IsOpen() end)
-                        if not locked and not barricaded and not isOpen then
-                            obj:ToggleDoor(npc)
+                        if isOpen then return end  -- deja ouverte
+
+                        local locked, barricaded = false, false
+                        pcall(function() locked = obj:isLocked() or obj:isLockedByKey() end)
+                        pcall(function() barricaded = obj:isBarricaded() end)
+                        if locked or barricaded then return end  -- verrouille, ne pas forcer
+
+                        -- Double porte (ex: entree principale, hopital)
+                        local isDoubleDoor = false
+                        pcall(function() isDoubleDoor = IsoDoor and IsoDoor.getDoubleDoorIndex(obj) > -1 end)
+                        if isDoubleDoor then
+                            pcall(function() IsoDoor.toggleDoubleDoor(obj, true) end)
+                            anyOpened = true
+                            return
                         end
+
+                        -- Porte garage
+                        local isGarage = false
+                        pcall(function() isGarage = IsoDoor and IsoDoor.getGarageDoorIndex(obj) > -1 end)
+                        if isGarage then
+                            pcall(function() IsoDoor.toggleGarageDoor(obj, true) end)
+                            anyOpened = true
+                            return
+                        end
+
+                        -- Porte standard : ToggleDoorSilent (pattern Bandits B42.18)
+                        pcall(function()
+                            obj:DirtySlice()
+                            IsoGridSquare.RecalcLightTime = -1.0
+                            sq:InvalidateSpecialObjectPaths()
+                            obj:ToggleDoorSilent()
+                            sq:RecalcProperties()
+                            obj:syncIsoObject(false, 1, nil, nil)
+                        end)
+                        anyOpened = true
                     end
                 end
             end
-            -- Objets speciaux (IsoThumpable construit in-game)
+
+            -- Objets speciaux : IsoThumpable avec isDoor() (portes construites in-game)
             local specials = sq:getSpecialObjects()
             if specials then
                 for i = 0, specials:size() - 1 do
@@ -167,15 +203,45 @@ function PHNPC.checkAndOpenDoors(npc)
                     if obj and instanceof(obj, "IsoThumpable") then
                         local isDoor = false
                         pcall(function() isDoor = obj:isDoor() end)
-                        local locked = false
-                        pcall(function() locked = obj:isLocked() end)
-                        local barricaded = false
-                        pcall(function() barricaded = obj:isBarricaded() end)
+                        if not isDoor then return end
+
                         local isOpen = false
                         pcall(function() isOpen = obj:IsOpen() end)
-                        if isDoor and not locked and not barricaded and not isOpen then
-                            obj:ToggleDoor(npc)
-                        end
+                        if isOpen then return end
+
+                        local locked, barricaded = false, false
+                        pcall(function() locked = obj:isLocked() end)
+                        pcall(function() barricaded = obj:isBarricaded() end)
+                        if locked or barricaded then return end
+
+                        pcall(function()
+                            obj:DirtySlice()
+                            sq:InvalidateSpecialObjectPaths()
+                            obj:ToggleDoorSilent()
+                            sq:RecalcProperties()
+                            obj:syncIsoObject(false, 1, nil, nil)
+                        end)
+                        anyOpened = true
+                    end
+                end
+            end
+        end)
+    end
+
+    -- Recalculer les paths/collisions dans un rayon de 2 tuiles autour du NPC
+    -- (sinon le pathfinder zombie garde en memoire l'obstacle = continue de taper)
+    if anyOpened then
+        pcall(function()
+            local sqSelf = cell:getGridSquare(nx, ny, nz)
+            if not sqSelf then return end
+            for dx = -2, 2 do
+                for dy = -2, 2 do
+                    local neighbor = cell:getGridSquare(nx + dx, ny + dy, nz)
+                    if neighbor then
+                        pcall(function() sqSelf:ReCalculateCollide(neighbor) end)
+                        pcall(function() sqSelf:ReCalculatePathFind(neighbor) end)
+                        pcall(function() neighbor:ReCalculateCollide(sqSelf) end)
+                        pcall(function() neighbor:ReCalculatePathFind(sqSelf) end)
                     end
                 end
             end

@@ -1,6 +1,40 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
-## [0.0.9f] — 2026-05-24
+## [0.0.9g] — 2026-05-25
+
+### Nouvelles fonctionnalités
+
+- **Tous les métiers (outfits) PZ B42 disponibles**
+  - Avant : seulement 7 outfits (Farmer, Police, Fireman, Doctor, Ranger, Chef, Survivor).
+  - **Ajout** : 50+ outfits issus de `clothing.xml` (source officielle PZ 42.18), répartis en 5 catégories :
+    - Forces de l'ordre / Militaire : Police, Sheriff_Deputy, Detective, Security, MallSecurity, PrisonGuard, Veteran, ArmyCamoGreen, ArmyCamoDesert, PrivateMilitia, BountyHunter
+    - Services d'urgence / Santé : Fireman, Doctor, Nurse, AmbulanceDriver, Pharmacist
+    - Travailleurs / Artisans : Farmer, Chef, Mechanic, ConstructionWorker, Trucker, Woodcut, MetalWorker, Sanitation, Postal, Foreman
+    - Nature / Plein air : Ranger, Hunter, Fisherman, Camper, Survivalist
+    - Civils : Teacher, IT, OfficeWorker, Resident, Retiree, Student, Tourist, Biker, Redneck, Hobbo, Inmate, Priest, FitnessInstructor
+    - Génériques : Generic01–05
+  - Chaque outfit a des stats cohérentes (speed/strength/health/maxWeight/items).
+  - `PHNPC.OUTFITS` mis à jour pour inclure tous ces métiers au spawn aléatoire.
+
+### Corrections de bugs
+
+- **NPCs tapent les portes au lieu de les ouvrir**
+  - **Cause** : L'ancienne `checkAndOpenDoors` utilisait `ToggleDoor(npc)` sans recalculer les chemins du pathfinder. Le pathfinder zombie de PZ conservait les portes en mémoire comme obstacles → continuait de taper.
+  - De plus, `checkAndOpenDoors` était appelée PENDANT le mouvement mais PAS avant le premier `pathToLocationF`/`pathToCharacter` → le pathfinder démarrait avec les portes fermées.
+  - **Fix (pattern Bandits 42.18 `BanditUpdate.lua`)** :
+    - `ToggleDoorSilent()` remplace `ToggleDoor(npc)` (méthode PZ B42 qui ouvre silencieusement).
+    - Support complet : double portes (`IsoDoor.toggleDoubleDoor`), portes garage (`IsoDoor.toggleGarageDoor`), portes standard (`ToggleDoorSilent`).
+    - Recalcul pathfind radius 2 tuiles après ouverture : `ReCalculateCollide` + `ReCalculatePathFind` sur les cases voisines → le pathfinder ne voit plus la porte comme obstacle.
+    - `checkAndOpenDoors` appelée **AVANT** `pathToLocationF`/`pathToCharacter` dans `startMovingTo` et `startFollowing`.
+    - Toujours appelée en continu dans `OnTick` via `PHNPC_Update.lua` pour les longs déplacements.
+
+### Robustesse
+
+- **Hardening de toutes les commandes NPC** (`PHNPC_Orders.lua`)
+  - Toutes les fonctions d'ordre (`recruitNPC`, `followNPC`, `stayNPC`, `attackOrderNPC`, `shelterNPC`, `freeNPC`, `quitTeamNPC`, `toggleCombatNPC`, `deleteNPC`, `enterGoToMode`, `goToLocation`) vérifient maintenant `if not npc then return end` et `if not md then return end` en tête, évitant tout crash si appelées avec un NPC nil ou invalide.
+
+
+
 
 ### Corrections de bugs
 
@@ -34,7 +68,7 @@
   - **Fix** : `PHNPC_Pathfind.lua` — radius par défaut `10→15`, système de score avec bonus `-50` pour les cases couvertes (`not sq:isOutside()`). Teste maintenant 12 directions au lieu de 8. Retourne toujours la case avec le meilleur score (couvert + sans zombies).
 
 
-
+## [0.0.9e] — 2026-05-23
 ### Corrections de bugs critiques
 
 - **CRASH `PHNPC_Log.lua` ligne 99 : `__add not defined for operands in Add`**

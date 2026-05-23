@@ -77,67 +77,134 @@ PHNPC.MAX_HEALTH = 100         -- PV par defaut si outfit inconnu
 -- strength  : force (0-10), influence les degats infliges (futur)
 -- health    : points de vie max
 -- maxWeight : poids max inventaire (kg)
--- items     : items donnes au spawn
+-- items     : items donnes au spawn ({A,B} = alternatif : essaie A puis B)
 -- ============================================================
 PHNPC.OUTFIT_STATS = {
-    Farmer  = {
-        speed     = 0.62,
-        strength  = 7,
-        health    = 90,
-        maxWeight = 15.0,
-        items     = { "Base.Shovel", "Base.Trowel" },
-    },
-    Police  = {
-        speed     = 0.70,
-        strength  = 8,
-        health    = 110,
-        maxWeight = 20.0,
-        -- v0.0.9f : essai Base.PoliceBaton puis Base.NightStick (nom variable selon build B42)
-        items     = { {"Base.PoliceBaton", "Base.NightStick"}, "Base.HandTorch" },
-    },
-    Fireman = {
-        speed     = 0.68,
-        strength  = 9,
-        health    = 120,
-        maxWeight = 25.0,
-        items     = { "Base.Axe" },
-    },
-    Doctor  = {
-        speed     = 0.62,
-        strength  = 6,
-        health    = 100,
-        maxWeight = 15.0,
-        items     = { "Base.BandageDirty", "Base.Painkillers" },
-    },
-    Ranger  = {
-        speed     = 0.75,
-        strength  = 7,
-        health    = 105,
-        maxWeight = 18.0,
-        items     = { "Base.HuntingKnife", "Base.HandTorch" },
-    },
-    Chef    = {
-        speed     = 0.62,
-        strength  = 6,
-        health    = 90,
-        maxWeight = 15.0,
-        items     = { "Base.KitchenKnife", "Base.CanOpener" },
-    },
-    Survivor = {
-        speed     = 0.65,
-        strength  = 7,
-        health    = 100,
-        maxWeight = 18.0,
-        items     = { "Base.Crowbar" },
-    },
+    -- ---- FORCES DE L'ORDRE / MILITAIRE ----
+    Police          = { speed=0.70, strength=8,  health=110, maxWeight=20.0,
+                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+    Sheriff_Deputy  = { speed=0.70, strength=8,  health=108, maxWeight=20.0,
+                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+    Detective       = { speed=0.68, strength=7,  health=100, maxWeight=18.0,
+                        items={"Base.HandTorch"} },
+    Security        = { speed=0.68, strength=7,  health=100, maxWeight=18.0,
+                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+    MallSecurity    = { speed=0.68, strength=7,  health=100, maxWeight=18.0,
+                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+    PrisonGuard     = { speed=0.70, strength=9,  health=110, maxWeight=20.0,
+                        items={{"Base.PoliceBaton","Base.NightStick"},"Base.HandTorch"} },
+    Veteran         = { speed=0.72, strength=9,  health=110, maxWeight=22.0,
+                        items={"Base.HuntingKnife","Base.HandTorch"} },
+    ArmyCamoGreen   = { speed=0.72, strength=9,  health=115, maxWeight=25.0,
+                        items={"Base.HuntingKnife","Base.HandTorch"} },
+    ArmyCamoDesert  = { speed=0.72, strength=9,  health=115, maxWeight=25.0,
+                        items={"Base.HuntingKnife","Base.HandTorch"} },
+    PrivateMilitia  = { speed=0.70, strength=9,  health=110, maxWeight=22.0,
+                        items={"Base.BaseballBat","Base.HandTorch"} },
+    BountyHunter    = { speed=0.70, strength=8,  health=105, maxWeight=20.0,
+                        items={"Base.HuntingKnife","Base.HandTorch"} },
+    -- ---- SERVICES D'URGENCE / SANTE ----
+    Fireman         = { speed=0.68, strength=9,  health=120, maxWeight=25.0,
+                        items={"Base.Axe"} },
+    Doctor          = { speed=0.62, strength=6,  health=100, maxWeight=15.0,
+                        items={"Base.BandageDirty","Base.Painkillers"} },
+    Nurse           = { speed=0.62, strength=5,  health=95,  maxWeight=15.0,
+                        items={"Base.BandageDirty","Base.Painkillers"} },
+    AmbulanceDriver = { speed=0.65, strength=6,  health=95,  maxWeight=18.0,
+                        items={"Base.BandageDirty","Base.Painkillers"} },
+    Pharmacist      = { speed=0.62, strength=5,  health=90,  maxWeight=15.0,
+                        items={"Base.Painkillers","Base.BandageDirty"} },
+    -- ---- TRAVAILLEURS / ARTISANS ----
+    Farmer          = { speed=0.62, strength=7,  health=90,  maxWeight=15.0,
+                        items={"Base.Shovel","Base.Trowel"} },
+    Chef            = { speed=0.62, strength=6,  health=90,  maxWeight=15.0,
+                        items={"Base.KitchenKnife","Base.CanOpener"} },
+    Mechanic        = { speed=0.65, strength=8,  health=100, maxWeight=20.0,
+                        items={"Base.Wrench","Base.HandTorch"} },
+    ConstructionWorker = { speed=0.65, strength=9, health=105, maxWeight=22.0,
+                        items={"Base.Hammer","Base.HandTorch"} },
+    Trucker         = { speed=0.65, strength=8,  health=100, maxWeight=22.0,
+                        items={"Base.Wrench"} },
+    Woodcut         = { speed=0.68, strength=9,  health=105, maxWeight=22.0,
+                        items={"Base.Axe"} },
+    MetalWorker     = { speed=0.65, strength=9,  health=105, maxWeight=22.0,
+                        items={"Base.Hammer","Base.HandTorch"} },
+    Sanitation      = { speed=0.65, strength=7,  health=95,  maxWeight=20.0,
+                        items={} },
+    Postal          = { speed=0.62, strength=6,  health=90,  maxWeight=18.0,
+                        items={"Base.HandTorch"} },
+    Foreman         = { speed=0.65, strength=8,  health=100, maxWeight=20.0,
+                        items={"Base.Hammer","Base.HandTorch"} },
+    -- ---- NATURE / PLEIN AIR ----
+    Ranger          = { speed=0.75, strength=7,  health=105, maxWeight=18.0,
+                        items={"Base.HuntingKnife","Base.HandTorch"} },
+    Hunter          = { speed=0.72, strength=7,  health=100, maxWeight=20.0,
+                        items={"Base.HuntingKnife","Base.HandTorch"} },
+    Fisherman       = { speed=0.65, strength=6,  health=90,  maxWeight=18.0,
+                        items={"Base.HuntingKnife"} },
+    Camper          = { speed=0.68, strength=7,  health=95,  maxWeight=20.0,
+                        items={"Base.HuntingKnife","Base.HandTorch"} },
+    Survivalist     = { speed=0.68, strength=7,  health=100, maxWeight=18.0,
+                        items={"Base.Crowbar","Base.HandTorch"} },
+    -- ---- CIVILS ----
+    Teacher         = { speed=0.60, strength=5,  health=85,  maxWeight=12.0,
+                        items={} },
+    IT              = { speed=0.58, strength=5,  health=80,  maxWeight=12.0,
+                        items={"Base.HandTorch"} },
+    OfficeWorker    = { speed=0.60, strength=5,  health=80,  maxWeight=12.0,
+                        items={} },
+    Resident        = { speed=0.60, strength=6,  health=85,  maxWeight=15.0,
+                        items={} },
+    Retiree         = { speed=0.55, strength=4,  health=80,  maxWeight=12.0,
+                        items={} },
+    Student         = { speed=0.65, strength=5,  health=85,  maxWeight=12.0,
+                        items={} },
+    Tourist         = { speed=0.62, strength=5,  health=85,  maxWeight=15.0,
+                        items={"Base.HandTorch"} },
+    Biker           = { speed=0.70, strength=7,  health=98,  maxWeight=18.0,
+                        items={"Base.BaseballBat"} },
+    Redneck         = { speed=0.68, strength=8,  health=95,  maxWeight=18.0,
+                        items={"Base.HuntingKnife"} },
+    Hobbo           = { speed=0.65, strength=6,  health=80,  maxWeight=12.0,
+                        items={} },
+    Inmate          = { speed=0.68, strength=7,  health=95,  maxWeight=15.0,
+                        items={} },
+    Priest          = { speed=0.58, strength=5,  health=85,  maxWeight=12.0,
+                        items={} },
+    FitnessInstructor = { speed=0.72, strength=8, health=100, maxWeight=18.0,
+                        items={} },
+    -- ---- GENERIQUES ----
+    Generic01       = { speed=0.62, strength=6,  health=90,  maxWeight=15.0, items={} },
+    Generic02       = { speed=0.62, strength=6,  health=90,  maxWeight=15.0, items={} },
+    Generic03       = { speed=0.62, strength=6,  health=90,  maxWeight=15.0, items={} },
+    Generic04       = { speed=0.62, strength=6,  health=90,  maxWeight=15.0, items={} },
+    Generic05       = { speed=0.62, strength=6,  health=90,  maxWeight=15.0, items={} },
+    -- ---- ALIAS RETROCOMPATIBILITE ----
+    Survivor        = { speed=0.65, strength=7,  health=100, maxWeight=18.0,
+                        items={"Base.Crowbar"} },  -- alias -> Survivalist
 }
 
 -- ============================================================
--- OUTFITS DISPONIBLES AU SPAWN
+-- OUTFITS DISPONIBLES AU SPAWN (tous les metiers B42)
 -- ============================================================
 PHNPC.OUTFITS = {
-    "Farmer", "Police", "Fireman", "Doctor",
-    "Ranger", "Chef", "Survivor",
+    -- Forces de l'ordre / Militaire
+    "Police", "Sheriff_Deputy", "Detective", "Security", "MallSecurity",
+    "PrisonGuard", "Veteran", "ArmyCamoGreen", "ArmyCamoDesert",
+    "PrivateMilitia", "BountyHunter",
+    -- Services d'urgence / Sante
+    "Fireman", "Doctor", "Nurse", "AmbulanceDriver", "Pharmacist",
+    -- Travailleurs / Artisans
+    "Farmer", "Chef", "Mechanic", "ConstructionWorker", "Trucker",
+    "Woodcut", "MetalWorker", "Sanitation", "Postal", "Foreman",
+    -- Nature / Plein air
+    "Ranger", "Hunter", "Fisherman", "Camper", "Survivalist",
+    -- Civils
+    "Teacher", "IT", "OfficeWorker", "Resident", "Retiree", "Student",
+    "Tourist", "Biker", "Redneck", "Hobbo", "Inmate", "Priest",
+    "FitnessInstructor",
+    -- Generiques
+    "Generic01", "Generic02", "Generic03", "Generic04", "Generic05",
 }
 
 -- ============================================================

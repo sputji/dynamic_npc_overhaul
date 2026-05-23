@@ -44,7 +44,9 @@
 -- ============================================================
 
 function PHNPC.recruitNPC(npc)
+    if not npc then return end
     local md = npc:getModData()
+    if not md then return end
     md.PHNPC_Recruited  = true
     md.PHNPC_State      = "following"
     md.PHNPC_Moving     = false
@@ -67,7 +69,9 @@ end
 -- ============================================================
 
 function PHNPC.followNPC(npc)
+    if not npc then return end
     local md = npc:getModData()
+    if not md then return end
     md.PHNPC_State  = "following"
     md.PHNPC_ZoneX  = nil  -- effacer la zone precedente
     md.PHNPC_ZoneY  = nil
@@ -84,7 +88,9 @@ end
 -- ============================================================
 
 function PHNPC.stayNPC(npc)
+    if not npc then return end
     local md = npc:getModData()
+    if not md then return end
     md.PHNPC_State = "staying"
     md.PHNPC_ZoneX = npc:getX()
     md.PHNPC_ZoneY = npc:getY()
@@ -102,7 +108,9 @@ end
 -- ============================================================
 
 function PHNPC.attackOrderNPC(npc)
+    if not npc then return end
     local md = npc:getModData()
+    if not md then return end
     md.PHNPC_CombatMode   = "auto"
     md.PHNPC_AttackReturn = true
     md.PHNPC_ZoneX        = npc:getX()
@@ -121,7 +129,9 @@ end
 -- ============================================================
 
 function PHNPC.shelterNPC(npc)
+    if not npc then return end
     local md = npc:getModData()
+    if not md then return end
     md.PHNPC_State = "shelter"
     md.PHNPC_ZoneX = nil  -- sera calcule par Update.lua
     md.PHNPC_ZoneY = nil
@@ -136,7 +146,9 @@ end
 -- ============================================================
 
 function PHNPC.freeNPC(npc)
+    if not npc then return end
     local md = npc:getModData()
+    if not md then return end
     md.PHNPC_State = "free"
     md.PHNPC_ZoneX = nil
     md.PHNPC_ZoneY = nil
@@ -151,7 +163,9 @@ end
 -- ============================================================
 
 function PHNPC.quitTeamNPC(npc)
+    if not npc then return end
     local md = npc:getModData()
+    if not md then return end
     md.PHNPC_Recruited = false
     md.PHNPC_State     = "idle"
     md.PHNPC_ZoneX     = nil
@@ -172,7 +186,9 @@ end
 -- ============================================================
 
 function PHNPC.toggleCombatNPC(npc)
+    if not npc then return end
     local md = npc:getModData()
+    if not md then return end
     if md.PHNPC_CombatMode == "off" then
         md.PHNPC_CombatMode = "auto"
         pcall(function()
@@ -192,7 +208,9 @@ end
 -- ============================================================
 
 function PHNPC.deleteNPC(npc)
+    if not npc then return end
     local md   = npc:getModData()
+    if not md then return end
     local name = md.PHNPC_Name or "?"
     md.PHNPC_IsNPC = nil
     if PHNPC._openInventoryNPC == npc then PHNPC._openInventoryNPC = nil end
@@ -277,6 +295,7 @@ pcall(function() PHNPC._initGoToCursor() end)
 
 -- enterGoToMode : active le curseur de selection de tuile pour l'ordre "Va la-bas"
 function PHNPC.enterGoToMode(npc)
+    if not npc then return end
     local player = getPlayer()
     if not player then return end
     -- v0.0.9f : utiliser PHNPC._initGoToCursor (champ table, pas upvalue locale)
@@ -293,7 +312,9 @@ end
 
 -- goToLocation : envoyer le NPC vers une coordonnee precise
 function PHNPC.goToLocation(npc, x, y, z)
+    if not npc then return end
     local md = npc:getModData()
+    if not md then return end
     md.PHNPC_State = "goingto"
     md.PHNPC_GoToX = x
     md.PHNPC_GoToY = y
