@@ -44,6 +44,25 @@ function PHNPC.enforceNPC(zombie)
     -- 4. Prevenir comportement zombie
     zombie:setNoTeeth(true)
     pcall(function() zombie:setEatBodyTarget(nil, false) end)
+    -- v0.0.9i FIX BUG 4 : casser DEFINITIVEMENT l'attraction zombie vers le joueur.
+    -- Le moteur IsoZombie/AI Lunge ciblait automatiquement l'IsoPlayer local et
+    -- redirigeait le pathfind, court-circuitant nos ordres Lua. Reset chaque tick.
+    pcall(function() zombie:setAttackedBy(nil) end)
+    pcall(function() zombie:setAlertedBy(nil) end)
+    pcall(function() zombie:setPathTargetCharacter(nil) end)
+    pcall(function() zombie:setPrimaryTarget(nil) end)
+    pcall(function() zombie:setSecondaryTarget(nil) end)
+    -- Si l'AnimEngine est en LungeState alors qu'on a un ordre explicite (goingto/shelter),
+    -- forcer la sortie immediate vers ZombieIdleState (l'attaque parasite l'IA).
+    if md.PHNPC_State == "goingto" or md.PHNPC_State == "shelter" then
+        pcall(function()
+            local st = zombie:getCurrentState()
+            if st and tostring(st):find("LungeState") then
+                zombie:changeState(ZombieIdleState.instance())
+                zombie:setTarget(nil)
+            end
+        end)
+    end
     local _hp = 0
     pcall(function() _hp = zombie:getHealth() end)
     if _hp < 9000 then zombie:setHealth(10000) end
@@ -108,16 +127,28 @@ function PHNPC.enforceNPC(zombie)
             md.PHNPC_Moving = false
 
         elseif asn == "falldown" or asn == "staggerback" or asn == "down" then
-            -- v0.0.9h FIX BUG 3 : T-pose lors de la transition falldown -> idle.
-            -- L'ordre est critique : d'abord lever le NPC, puis reset model, puis changeState.
+            -- v0.0.9i FIX BUG 3 : T-pose lors de la transition falldown -> idle.
+            -- En B42.18 l'AnimEngine bloque la transition tant que les variables
+            -- BumpFall* restent actives. Il faut les reset EN PLUS de l'API Java.
+            pcall(function() zombie:setVariable("BumpFall", false) end)
+            pcall(function() zombie:setVariable("BumpFallType", "") end)
+            pcall(function() zombie:setVariable("BumpDone", true) end)
+            pcall(function() zombie:setVariable("OnTheFloor", false) end)
+            pcall(function() zombie:setVariable("WasOnFloor", false) end)
             pcall(function() zombie:setOnFloor(false) end)
             pcall(function() zombie:knockDown(false) end)
             pcall(function() zombie:setKnockedDown(false) end)
+            pcall(function() zombie:setBecomeCrawler(false) end)
+            pcall(function() zombie:setCrawler(false) end)
             pcall(function() zombie:setCanWalk(true) end)
+            pcall(function() zombie:setSprinting(false) end)
             pcall(function() zombie:setAnimatingBackwards(false) end)
+            -- Forcer la reinitialisation du modele 3D (essentiel pour casser la T-pose).
             pcall(function() zombie:resetModel() end)
+            pcall(function() zombie:resetModelNextFrame() end)
+            pcall(function() zombie:setSkeletonResetting(true) end)
             zombie:changeState(ZombieIdleState.instance())
-            pcall(function() zombie:setBumpType("Shrug") end)
+            pcall(function() zombie:setBumpType("IdleToWalk") end)
             md.PHNPC_Moving = false
 
         elseif asn == "getup" then
@@ -172,4 +203,4 @@ function PHNPC.enforceNPC(zombie)
     zombie:setWalkType("Walk")
 end
 
-print("[PHNPC] Enforce v0.0.9h loaded")
+print("[PHNPC] Enforce v0.0.9i loaded")

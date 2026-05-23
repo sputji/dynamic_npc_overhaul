@@ -1,6 +1,6 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 23 mai 2026 | Version **0.0.9h** | Fix 7 bugs (Events.OnGameEnd guard, Nightstick, follow offset, goingto, shelter retry, fenêtres, T-pose). v0.0.9g : 47 outfits + checkAndOpenDoors réécrit.
+> Mise a jour : 23 mai 2026 | Version **0.0.9i** | Fix Java natifs 4 bugs persistants (NPC colle, Va la-bas / Mets-toi a l'abri ecrasees par Combat, T-pose AnimSet BumpFall). v0.0.9h : 7 fixes (OnGameEnd, Nightstick, follow offset, GoTo seuil, shelter retry, fenetres, T-pose v1).
 > Mise a jour : 27 mai 2026 | Version **0.0.7a** | Combat NPC auto, fuite HP<30%, dialogue contextuel, menu complet.
 
 ---
@@ -193,15 +193,15 @@ PHNPC.recruited = {}            -- [npcRef] = true (suivent ou restent)
 
 ### Phase 0.1.0 — Qualité des interactions
 - [x] Creer un fichier qui creer et recuper tous les log du mod pour simplifier le debug. (v0.0.9d : PHNPC_Log.lua / v0.0.9h : guard Events.OnGameEnd)
-- [ ] Comportement de fuite quand HP < 30% (a améliorer avec un pathfind vers une zone dégagée, ou vers le joueur si zone dégagée)
-- [ ] Systeme de combat NPC (défendre → attaquer les zombies proches) (a ameliorer avec des attaques variées selon les armes, ou des attaques spéciales selon les professions, peut utiliser les objets de sont inventaire.)
+- [x] Comportement de fuite quand HP < 30% (a améliorer avec un pathfind vers une zone dégagée, ou vers le joueur si zone dégagée) (v0.0.9c : findEscapeDirection / v0.0.9i : ne s'interrompt plus en goingto/shelter sauf HP<15%)
+- [x] Systeme de combat NPC (défendre → attaquer les zombies proches) (a ameliorer avec des attaques variées selon les armes, ou des attaques spéciales selon les professions, peut utiliser les objets de sont inventaire.) (v0.0.9c : npcCombatStep + getNPCWeapon / v0.0.9i : respect ordres explicites)
 - [X] NPC peut transporter des items dans son inventaire natif. (poids max + items de départ selon le métier) ✅ v0.0.5
 - [ ] Dialogue basique (bark texte au-dessus de la tête selon état)
 - [/] Bark de dialogue (texte au-dessus de la tête selon état : peur, colère, satisfaction, etc.)
-- [x] Ordre "Va là-bas" (click droit sur une tuile cible) (v0.0.9f : enterGoToMode / v0.0.9h : seuil arrivee GOTO_ARRIVE_DISTANCE)
+- [x] Ordre "Va là-bas" (click droit sur une tuile cible) (v0.0.9f : enterGoToMode / v0.0.9h : seuil arrivee GOTO_ARRIVE_DISTANCE / v0.0.9i : Combat n'écrase plus la destination)
 - [ ] Ordre "recolte' (faire cueillir des plantes ou fouiller des containers, loot, etc.)
-- [ ] NPC peut etre attaquer par des Zombies (doMeleeAttack) et réagir (hitreaction)
-- [ ] NPC peut attaquer les Zombies (doMeleeAttack) et réagir (hitreaction)
+- [x] NPC peut etre attaquer par des Zombies (doMeleeAttack) et réagir (hitreaction) (v0.0.9i : hitreaction handler dans enforceNPC, setAttackedBy reset chaque tick)
+- [x] NPC peut attaquer les Zombies (doMeleeAttack) et réagir (hitreaction) (v0.0.9c : npcCombatStep / v0.0.9i : LungeState forcé vers Idle si ordre explicite)
 - [ ] NPC peut demander de l'aide à un allié ou un ennemi (bark de demande d'aide, peut attaquer ou fuir selon le niveau de colère)
 
 ### Phase 0.1.1 — Qualité des interactions (loot)

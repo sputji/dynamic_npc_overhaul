@@ -144,4 +144,4 @@ if _onEndEvent and _onEndEvent.Add then
 end
 
 PHNPC.Log.info("Log", "=== PHNPC_Log v0.0.9h initialise (LEVEL=" .. tostring(PHNPC.Log.LEVEL) .. ") ===")
-print("[PHNPC] Log v0.0.9h loaded")
+print("[PHNPC] Log v0.0.9i loaded")

@@ -326,4 +326,4 @@ Events.OnGameStart.Add(function()
     print("[PHNPC] v0.0.9h pret")
 end)
 
-print("[PHNPC] Update v0.0.9h loaded")
+print("[PHNPC] Update v0.0.9i loaded")

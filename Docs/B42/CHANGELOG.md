@@ -1,5 +1,45 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9i] — 2026-05-23
+
+### Corrections définitives Java natives (4 bugs persistants après v0.0.9h)
+
+Diagnostic : le comportement résiduel d'`IsoZombie` (auto-ciblage du joueur, AnimEngine bloqué en BumpFall) court-circuitait les ordres Lua. Solutions trouvées via la JavaDoc `zombie/characters/IsoZombie`.
+
+- **BUG 2 — « Va là-bas » ignoré (NPC reste à côté du joueur)**
+  - **Cause racine** : dans `PHNPC_Update.OnTick`, `npcCombatStep` était appelé **avant** le test du state machine. Dès qu'un zombie passait à ≤ `COMBAT_RANGE` (8 tuiles, donc presque toujours), le NPC basculait en `state="defending"` et `startMovingTo(zombie_x, zombie_y)` écrasait notre destination `goingto`. Comme les zombies sont souvent près du joueur, le NPC tournait autour du joueur au lieu d'aller au point cliqué.
+  - **Fix** : dans `PHNPC.npcCombatStep`, garde explicite `if md.PHNPC_State == "goingto" or md.PHNPC_State == "shelter" then return end`. Les ordres explicites du joueur sont désormais prioritaires sur l'IA combat.
+
+- **BUG 5 — « Mets-toi à l'abri » ignoré (même symptôme)**
+  - **Cause racine** : identique à Bug 2 (`npcCombatStep` + `npcFlightStep` écrasaient `state="shelter"`).
+  - **Fix** : même garde dans `npcCombatStep` et dans `npcFlightStep` (sauf si HP critique < 15 % — la survie reste prioritaire).
+
+- **BUG 4 — Le NPC pousse le joueur (offset négatif ignoré, mouvement saccadé)**
+  - **Cause racine** : le moteur natif `IsoZombie` ré-applique automatiquement chaque tick le ciblage du joueur (`setTarget`, `LungeState`) via l'AI Lunge. Notre `pathToLocationF` calculait bien l'offset mais le `PathFindBehavior2` interne reprenait le joueur comme cible immédiatement après. Le NPC oscillait entre notre pathfind et le ciblage automatique zombie.
+  - **Fix** : neutralisation native chaque tick dans `PHNPC_Enforce.enforceNPC` :
+    - `setAttackedBy(nil)`, `setAlertedBy(nil)`, `setPathTargetCharacter(nil)`, `setPrimaryTarget(nil)`, `setSecondaryTarget(nil)`.
+    - Si `getCurrentState()` retourne `LungeState` alors qu'un ordre `goingto`/`shelter` est actif, forçage immédiat de `ZombieIdleState.instance()`.
+    - Reset cible **avant** chaque `pathToLocationF` dans `startMovingTo` et `startFollowing` (`setTarget(nil)` + `clearAggroList()` + `setPathTargetCharacter(nil)`).
+
+- **BUG 3 — T-pose persistante après chute (AnimEngine bloqué)**
+  - **Cause racine** : l'AnimEngine B42.18 conserve les variables AnimSet `BumpFall`, `BumpFallType`, `BumpDone`, `OnTheFloor` actives après une chute. Tant que `BumpFall=true`, le squelette n'est pas réinitialisé et l'entité reste figée en T-pose, même après `changeState(ZombieIdleState)`.
+  - **Fix** : nouveau handler `falldown/staggerback/down` dans `enforceNPC` :
+    - Reset variables AnimSet : `setVariable("BumpFall", false)`, `setVariable("BumpFallType", "")`, `setVariable("BumpDone", true)`, `setVariable("OnTheFloor", false)`, `setVariable("WasOnFloor", false)`.
+    - Reset état physique : `setOnFloor(false)`, `knockDown(false)`, `setKnockedDown(false)`, `setBecomeCrawler(false)`, `setCrawler(false)`, `setCanWalk(true)`, `setSprinting(false)`, `setAnimatingBackwards(false)`.
+    - Reset modèle 3D : `resetModel()`, `resetModelNextFrame()`, `setSkeletonResetting(true)`.
+    - Transition propre : `changeState(ZombieIdleState.instance())` puis `setBumpType("IdleToWalk")` (au lieu de "Shrug" qui pouvait re-trigger une animation parasite).
+
+### Détails techniques
+
+- Bannière `[PHNPC] ... v0.0.9i loaded` sur Log, Core, Stats, Actions, Update, Orders, Enforce, Combat.
+- Aucun nouveau réglage `PHNPC_Core`. Aucune nouvelle dépendance.
+- Méthodes Java natives utilisées (toutes encapsulées en `pcall` pour la sécurité Kahlua) :
+  - `IsoZombie.setAttackedBy/setAlertedBy/setPathTargetCharacter/setPrimaryTarget/setSecondaryTarget/setBecomeCrawler/setCrawler/setSprinting/setSkeletonResetting/resetModelNextFrame`
+  - `IsoGameCharacter.setVariable("BumpFall"/"BumpFallType"/"BumpDone"/"OnTheFloor"/"WasOnFloor")`
+  - `IsoGameCharacter.getCurrentState()` + détection `LungeState`
+
+---
+
 ## [0.0.9h] — 2026-05-23
 
 ### Corrections de bugs (rapport de test joueur)

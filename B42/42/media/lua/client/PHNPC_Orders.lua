@@ -223,7 +223,7 @@ function PHNPC.deleteNPC(npc)
     PHNPC.Log.info("Orders", "Supprime : " .. name)
 end
 
-print("[PHNPC] Orders v0.0.9h loaded")
+print("[PHNPC] Orders v0.0.9i loaded")
 
 -- ============================================================
 -- "VA LA-BAS" : CURSOR TILE VERTE + ORDRE DE DEPLACEMENT

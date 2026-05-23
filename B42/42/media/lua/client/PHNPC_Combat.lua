@@ -77,6 +77,10 @@ function PHNPC.npcCombatStep(npc)
     if md.PHNPC_CombatMode == "off" then return end
     -- Pas de combat si en fuite
     if md.PHNPC_State == "fleeing" then return end
+    -- v0.0.9i FIX BUG 2/4/5 : ordres explicites du joueur prioritaires.
+    -- Combat ne doit JAMAIS interrompre "Va la-bas" / "Mets-toi a l'abri".
+    -- Le NPC n'engage le combat que s'il est en mode neutre (following/staying/free).
+    if md.PHNPC_State == "goingto" or md.PHNPC_State == "shelter" then return end
 
     -- Decrementer cooldown attaque
     if (md.PHNPC_AttackCooldown or 0) > 0 then
@@ -161,6 +165,13 @@ end
 function PHNPC.npcFlightStep(npc, player)
     local md = npc:getModData()
     if not md.PHNPC_Recruited then return end
+    -- v0.0.9i FIX BUG 2/5 : ne pas interrompre les ordres explicites.
+    -- Si HP critique le NPC peut quand meme fuir, mais sinon respecter goingto/shelter.
+    local hpRatioOverride = (md.PHNPC_Health or 100) / (md.PHNPC_MaxHealth or 100)
+    if (md.PHNPC_State == "goingto" or md.PHNPC_State == "shelter")
+       and hpRatioOverride > 0.15 then
+        return
+    end
 
     local hp    = md.PHNPC_Health    or 100
     local maxHp = md.PHNPC_MaxHealth or 100
@@ -235,4 +246,4 @@ function PHNPC.npcFlightStep(npc, player)
     end
 end
 
-print("[PHNPC] Combat v0.0.9c loaded")
+print("[PHNPC] Combat v0.0.9i loaded")

@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.9g-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.9i-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,11 +20,11 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.9g**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.9i**.
 
 ---
 
-## Fonctionnalités actuelles (v0.0.9g)
+## Fonctionnalités actuelles (v0.0.9i)
 
 ### PNJ & Professions
 
@@ -232,6 +232,8 @@ Dynamic_NPC_Overhaul/
 | v0.0.9d | États comportement complets (free/shelter/attacking/goingto), ordres étendus | ✅ |
 | v0.0.9f | Fix Kahlua upvalue, noms complets, vitesse, items alternatifs | ✅ |
 | v0.0.9g | 47 outfits B42, ouverture portes correcte (ToggleDoorSilent), hardening ordres | ✅ |
+| v0.0.9h | Fix crash lancement (OnGameEnd), fix items Nightstick, ouverture fenêtres, GoTo seuil dédié | ✅ |
+| v0.0.9i | Fix Java natifs : neutralisation cible auto zombie (Bug 4), respect des ordres goingto/shelter (Bug 2/5), AnimSet BumpFall reset (T-pose Bug 3) | ✅ |
 | v0.1.0 | Dialogue avancé, réaction aux zombies améliorée | 🔜 |
 | v0.1.1 | Loot de bâtiments, échange d'items amélioré | 🔜 |
 | v0.1.5 | Persistance (sauvegarde/rechargement des PNJ) | 🔜 |
@@ -258,6 +260,8 @@ Historique complet des modifications : **[Docs/B42/CHANGELOG.md](https://github.
 
 | Version | Résumé |
 |---------|--------|
+| [v0.0.9i](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009i----2026-05-23) | Fix définitifs Java natifs : ordre Va là-bas + Mets-toi à l'abri respectés, NPC ne colle plus, T-pose résolue (BumpFall AnimSet reset) |
+| [v0.0.9h](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009h----2026-05-23) | Fix crash launch (OnGameEnd guard B42.18), Nightstick correct, fenêtres ouvertes par NPC, GOTO_ARRIVE_DISTANCE dédié |
 | [v0.0.9g](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009g----2026-05-23) | 47 outfits PZ B42, fix ouverture portes NPCs (ToggleDoorSilent + recalc pathfind), hardening toutes commandes |
 | [v0.0.9f](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009f----2026-05-24) | Fix upvalues Kahlua (Log/GoTo), noms complets, vitesse, items, portes, shelter |
 | [v0.0.9e](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009e----2026-05-23) | Fix crash Log (Kahlua upvalue), fix NPC tourne (`pathToCharacter`), fix sync nom NPC/badges |
