@@ -250,4 +250,4 @@ function PHNPC.getOutfitStats(outfit)
     return PHNPC.OUTFIT_STATS[outfit] or PHNPC.OUTFIT_STATS["Survivor"]
 end
 
-print("[PHNPC] Core v0.0.9k loaded")
+print("[PHNPC] Core v0.0.9l loaded")

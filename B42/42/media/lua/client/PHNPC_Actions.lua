@@ -71,12 +71,25 @@ end
 PHNPC._applyMoveSetup = applyMoveSetup
 
 -- Doit-on (re)lancer un pathfind ? Vrai si destination differente ou NPC a l'arret.
+-- v0.0.9l : ajoute cooldown 8 ticks anti-spam (evite saccades quand le moteur
+-- alterne entre etats idle/pathfind transitoires).
+local PATH_COOLDOWN = 8
+local _pathTickCounter = PHNPC._pathTickCounter or 0
+PHNPC._pathTickCounter = _pathTickCounter
 local function needNewPath(npc, md, x, y, z)
-    if not md.PHNPC_Moving then return true end
     if not md.PHNPC_PathX or not md.PHNPC_PathY then return true end
     local dx = (md.PHNPC_PathX - x)
     local dy = (md.PHNPC_PathY - y)
-    if dx*dx + dy*dy > 1 then return true end  -- nouvelle dest (> 1 tile diff)
+    if dx*dx + dy*dy > 4 then  -- > 2 tiles : nouvelle destination
+        return true
+    end
+    if not md.PHNPC_Moving then
+        -- pas en mouvement mais memes coords : verifier cooldown anti-spam
+        if md.PHNPC_LastPathTick and (PHNPC._pathTickCounter - md.PHNPC_LastPathTick) < PATH_COOLDOWN then
+            return false
+        end
+        return true
+    end
     return false
 end
 PHNPC._needNewPath = needNewPath
@@ -116,6 +129,7 @@ function PHNPC.startFollowing(npc, player)
         md.PHNPC_PathY    = ty
         md.PHNPC_PathZ    = pz
         md.PHNPC_WalkType = walkType
+        md.PHNPC_LastPathTick = PHNPC._pathTickCounter
         md.PHNPC_StuckTicks = 0
         md.PHNPC_LastMoveX  = npc:getX()
         md.PHNPC_LastMoveY  = npc:getY()
@@ -153,6 +167,7 @@ function PHNPC.startMovingTo(npc, x, y, z, forceWalkType)
         md.PHNPC_PathY    = y
         md.PHNPC_PathZ    = z
         md.PHNPC_WalkType = walkType
+        md.PHNPC_LastPathTick = PHNPC._pathTickCounter
         md.PHNPC_StuckTicks = 0
         md.PHNPC_LastMoveX  = npc:getX()
         md.PHNPC_LastMoveY  = npc:getY()
@@ -473,7 +488,7 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.9k loaded")
+print("[PHNPC] Actions v0.0.9l loaded")
 
 -- ============================================================
 -- FENETRES (v0.0.9h NEW — Bug 6)

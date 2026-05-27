@@ -107,4 +107,4 @@ end
 
 Events.OnZombieDead.Add(onZombieDead)
 
-print("[PHNPC] Loot v0.0.9k loaded")
+print("[PHNPC] Loot v0.0.9l loaded")

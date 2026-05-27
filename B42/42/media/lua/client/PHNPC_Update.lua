@@ -69,6 +69,9 @@ Events.OnTick.Add(function()
     local player = getPlayer()
     if not player or not PHNPC then return end
 
+    -- v0.0.9l : compteur global pour cooldown anti-spam pathToLocationF
+    PHNPC._pathTickCounter = (PHNPC._pathTickCounter or 0) + 1
+
     -- ---- NPCs recrutes : fuite + combat + suivi ----
     for npc, _ in pairs(PHNPC.recruited) do
         local valid = false
@@ -369,4 +372,4 @@ Events.OnGameStart.Add(function()
     print("[PHNPC] v0.0.9h pret")
 end)
 
-print("[PHNPC] Update v0.0.9k loaded")
+print("[PHNPC] Update v0.0.9l loaded")

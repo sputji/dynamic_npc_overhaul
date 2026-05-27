@@ -1,5 +1,6 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
+> Mise a jour : 27 mai 2026 | Version **0.0.9l** | FIX BUGS v0.0.9k : (1) crash total "Mets-toi a l'abri" via PHNPC_Building.lua spc wrapper (pcall=nil au load Kahlua) -> retire pcall, appels Java directs (toutes API verifees B42.18). (2) Saccades "Va la-bas" : Enforce.lua idle handler attendait 0 tick avant stopMoving -> compteur PHNPC_IdleTicks seuil 15. (3) Anti-spam pathToLocationF : Actions.lua needNewPath ajoute cooldown 8 ticks via _pathTickCounter global (incremente OnTick).
 > Mise a jour : 27 mai 2026 | Version **0.0.9k** | REFONTE GAMEPLAY : ordres "Va la-bas" / "Mets-toi a l'abri" fonctionnels (pathToLocationF UNE FOIS au lieu d'en boucle), NPC court (setRunning + setVariable BanditWalkType), drop inventaire a la mort (PHNPC_Loot.lua), detection batiments (PHNPC_Building.lua avec scan spiral + room safe), detection stuck (re-path auto), Enforce.lua ne casse plus le pathfind en cours (setTarget/setWalkType respectent l'etat).
 > Mise a jour : 27 mai 2026 | Version **0.0.9j** | HOTFIX critique : retire 5 methodes IsoZombie inexistantes en B42.18 (setAlertedBy, setPathTargetCharacter, setPrimaryTarget, setSecondaryTarget, setSkeletonResetting). Ces appels levaient KahluaException "Object tried to call nil" non-rattrapable par pcall, causant cascade infinie a PHNPC_Update.lua:61. Fonctions preservees (setAttackedBy, setTarget, clearAggroList suffisent pour neutraliser ciblage zombie).
 > Mise a jour : 23 mai 2026 | Version **0.0.9i** | Fix Java natifs 4 bugs persistants (NPC colle, Va la-bas / Mets-toi a l'abri ecrasees par Combat, T-pose AnimSet BumpFall). v0.0.9h : 7 fixes (OnGameEnd, Nightstick, follow offset, GoTo seuil, shelter retry, fenetres, T-pose v1).
@@ -11,6 +12,7 @@
 
 | Version | Date | Resume |
 |---------|------|---------|
+| **0.0.9l** | **27 mai 2026** | Fix crash shelter (Building.lua sans pcall - API Java B42.18 verifiees), fix saccades "Va la-bas" (Enforce idle compteur 15 ticks + Actions cooldown path 8 ticks). |
 | **0.0.9k** | **27 mai 2026** | Ordres deplacement fonctionnels (path-once + stuck detection), course auto (setRunning + BanditWalkType), drop inventaire mort (PHNPC_Loot.lua), detection batiments (PHNPC_Building.lua). |
 | **0.0.9j** | **27 mai 2026** | HOTFIX : retire 5 methodes IsoZombie inexistantes en B42.18 (cascade "Object tried to call nil"). |
 | **0.0.7a** | **27 mai 2026** | Combat NPC vs zombies (Shove/FrontKick/HighKick), fuite HP<30%, barks contextuels, menu Parler + Mode combat + DEBUG sous-menu |

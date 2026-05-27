@@ -74,11 +74,23 @@ function PHNPC.enforceNPC(zombie)
         if asn ~= "bumped" then md.PHNPC_BumpTick = 0 end
 
         if asn == "idle" then
+            -- v0.0.9l : ne PAS stopMoving au premier tick "idle" - le moteur
+            -- PathFindBehavior2 alterne occasionnellement idle/pathfind entre
+            -- 2 steps de marche. stopMoving brutal reset md.PHNPC_PathX et
+            -- relance pathToLocationF chaque tick (saccades).
+            -- => compter les ticks idle consecutifs ; stop seulement si > 15.
             if md.PHNPC_Moving then
-                PHNPC.stopMoving(zombie)
+                md.PHNPC_IdleTicks = (md.PHNPC_IdleTicks or 0) + 1
+                if md.PHNPC_IdleTicks >= 15 then
+                    md.PHNPC_IdleTicks = 0
+                    PHNPC.stopMoving(zombie)
+                end
+            else
+                md.PHNPC_IdleTicks = 0
             end
 
         elseif asn == "pathfind" then
+            md.PHNPC_IdleTicks = 0  -- v0.0.9l reset si on pathfind
             skipSecurity = true
 
         elseif asn == "bumped" then
@@ -210,4 +222,4 @@ function PHNPC.enforceNPC(zombie)
     end
 end
 
-print("[PHNPC] Enforce v0.0.9k loaded")
+print("[PHNPC] Enforce v0.0.9l loaded")
