@@ -1,5 +1,50 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9p] — 2026-05-27
+
+### Passe d'audit API B42.18 + hardening defensif (avant tests joueur)
+
+Avant la session de tests en jeu post-v0.0.9o, audit complet de toutes les API utilisees contre les sources officielles :
+
+- **JavaDoc B42.18** : https://demiurgequantified.github.io/ProjectZomboidJavaDocs/
+- **PZ Wiki Lua API** : https://pzwiki.net/wiki/Lua_(API)
+- **PZ Wiki Modding** : https://pzwiki.net/wiki/Category:Modding
+- **Build status TIS** : https://projectzomboid.com/blog/news/2017/02/buildstatus/
+- **Patterns reference** : `mod example/B42/Bandits/42.18/`, `mod example/B42/BanditsWeekOne/42.18/`, `mod example/B42/NPC_Helper_Mod/`
+
+**Verifications effectuees** :
+- Toutes les methodes IsoZombie / IsoGameCharacter / IsoMovingObject / IsoObject utilisees existent en B42.18 (rev `9d7e334cab5e2ac8c6f2664535c6b23a745a8600`, build 2026-05-11).
+- `setHealth`, `knockDown`, `setBumpType`, `setWalkType`, `setRunning`, `setVariable`, `clearVariable`, `pathToLocationF`, `pathToCharacter`, `faceLocationF`, `setTarget(IsoMovingObject)`, `setAttackedBy(IsoGameCharacter)`, `clearAggroList`, `addAggro`, `getWornItems`, `getInventory`, `getPrimaryHandItem`, `getCurrentBuilding`, `playSound`, `dressInRandomOutfit`, `getActionStateName`, `changeState`, `setUseless`, `setNoTeeth`, `setSpeedMod`, `setFemaleEtc`, `setAnimatingBackwards`, `setEatBodyTarget`, `resetModel`, `resetModelNextFrame`, `setOnFloor`, `setKnockedDown`, `setBecomeCrawler`, `setCrawler`, `setCanWalk`, `setSprinting`, `getDescriptor`, `getEmitter`, `getCurrentState`, `setVoicePrefix`, `stopSoundByName`, `addLineChatElement`, `getModData`, `getCell`, `setDrag`, `ToggleDoorSilent`, `AddWorldInventoryItem` : **TOUTES CONFIRMEES**.
+- `console.txt` post-v0.0.9o : aucune erreur de mod (uniquement warnings vanilla `Build_AnvilStone`, `CorpseDrop`, `corpseStorageCheck` qui sont des bugs PZ stock).
+
+### Corrections appliquees
+
+**`PHNPC_Enforce.lua` v0.0.9p** : hardening pcall sur les derniers appels Java bare-natifs qui pouvaient theoriquement remonter une exception si le moteur change leur signature en future patch :
+- `zombie:setHealth(10000)` → `pcall(function() zombie:setHealth(10000) end)` (tank-mode)
+- `zombie:setTarget(nil)` (turnalerted) → wrappe en pcall
+- `zombie:setTarget(nil)` (lunge fallback) → wrappe en pcall
+- `zombie:setTarget(nil)` (attack/eatBody) → wrappe en pcall
+- `zombie:setTarget(nil)` (securite step 6) → wrappe en pcall
+- `zombie:setUseless(true/false)` (step 7) → wrappe en pcall
+- `zombie:changeState(ZombieIdleState.instance())` (turnalerted/lunge/attack) → wrappe en pcall
+
+**Effet** : meme si une future evolution de l'API B42 modifie la signature ou rend une de ces methodes nullable, le tick NPC continue de tourner sans interrompre le for-loop `OnTick` (le bug qui a cause les saccades en v0.0.9n).
+
+### Fichiers touches
+
+- [B42/42/mod.info](B42/42/mod.info) : `version=0.0.9p`
+- [B42/42/media/lua/client/PHNPC_Enforce.lua](B42/42/media/lua/client/PHNPC_Enforce.lua) : 7 wraps pcall, banner `Enforce v0.0.9p loaded`
+- [Docs/B42/CHANGELOG.md](Docs/B42/CHANGELOG.md)
+- [Docs/B42/ARCHITECTURE.md](Docs/B42/ARCHITECTURE.md)
+- [Docs/B42/feuille de route.md](Docs/B42/feuille%20de%20route.md)
+- [Docs/B42/GUIDE_CREATION.md](Docs/B42/GUIDE_CREATION.md)
+
+### Action joueur
+
+Lancer la checklist de tests fournie a la fin de la conversation (12 categories, depuis le menu sandbox).
+
+---
+
 ## [0.0.9o] — 2026-05-27
 
 ### Cause racine identifiee dans `console.txt` : `ToggleDoor(npc)` plantait en boucle

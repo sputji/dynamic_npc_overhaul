@@ -1,6 +1,8 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.0.9o_
+_Version 0.0.9p_
 
+> **Mise a jour v0.0.9p (2026-05-27)** — Passe d'audit API B42.18 (JavaDoc officielle + PZ Wiki + patterns Bandits 42.18) : **toutes** les methodes Java utilisees par le mod sont confirmees existantes dans la build `42.18.0 rev 9d7e334cab` (2026-05-11). `console.txt` propre. Hardening pcall applique sur `PHNPC_Enforce.lua` : tous les `setTarget(nil)`, `setHealth(10000)`, `setUseless(...)`, `changeState(...)` bare sont desormais defensifs. Le for-loop `OnTick` est blinde contre toute future evolution d'API.
+>
 > **Mise a jour v0.0.9o** — Methodologie consolidee : **copier directement les patterns du mod Bandits B42.18** plutot que d'extrapoler depuis la doc decompilee. Les approximations de ma part (v0.0.9k -> v0.0.9n) ont a chaque fois introduit des regressions. Reference : `D:\PZ Mods\Dynamic_NPC_Overhaul\mod example\B42\Bandits\42.18`.
 >
 > ### Piege 0 (NOUVEAU v0.0.9o) — Les methodes `ToggleDoor`/`isLocalPlayer` plantent sur un IsoZombie

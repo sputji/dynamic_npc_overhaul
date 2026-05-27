@@ -1,5 +1,9 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.9o
+# Architecture B42 — Dynamic NPC Overhaul v0.0.9p
 
+> **v0.0.9p (2026-05-27)** — Passe d'audit API B42.18 + hardening pcall.
+>
+> Audit complet des 17 fichiers client + 2 shared (~3800 LOC) contre la JavaDoc officielle B42.18 (`demiurgequantified.github.io/ProjectZomboidJavaDocs`), le PZ Wiki Lua API et les patterns Bandits 42.18 / NPC_Helper_Mod. **Toutes** les methodes Java utilisees sont confirmees existantes dans la build courante (`42.18.0 rev 9d7e334cab` 2026-05-11). Le `console.txt` post-v0.0.9o est propre (aucune erreur mod). En prevention, durcissement defensif sur les derniers appels bare dans `PHNPC_Enforce.lua` (step 6 securite, step 7 setUseless, step 5 setTarget pour turnalerted/lunge/attack) : tous wrappes en pcall pour qu'une evolution future de l'API ne casse jamais le for-loop principal d'`OnTick`.
+>
 > **v0.0.9o (2026-05-27)** — Cause racine des saccades + « rien ne fonctionne » trouvee dans `console.txt` :
 >
 > 1. **`obj:ToggleDoor(npc)` plantait** avec `NullPointerException: IsoPlayer.isLocalPlayer() because "player" is null`. La methode Java cast en interne en `IsoPlayer` ; le NPC du mod est un `IsoZombie`. Le NPE non-rattrape interrompait le for-loop principal -> tous les NPCs suivants perdaient leur tick (saccades, ordres ignores, pas d'attaque).

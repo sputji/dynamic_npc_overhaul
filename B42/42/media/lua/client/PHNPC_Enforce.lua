@@ -64,7 +64,7 @@ function PHNPC.enforceNPC(zombie)
     end
     local _hp = 0
     pcall(function() _hp = zombie:getHealth() end)
-    if _hp < 9000 then zombie:setHealth(10000) end
+    if _hp < 9000 then pcall(function() zombie:setHealth(10000) end) end
 
     -- 5. Gestion etats d'action (Bandits ManageActionState)
     local skipSecurity = false
@@ -117,24 +117,24 @@ function PHNPC.enforceNPC(zombie)
             end
 
         elseif asn == "turnalerted" then
-            zombie:changeState(ZombieIdleState.instance())
+            pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
             pcall(function() zombie:clearAggroList() end)
-            zombie:setTarget(nil)
+            pcall(function() zombie:setTarget(nil) end)
 
         elseif asn == "lunge" then
             if md.PHNPC_Moving then
                 skipSecurity = true
             else
-                zombie:changeState(ZombieIdleState.instance())
+                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
                 pcall(function() zombie:clearAggroList() end)
-                zombie:setTarget(nil)
+                pcall(function() zombie:setTarget(nil) end)
                 md.PHNPC_Moving = false
             end
 
         elseif asn == "attack" or asn == "eatBody" then
-            zombie:changeState(ZombieIdleState.instance())
+            pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
             pcall(function() zombie:clearAggroList() end)
-            zombie:setTarget(nil)
+            pcall(function() zombie:setTarget(nil) end)
             md.PHNPC_Moving = false
 
         elseif asn == "falldown" or asn == "staggerback" or asn == "down" then
@@ -170,19 +170,19 @@ function PHNPC.enforceNPC(zombie)
     -- 6. Securite : setTarget(nil) SEULEMENT si pas en pathfind ET pas en mouvement
     -- v0.0.9k : ne PAS casser le pathfind en cours (md.PHNPC_Moving=true) avec setTarget(nil)
     if not skipSecurity and not md.PHNPC_Moving then
-        zombie:setTarget(nil)
+        pcall(function() zombie:setTarget(nil) end)
         pcall(function() zombie:clearAggroList() end)
     end
 
     -- 7. setUseless selon recrutement + patrol
     --    PatrolActive : NPC non-recrute en patrouille => setUseless(false) temporairement
     if md.PHNPC_Recruited then
-        zombie:setUseless(false)
+        pcall(function() zombie:setUseless(false) end)
     elseif (md.PHNPC_PatrolActive or 0) > 0 then
         md.PHNPC_PatrolActive = md.PHNPC_PatrolActive - 1
-        zombie:setUseless(false)
+        pcall(function() zombie:setUseless(false) end)
     else
-        zombie:setUseless(true)
+        pcall(function() zombie:setUseless(true) end)
     end
 
     -- 8. Sons : voix zombie supprimees
@@ -222,4 +222,4 @@ function PHNPC.enforceNPC(zombie)
     end
 end
 
-print("[PHNPC] Enforce v0.0.9l loaded")
+print("[PHNPC] Enforce v0.0.9p loaded")
