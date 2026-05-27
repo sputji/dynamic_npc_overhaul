@@ -1,5 +1,13 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.9m
+# Architecture B42 — Dynamic NPC Overhaul v0.0.9o
 
+> **v0.0.9o (2026-05-27)** — Cause racine des saccades + « rien ne fonctionne » trouvee dans `console.txt` :
+>
+> 1. **`obj:ToggleDoor(npc)` plantait** avec `NullPointerException: IsoPlayer.isLocalPlayer() because "player" is null`. La methode Java cast en interne en `IsoPlayer` ; le NPC du mod est un `IsoZombie`. Le NPE non-rattrape interrompait le for-loop principal -> tous les NPCs suivants perdaient leur tick (saccades, ordres ignores, pas d'attaque).
+> 2. **Fix** : pattern Bandits B42.18 verifie (`BanditUpdate.lua:823`, `BanditServerCommands.lua:172/178/184`) -> **`obj:ToggleDoorSilent()` sans argument**. Applique aux 3 sites (`closeNearbyDoors` x2, `checkAndOpenDoors`).
+> 3. **Saccades residuelles** : `setBumpType` (dans `applyMoveStart`) etait re-declenche a chaque cooldown de re-path (8 ticks). Desormais `applyMoveStart` est appele **uniquement** au tout premier path (`md.PHNPC_Moving == false`). Pendant le mouvement, seuls `applyMoveTick` (idempotent) + `pathToLocationF(newTx, newTy)` tournent -> le moteur enchaine sans reset d'anim.
+>
+> **v0.0.9n (2026-05-27)** — Building.lua ultra-defensif (`IsoBuilding:getRoom(int)` n'existe PAS - extraction `.class` -> seuls `getRoom()` no-arg, `getRoomByID(long)`, `getRandomRoom()`. Fallback `getDef():getRooms()` ArrayList iter). Loot.lua via `OnDeadBodySpawn` (items INTO corpse, pattern Bandits `body:getContainer():AddItem`). Update.lua : `pickShelterPoint` + `findNearestZombie` proteges en pcall.
+>
 > **v0.0.9m (2026-05-27)** — Trois fixes critiques majeurs :
 >
 > 1. **`PHNPC_Building.lua`** — l'API `IsoBuilding` (retournee par `getCurrentBuilding()`) n'a **pas** de `getRooms()`. Reecrit avec `getRoomsNumber()` + `getRoom(i)` + `IsoRoom:getRandomFreeSquare()`. Le crash en boucle (chaque frame) est resolu.

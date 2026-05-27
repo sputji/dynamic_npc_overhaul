@@ -1,5 +1,52 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9o] — 2026-05-27
+
+### Cause racine identifiee dans `console.txt` : `ToggleDoor(npc)` plantait en boucle
+
+Le joueur signalait apres v0.0.9n : « les NPC font n'importe quoi, saccades, trop d'erreurs, rien ne fonctionne ». Analyse de `C:\Users\Nicolas\Zomboid\console.txt` :
+
+```
+Caused by: java.lang.NullPointerException:
+  Cannot invoke "zombie.characters.IsoPlayer.isLocalPlayer()" because "player" is null
+  at PHNPC_Actions.lua:258  (closeNearbyDoors -> obj:ToggleDoor(npc))
+  via stopMoving (line 228) <- npcCombatStep (PHNPC_Combat.lua:106)
+```
+
+**Diagnostic** : `IsoDoor.ToggleDoor(IsoGameCharacter)` et `IsoThumpable.ToggleDoor(IsoGameCharacter)` cast en interne le character en `IsoPlayer` pour `isLocalPlayer()`. Le NPC du mod est un `IsoZombie` (pas un `IsoPlayer`) -> NPE non-rattrape qui :
+- interrompt le for-loop `for npc in pairs(PHNPC.recruited)` -> les NPCs suivants ne recoivent **plus de ticks** ce frame -> saccades visuelles + ordres ignores
+- spamme 18 stack traces par seconde -> log pollue + impression de « tout crash »
+
+Pattern verifie chez Bandits B42.18 (`BanditUpdate.lua:823`, `BanditServerCommands.lua:172/178/184`) : **`object:ToggleDoorSilent()` sans argument**.
+
+### Corrections principales
+
+**`PHNPC_Actions.lua` v0.0.9o** :
+- `closeNearbyDoors` : `obj:ToggleDoor(npc)` -> `obj:ToggleDoorSilent()` (IsoDoor)
+- `closeNearbyDoors` : meme correction pour `IsoThumpable`
+- `checkAndOpenDoors` : `obj:ToggleDoor(npc)` -> `obj:ToggleDoorSilent()`
+- `startMovingTo` / `startFollowing` : `setBumpType` (via `applyMoveStart`) appele **uniquement** quand `md.PHNPC_Moving == false` (premier path). Si NPC deja en mouvement, on appelle `applyMoveTick` (idempotent : pas de `setBumpType`/`faceLocationF`) puis `pathToLocationF(tx, ty, tz)` met simplement a jour la destination. Le moteur enchaine sans interrompre l'anim -> **plus de saccades** quand le joueur bouge pendant le suivi.
+- Bannieres mises a jour : `Actions v0.0.9o loaded`.
+
+### Verification
+
+- `Get-Content console.txt | grep PHNPC -> ToggleDoor` : 36 occurrences en v0.0.9n -> 0 attendues en v0.0.9o.
+- `pathToLocationF` log conserve mais `setBumpType` ne se redeclenche plus chaque cooldown (8 ticks).
+
+### Fichiers touches
+
+- [B42/42/media/lua/client/PHNPC_Actions.lua](B42/42/media/lua/client/PHNPC_Actions.lua)
+- [Docs/B42/CHANGELOG.md](Docs/B42/CHANGELOG.md)
+- [Docs/B42/feuille de route.md](Docs/B42/feuille%20de%20route.md)
+
+### Action joueur
+
+1. Redemarrer le jeu (pas seulement reload mod) pour purger le KahluaThread.
+2. Recruter un NPC et le faire stopper pres d'une porte ouverte : aucune erreur dans `console.txt`.
+3. Suivre le joueur en courant : aucune saccade.
+
+---
+
 ## [0.0.9n] — 2026-05-27
 
 ### Correctifs post-v0.0.9m (re-crash + loot mal place)

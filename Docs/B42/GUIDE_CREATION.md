@@ -1,7 +1,33 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.0.9m_
+_Version 0.0.9o_
 
-> **Mise a jour v0.0.9m** : 3 pieges critiques identifies lors de l'audit complet de l'API B42.18.
+> **Mise a jour v0.0.9o** — Methodologie consolidee : **copier directement les patterns du mod Bandits B42.18** plutot que d'extrapoler depuis la doc decompilee. Les approximations de ma part (v0.0.9k -> v0.0.9n) ont a chaque fois introduit des regressions. Reference : `D:\PZ Mods\Dynamic_NPC_Overhaul\mod example\B42\Bandits\42.18`.
+>
+> ### Piege 0 (NOUVEAU v0.0.9o) — Les methodes `ToggleDoor`/`isLocalPlayer` plantent sur un IsoZombie
+> `IsoDoor:ToggleDoor(character)` et `IsoThumpable:ToggleDoor(character)` cast en interne le character en `IsoPlayer` pour appeler `isLocalPlayer()`. **Notre NPC est `IsoZombie`** -> `NullPointerException` non-rattrape par `pcall` qui interrompt le for-loop principal -> tous les NPCs perdent leur tick (saccades, ordres ignores).
+>
+> **Reference Bandits B42.18** (`BanditUpdate.lua:823`, `BanditServerCommands.lua:172/178/184`) :
+>
+> ```lua
+> -- BON pour un NPC IsoZombie :
+> object:ToggleDoorSilent()       -- sans argument
+> -- MAUVAIS :
+> object:ToggleDoor(npc)           -- crash si npc n'est pas IsoPlayer
+> ```
+>
+> **Pour les fenetres**, `window:ToggleWindow(zombie)` accepte un `IsoZombie` (pattern `ZAOpenWindow.lua:21` Bandits) -> OK.
+>
+> ### Piege 0bis (NOUVEAU v0.0.9o) — Saccades sur re-path
+> Appeler `setBumpType` + `faceLocationF` a chaque cooldown de re-path interrompt l'anim a chaque fois -> NPC saccade visiblement. Pattern Bandits `ZAGoTo.onStart` : `setBumpType` est appele **une seule fois** au lancement, ensuite seul `pathToLocationF(newX, newY)` est rappele pour mettre a jour la destination -> le moteur enchaine sans reset d'anim.
+>
+> ```lua
+> if not md.PHNPC_Moving then
+>     applyMoveStart(npc, x, y, walkType)   -- setBumpType + faceLocationF UNE FOIS
+> else
+>     applyMoveTick(npc, walkType)          -- idempotent : setVariable + setRunning seulement
+> end
+> pcall(function() npc:pathToLocationF(x, y, z) end)
+> ```
 >
 > ### Piege 1 — `npc:getCurrentBuilding()` retourne un `IsoBuilding`, **pas** un `BuildingDef`
 > `IsoBuilding` n'a **pas** de methode `getRooms()`. Utiliser `getRoomsNumber()` + `getRoom(int)` (qui renvoie `IsoRoom`). Sur l'`IsoRoom`, utiliser `getRandomFreeSquare()` pour obtenir une case libre. Verifie par extraction des `.class` du moteur.

@@ -143,7 +143,14 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
         pcall(function() npc:clearAggroList() end)
         pcall(function() PHNPC.checkAndOpenDoors(npc) end)
         pcall(function() PHNPC.checkAndOpenWindows(npc) end)
-        applyMoveSetup(npc, tx, ty, walkType)
+        -- v0.0.9o : setBumpType UNIQUEMENT au lancement initial (pattern Bandits ZAGoTo).
+        -- Si le NPC est deja en mouvement, juste retransmettre pathToLocationF
+        -- (le moteur enchaine sans reset d'anim) -> ZERO saccade.
+        if not md.PHNPC_Moving then
+            applyMoveStart(npc, tx, ty, walkType)
+        else
+            applyMoveTick(npc, walkType)
+        end
         pcall(function() npc:pathToLocationF(tx, ty, pz) end)
         md.PHNPC_Moving   = true
         md.PHNPC_PathX    = tx
@@ -182,7 +189,13 @@ function PHNPC.startMovingTo(npc, x, y, z, forceWalkType)
         end)
         pcall(function() PHNPC.checkAndOpenDoors(npc) end)
         pcall(function() PHNPC.checkAndOpenWindows(npc) end)
-        applyMoveSetup(npc, x, y, walkType)
+        -- v0.0.9o : setBumpType UNIQUEMENT au lancement initial. Si en mouvement,
+        -- on retransmet juste pathToLocationF (le moteur enchaine sans saccade).
+        if not md.PHNPC_Moving then
+            applyMoveStart(npc, x, y, walkType)
+        else
+            applyMoveTick(npc, walkType)
+        end
         pcall(function() npc:pathToLocationF(x, y, z) end)
         md.PHNPC_Moving   = true
         md.PHNPC_PathX    = x
@@ -255,7 +268,9 @@ function PHNPC.closeNearbyDoors(npc)
                         local isOpen = false
                         pcall(function() isOpen = obj:IsOpen() end)
                         if isOpen then
-                            pcall(function() obj:ToggleDoor(npc) end)
+                            -- v0.0.9o : ToggleDoorSilent() (sans arg) - ToggleDoor(npc)
+                            -- crash car attend un IsoPlayer, npc est IsoZombie.
+                            pcall(function() obj:ToggleDoorSilent() end)
                         end
                     end
                 end
@@ -269,7 +284,8 @@ function PHNPC.closeNearbyDoors(npc)
                         pcall(function() isDoor = obj:isDoor() end)
                         pcall(function() isOpen = obj:IsOpen() end)
                         if isDoor and isOpen then
-                            pcall(function() obj:ToggleDoor(npc) end)
+                            -- v0.0.9o : ToggleDoorSilent() (sans arg)
+                            pcall(function() obj:ToggleDoorSilent() end)
                         end
                     end
                 end
@@ -452,7 +468,8 @@ function PHNPC.handleStuck(npc)
                             local barricaded = false; pcall(function() barricaded = obj:isBarricaded() end)
                             local isOpen = false; pcall(function() isOpen = obj:IsOpen() end)
                             if not locked and not barricaded and not isOpen then
-                                obj:ToggleDoor(npc)
+                                -- v0.0.9o : ToggleDoorSilent() (sans arg)
+                                obj:ToggleDoorSilent()
                                 doorFound = true
                             end
                         end
@@ -511,7 +528,7 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.9l loaded")
+print("[PHNPC] Actions v0.0.9o loaded")
 
 -- ============================================================
 -- FENETRES (v0.0.9h NEW — Bug 6)
