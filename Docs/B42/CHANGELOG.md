@@ -1,5 +1,40 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9n] — 2026-05-27
+
+### Correctifs post-v0.0.9m (re-crash + loot mal place)
+
+Apres v0.0.9m le joueur signale **encore** : crash en boucle `Object tried to call nil in findSafeRoomSquare`, le NPC ne va pas a l'endroit demande, n'attaque pas les zombies, les items ne sont pas visibles dans le cadavre.
+
+Diagnostic : ma supposition v0.0.9m que `IsoBuilding:getRoom(int)` existait etait **fausse**. Extraction `.class` confirme : seuls `getRoom()` (sans arg), `getRoomByID(long)`, `getRandomRoom()` existent — pas de `getRoom(int)`. Mon code v0.0.9m crashait donc en boucle, ce qui empechait par cascade le combat et les ordres "Va la-bas" de s'executer (le crash dans le for-loop tuait l'iteration sur tous les NPCs suivants).
+
+### Corrections principales
+
+- **`PHNPC_Building.lua` v0.0.9n — defense totale (zero crash possible)**
+  - Reecriture ULTRA-DEFENSIVE : tous les appels Java sont en `pcall`.
+  - `findSafeRoomSquare` n'utilise plus `getRoom(int)`. Strategie : `building:getRandomRoom()` jusqu'a 8 tentatives, fallback `building:getDef():getRooms()` (ArrayList<RoomDef>) puis `roomDef:getIsoRoom():getRandomFreeSquare()`.
+  - Si tout echoue, retour `nil` sans crash : le NPC reste en `shelter` et `Update.lua` finit par le passer en idle.
+
+- **`PHNPC_Loot.lua` v0.0.9n — items DANS le cadavre (pas par terre)**
+  - Pattern Bandits `BanditUpdate.lua:2412` confirme : `body:getContainer():AddItem(item)`.
+  - Nouvelle architecture :
+    1. `OnZombieDead` : snapshot des items + retrait de l'inventaire NPC, stocke dans `PHNPC._pendingLoot[id] = { x, y, z, items }`.
+    2. `OnDeadBodySpawn(body)` : matching par proximite (≤ 2 tuiles), transfert dans `body:getContainer()`. Flag `body.modData.PHNPC_WasNPC = true`.
+    3. Fallback : si pas de cadavre apres 120 ticks (~2s), drop au sol (pattern Bandits `ZADrop` `sq:AddWorldInventoryItem`).
+
+- **`PHNPC_Update.lua` v0.0.9n — protection cascade**
+  - `pickShelterPoint` desormais en `pcall` (anti-cascade si Building.lua plante).
+  - `findNearestZombie` en `pcall` pour l'etat `attacking` (cas cell nil).
+
+### Effet attendu
+
+- Plus aucun crash en boucle, meme si l'API B42.18 evolue.
+- L'ordre "Mets-toi a l'abri" trouve une chambre ou abandonne silencieusement.
+- L'ordre "Va la-bas" et le combat fonctionnent (la cascade qui les bloquait est supprimee).
+- Loot visible dans le clic-droit -> Examiner le cadavre.
+
+---
+
 ## [0.0.9m] — 2026-05-27
 
 ### Correctifs post-v0.0.9l (3 bugs critiques persistants apres test)

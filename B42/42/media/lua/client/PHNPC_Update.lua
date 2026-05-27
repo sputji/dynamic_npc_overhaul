@@ -1,5 +1,8 @@
 --[[
-    PHNPC_Update.lua  v0.0.9m  (client)
+    PHNPC_Update.lua  v0.0.9n  (client)
+    v0.0.9n :
+      - pickShelterPoint en pcall (anti-crash Building.lua)
+      - findNearestZombie en pcall pour etat attacking
     Boucles de mise a jour principales :
       OnZombieUpdate => enforce comportement NPC chaque tick
       OnTick         => IA suivi + etats comportement + patrouille
@@ -238,10 +241,10 @@ Events.OnTick.Add(function()
                     --   (3) fallback findClearAreaNear
                     local sx, sy, sz, reason
                     if PHNPC.pickShelterPoint then
-                        sx, sy, sz, reason = PHNPC.pickShelterPoint(npc)
+                        pcall(function() sx, sy, sz, reason = PHNPC.pickShelterPoint(npc) end)
                     end
                     if not sx and PHNPC.findClearAreaNear then
-                        sx, sy = PHNPC.findClearAreaNear(npc:getX(), npc:getY(), npc:getZ(), 15)
+                        pcall(function() sx, sy = PHNPC.findClearAreaNear(npc:getX(), npc:getY(), npc:getZ(), 15) end)
                         sz = npc:getZ()
                         reason = "fallback_clear"
                     end
@@ -295,7 +298,10 @@ Events.OnTick.Add(function()
 
             -- 8. Etat "attacking" : attaquer, puis retourner a la position de base
             elseif md.PHNPC_State == "attacking" then
-                local atarget = PHNPC.findNearestZombie and PHNPC.findNearestZombie(npc, PHNPC.COMBAT_RANGE or 8)
+                local atarget
+                if PHNPC.findNearestZombie then
+                    pcall(function() atarget = PHNPC.findNearestZombie(npc, PHNPC.COMBAT_RANGE or 8) end)
+                end
                 if not atarget and md.PHNPC_ZoneX then
                     -- Plus de cibles : retourner a la position de base
                     local rdx = npc:getX() - md.PHNPC_ZoneX

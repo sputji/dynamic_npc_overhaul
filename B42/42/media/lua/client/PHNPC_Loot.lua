@@ -1,134 +1,253 @@
 --[[
-    PHNPC_Loot.lua  -  v0.0.9m
+    PHNPC_Loot.lua  -  v0.0.9n
     ----------------------------------------------------------------
-    Drop l'inventaire complet du NPC quand il meurt.
+    Transfert de l'inventaire complet du NPC DANS LE CADAVRE quand il meurt.
 
-    v0.0.9m REFONTE :
-      - Pattern Bandits ZADrop confirme : sq:AddWorldInventoryItem(item, rx, ry, 0)
-      - Drop AU SOL en priorite (toujours fiable), avec offset aleatoire.
-      - Drop aussi les WORN ITEMS (vetements, armures).
-      - 2eme passe via OnIsoZombieUpdate juste apres mort si OnZombieDead n'a pas
-        ete declenche (cas multi-shot/explosion).
-      - Logs INFO explicites a chaque etape pour diagnostic.
-      - Retrait pcall (cause d'echec silencieux v0.0.9k/l) - les API utilisees
-        sont stables en B42.18.
+    v0.0.9n REFONTE :
+      - Le joueur veut voir les items DANS le cadavre, pas par terre.
+      - Pattern Bandits BanditUpdate.lua:2412 : body:getContainer():AddItem(item).
+      - OnZombieDead fire AVANT que IsoDeadBody soit cree.
+      - Strategie :
+          1. OnZombieDead   : snapshot des items + worn + arme, stocke dans
+             PHNPC._pendingLoot[id] = { x, y, z, items, gameTimeTick }
+          2. OnDeadBodySpawn: pour chaque pending loot, on cherche un body proche
+             (meme x,y,z a +/- 1) et on AddItem dans body:getContainer().
+          3. Fallback (2s sans match) : drop AU SOL (pattern Bandits ZADrop).
+      - Important : on retire les items de l'inventaire du NPC AVANT le snapshot
+        pour eviter une double presence si le moteur fait sa propre copie.
 
-    Verifie cote IsoZombie B42.18 :
-      getInventory()    -> ItemContainer
-      getWornItems()    -> List<WornItem>
-      getSquare()       -> IsoGridSquare
-    Verifie cote IsoGridSquare B42.18 :
-      AddWorldInventoryItem(item, dx, dy, dz) -> drop visible au sol
+    Verifie cote IsoDeadBody B42.18 :
+      getContainer()  -> ItemContainer
+      getX/Y/Z()      -> coordonnees
+      getModData()    -> table de persistance
+    Verifie cote ItemContainer B42.18 :
+      AddItem(item)   -> ajoute un item
 ]]
 
 PHNPC = PHNPC or {}
+PHNPC._pendingLoot = PHNPC._pendingLoot or {}
 
+-- ============================================================
+-- HELPERS
+-- ============================================================
 local function dropItemOnGround(sq, item)
     if not sq or not item then return false end
-    -- Offset aleatoire pour ne pas empiler tout au meme pixel
-    local rx = ZombRandFloat(0.1, 0.9)
-    local ry = ZombRandFloat(0.1, 0.9)
-    sq:AddWorldInventoryItem(item, rx, ry, 0)
-    return true
+    local ok = false
+    pcall(function()
+        local rx = ZombRandFloat(0.1, 0.9)
+        local ry = ZombRandFloat(0.1, 0.9)
+        sq:AddWorldInventoryItem(item, rx, ry, 0)
+        ok = true
+    end)
+    return ok
 end
 
-function PHNPC.dropNPCInventory(npc)
+local function nextPendingId()
+    PHNPC._pendingLootCounter = (PHNPC._pendingLootCounter or 0) + 1
+    return PHNPC._pendingLootCounter
+end
+
+-- ============================================================
+-- 1. SNAPSHOT INVENTAIRE (au moment de la mort)
+-- ============================================================
+function PHNPC.snapshotNPCLoot(npc)
     if not npc then return end
     local md = npc:getModData()
     if not md.PHNPC_IsNPC then return end
-    if md.PHNPC_Looted then
-        if PHNPC.Log then PHNPC.Log.debug("Loot", tostring(md.PHNPC_Name) .. " deja loote, skip") end
-        return
-    end
+    if md.PHNPC_Looted then return end
     md.PHNPC_Looted = true
 
     local name = tostring(md.PHNPC_Name or "NPC")
-    if PHNPC.Log then PHNPC.Log.info("Loot", name .. " mort - debut drop inventaire") end
+    if PHNPC.Log then PHNPC.Log.info("Loot", name .. " mort - snapshot inventaire") end
 
-    local sq = npc:getSquare()
-    if not sq then
-        if PHNPC.Log then PHNPC.Log.info("Loot", name .. " ECHEC : pas de square") end
-        return
+    local items = {}
+
+    -- 1) WORN ITEMS
+    local worn
+    pcall(function() worn = npc:getWornItems() end)
+    if worn then
+        local n = 0; pcall(function() n = worn:size() end)
+        for i = 0, n - 1 do
+            local wi
+            pcall(function() wi = worn:get(i) end)
+            if wi then
+                local it
+                pcall(function() it = wi:getItem() end)
+                if it then items[#items + 1] = it end
+            end
+        end
+        pcall(function() npc:resetEquippedHandsModels() end)
     end
 
-    local total = 0
-    local dropped = 0
-
-    -- 1) WORN ITEMS (vetements/armures) en priorite : ils restent attaches sinon
-    local worn = npc:getWornItems()
-    if worn and worn:size() > 0 then
-        if PHNPC.Log then PHNPC.Log.info("Loot", name .. " - " .. worn:size() .. " worn items detectes") end
-        local snapshot = {}
-        for i = 0, worn:size() - 1 do
-            local wi = worn:get(i)
-            if wi and wi:getItem() then snapshot[#snapshot + 1] = wi:getItem() end
-        end
-        for _, it in ipairs(snapshot) do
-            total = total + 1
-            if dropItemOnGround(sq, it) then dropped = dropped + 1 end
-        end
-        -- Vider le worn container (le NPC ne porte plus rien)
-        npc:resetEquippedHandsModels()
-    end
-
-    -- 2) INVENTAIRE principal
-    local inv = npc:getInventory()
+    -- 2) INVENTAIRE PRINCIPAL
+    local inv
+    pcall(function() inv = npc:getInventory() end)
     if inv then
-        local items = inv:getItems()
-        if items and items:size() > 0 then
-            if PHNPC.Log then PHNPC.Log.info("Loot", name .. " - " .. items:size() .. " items en inventaire") end
+        local list
+        pcall(function() list = inv:getItems() end)
+        if list then
+            local n = 0; pcall(function() n = list:size() end)
             local snapshot = {}
-            for i = 0, items:size() - 1 do
-                local it = items:get(i)
+            for i = 0, n - 1 do
+                local it
+                pcall(function() it = list:get(i) end)
                 if it then snapshot[#snapshot + 1] = it end
             end
             for _, it in ipairs(snapshot) do
-                total = total + 1
-                if dropItemOnGround(sq, it) then
-                    dropped = dropped + 1
-                    inv:Remove(it)
-                end
+                items[#items + 1] = it
+                pcall(function() inv:Remove(it) end)
             end
-            inv:setDrawDirty(true)
+            pcall(function() inv:setDrawDirty(true) end)
         end
     end
 
-    -- 3) ARME EN MAIN (au cas ou : Bandit pattern clearAttachedItems)
-    npc:setPrimaryHandItem(nil)
-    npc:setSecondaryHandItem(nil)
-    npc:clearAttachedItems()
+    -- 3) ARMES EN MAIN
+    pcall(function() npc:setPrimaryHandItem(nil) end)
+    pcall(function() npc:setSecondaryHandItem(nil) end)
+    pcall(function() npc:clearAttachedItems() end)
+
+    if #items == 0 then
+        if PHNPC.Log then PHNPC.Log.info("Loot", name .. " : aucun item a transferer") end
+        return
+    end
+
+    local nx, ny, nz = 0, 0, 0
+    pcall(function() nx = npc:getX() end)
+    pcall(function() ny = npc:getY() end)
+    pcall(function() nz = npc:getZ() end)
+
+    local id = nextPendingId()
+    PHNPC._pendingLoot[id] = {
+        name  = name,
+        x     = nx,
+        y     = ny,
+        z     = nz,
+        items = items,
+        ticks = 0,  -- compteur d'attente, abandonne apres 120 ticks
+    }
 
     if PHNPC.Log then
-        PHNPC.Log.info("Loot", string.format("%s : %d/%d items droppes au sol", name, dropped, total))
+        PHNPC.Log.info("Loot", string.format("%s : %d items en attente du cadavre (id=%d, %.1f,%.1f,%.0f)",
+            name, #items, id, nx, ny, nz))
     end
 end
 
 -- ============================================================
--- EVENT : detection mort NPC (handler principal)
+-- 2. TRANSFERT VERS CADAVRE (OnDeadBodySpawn)
+-- ============================================================
+local function transferToBody(body, entry)
+    local container
+    pcall(function() container = body:getContainer() end)
+    if not container then return false, 0 end
+    local dropped = 0
+    for _, item in ipairs(entry.items) do
+        local ok = false
+        pcall(function() container:AddItem(item); ok = true end)
+        if ok then dropped = dropped + 1 end
+    end
+    pcall(function()
+        local bmd = body:getModData()
+        bmd.PHNPC_WasNPC = true
+        bmd.PHNPC_Name   = entry.name
+    end)
+    return true, dropped
+end
+
+local function onDeadBodySpawn(body)
+    if not body then return end
+    if not PHNPC._pendingLoot then return end
+    local bx, by, bz = 0, 0, 0
+    pcall(function() bx = body:getX() end)
+    pcall(function() by = body:getY() end)
+    pcall(function() bz = body:getZ() end)
+
+    local bestId, bestDist = nil, 9999
+    for id, entry in pairs(PHNPC._pendingLoot) do
+        local dx = bx - entry.x
+        local dy = by - entry.y
+        local dz = bz - entry.z
+        local d  = dx * dx + dy * dy + dz * dz
+        if d < bestDist and d <= 4 then  -- 2 tiles tolerance
+            bestDist = d
+            bestId   = id
+        end
+    end
+
+    if not bestId then return end
+    local entry = PHNPC._pendingLoot[bestId]
+    PHNPC._pendingLoot[bestId] = nil
+    local ok, n = transferToBody(body, entry)
+    if PHNPC.Log then
+        if ok then
+            PHNPC.Log.info("Loot", string.format("%s : %d items transferes DANS le cadavre", entry.name, n))
+        else
+            PHNPC.Log.warn("Loot", entry.name .. " : body:getContainer() KO, fallback sol")
+            local sq
+            pcall(function() sq = body:getSquare() end)
+            if sq then
+                for _, it in ipairs(entry.items) do dropItemOnGround(sq, it) end
+            end
+        end
+    end
+end
+
+-- ============================================================
+-- 3. FALLBACK GROUND DROP si pas de cadavre apres 120 ticks
+--    (pattern de securite, ne devrait jamais arriver en pratique)
+-- ============================================================
+local function tickPendingLoot()
+    if not PHNPC._pendingLoot then return end
+    local cell = getCell()
+    for id, entry in pairs(PHNPC._pendingLoot) do
+        entry.ticks = entry.ticks + 1
+        if entry.ticks >= 120 then
+            PHNPC._pendingLoot[id] = nil
+            if cell then
+                local sq
+                pcall(function() sq = cell:getGridSquare(math.floor(entry.x), math.floor(entry.y), math.floor(entry.z)) end)
+                if sq then
+                    local n = 0
+                    for _, it in ipairs(entry.items) do
+                        if dropItemOnGround(sq, it) then n = n + 1 end
+                    end
+                    if PHNPC.Log then
+                        PHNPC.Log.warn("Loot", string.format("%s : pas de cadavre apres 120t, %d items au sol", entry.name, n))
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ============================================================
+-- EVENTS
 -- ============================================================
 local function onZombieDead(zombie)
     if not zombie then return end
     local md = zombie:getModData()
     if not md or not md.PHNPC_IsNPC then return end
-    PHNPC.dropNPCInventory(zombie)
+    PHNPC.snapshotNPCLoot(zombie)
 end
 
-Events.OnZombieDead.Add(onZombieDead)
-
--- ============================================================
--- BACKUP : OnZombieUpdate detecte les NPC morts sans OnZombieDead
--- (cas connus en B42 : explosions, multi-degats simultanes)
--- ============================================================
 local function onZombieUpdateLootCheck(zombie)
     if not zombie then return end
     local md = zombie:getModData()
     if not md or not md.PHNPC_IsNPC or md.PHNPC_Looted then return end
-    if zombie:isDead() or zombie:getHealth() <= 0 then
-        if PHNPC.Log then PHNPC.Log.info("Loot", "Detection mort via OnZombieUpdate (OnZombieDead manque)") end
-        PHNPC.dropNPCInventory(zombie)
+    local dead = false
+    pcall(function() dead = zombie:isDead() end)
+    local hp = 100
+    pcall(function() hp = zombie:getHealth() end)
+    if dead or hp <= 0 then
+        if PHNPC.Log then PHNPC.Log.info("Loot", "Mort detectee via OnZombieUpdate") end
+        PHNPC.snapshotNPCLoot(zombie)
     end
 end
 
+Events.OnZombieDead.Add(onZombieDead)
 Events.OnZombieUpdate.Add(onZombieUpdateLootCheck)
+if Events.OnDeadBodySpawn then
+    Events.OnDeadBodySpawn.Add(onDeadBodySpawn)
+end
+Events.OnTick.Add(tickPendingLoot)
 
-print("[PHNPC] Loot v0.0.9m loaded")
+print("[PHNPC] Loot v0.0.9n loaded")

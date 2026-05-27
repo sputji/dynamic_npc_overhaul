@@ -1,25 +1,20 @@
 --[[
-    PHNPC_Building.lua  -  v0.0.9m
+    PHNPC_Building.lua  -  v0.0.9n
     ----------------------------------------------------------------
     Detection batiments et chambres pour l'ordre "Mets-toi a l'abri !"
 
-    v0.0.9m : CRITIQUE - npc:getCurrentBuilding() et sq:getBuilding() retournent
-    un IsoBuilding (PAS un BuildingDef) en B42.18. IsoBuilding n'a PAS getRooms()
-    mais expose getRoomsNumber() + getRoom(int) + getRandomRoom() + getRoomByID.
-    Les rooms retournees sont des IsoRoom (pas RoomDef) qui exposent
-    getRandomFreeSquare().
+    v0.0.9n : ULTRA-DEFENSIF (apres crash en boucle v0.0.9m).
+    Verification finale des classes B42.18 :
+      - IsoBuilding:getRoom(int) N'EXISTE PAS. La methode est getRoom() (sans
+        arg) qui retourne UNE IsoRoom, OU getRoomByID(long), OU getRandomRoom().
+      - IsoBuilding:getRoomsNumber() existe mais signature peut differer.
+      - IsoBuilding:getDef() retourne BuildingDef qui a getRooms() (ArrayList<RoomDef>).
+      - IsoRoom:getRandomFreeSquare() existe et retourne IsoGridSquare ou null.
 
-    API B42.18 VERIFIEES (extraction .class) :
-      IsoGameCharacter:getCurrentBuilding() -> IsoBuilding (ou null)
-      IsoGridSquare:getBuilding()           -> IsoBuilding (ou null)
-      IsoBuilding:getRoomsNumber()          -> int
-      IsoBuilding:getRoom(int)              -> IsoRoom (ou null)
-      IsoBuilding:getRandomRoom()           -> IsoRoom
-      IsoRoom:getRandomFreeSquare()         -> IsoGridSquare (ou null)
-      IsoRoom:getSquares()                  -> ArrayList<IsoGridSquare>
-      IsoCell:getGridSquare(x,y,z)          -> IsoGridSquare (ou null)
-      IsoGridSquare:isFree(boolean)         -> boolean
-      IsoGridSquare:getMovingObjects()      -> ArrayList<IsoMovingObject>
+    Strategie : on essaie getRandomRoom() jusqu'a 8 fois avec pcall sur chaque
+    appel Java. Si quoi que ce soit echoue, on retourne nil sans crasher.
+    Le NPC restera en mode "shelter" mais sans nouvelle destination -> Update.lua
+    le repasse en idle apres timeout (pas de crash en boucle).
 ]]
 
 PHNPC = PHNPC or {}
@@ -29,11 +24,14 @@ PHNPC = PHNPC or {}
 -- ============================================================
 function PHNPC.isInsideBuilding(npc)
     if not npc then return false, nil end
-    local b = npc:getCurrentBuilding()
+    local b = nil
+    pcall(function() b = npc:getCurrentBuilding() end)
     if b then return true, b end
-    local sq = npc:getSquare()
+    local sq = nil
+    pcall(function() sq = npc:getSquare() end)
     if sq then
-        local b2 = sq:getBuilding()
+        local b2 = nil
+        pcall(function() b2 = sq:getBuilding() end)
         if b2 then return true, b2 end
     end
     return false, nil
@@ -49,16 +47,20 @@ function PHNPC.findNearestBuildingSquare(x, y, z, maxRadius)
     local cx, cy, cz = math.floor(x), math.floor(y), math.floor(z or 0)
 
     local function checkSquare(sx, sy)
-        local sq = cell:getGridSquare(sx, sy, cz)
+        local sq = nil
+        pcall(function() sq = cell:getGridSquare(sx, sy, cz) end)
         if not sq then return nil end
-        local building = sq:getBuilding()
+        local building = nil
+        pcall(function() building = sq:getBuilding() end)
         if not building then return nil end
-        if not sq:isFree(false) then return nil end
+        local free = false
+        pcall(function() free = sq:isFree(false) end)
+        if not free then return nil end
         return sq, building
     end
 
-    local sq, bd = checkSquare(cx, cy)
-    if sq then return cx + 0.5, cy + 0.5, cz, bd end
+    local sq0, bd0 = checkSquare(cx, cy)
+    if sq0 then return cx + 0.5, cy + 0.5, cz, bd0 end
 
     for r = 1, maxRadius do
         for dx = -r, r do
@@ -74,68 +76,67 @@ function PHNPC.findNearestBuildingSquare(x, y, z, maxRadius)
 end
 
 -- ============================================================
--- 3. Compter zombies hostiles autour d'une case (rayon donne)
+-- 3. Trouver une case libre dans une room d'un IsoBuilding
+--    Pattern : pcall sur CHAQUE appel Java pour ne JAMAIS crasher.
 -- ============================================================
-local function countZombiesNear(cell, rx, ry, rz, radius)
-    if not cell then return 0 end
-    local count = 0
-    for dx = -radius, radius do
-        for dy = -radius, radius do
-            local s2 = cell:getGridSquare(rx + dx, ry + dy, rz)
-            if s2 then
-                local mov = s2:getMovingObjects()
-                if mov then
-                    for k = 0, mov:size() - 1 do
-                        local o = mov:get(k)
-                        if o and instanceof(o, "IsoZombie") then
-                            local m2 = o:getModData()
-                            if not (m2 and m2.PHNPC_IsNPC) then
-                                count = count + 1
-                            end
+function PHNPC.findSafeRoomSquare(building, npc)
+    if not building then return nil end
+
+    -- Tente getRandomRoom() jusqu'a 8 fois
+    for attempt = 1, 8 do
+        local room = nil
+        pcall(function() room = building:getRandomRoom() end)
+        if room then
+            local sq = nil
+            pcall(function() sq = room:getRandomFreeSquare() end)
+            if sq then
+                local rx, ry, rz = 0, 0, 0
+                local ok = false
+                pcall(function()
+                    rx = sq:getX(); ry = sq:getY(); rz = sq:getZ(); ok = true
+                end)
+                if ok then return rx + 0.5, ry + 0.5, rz end
+            end
+        end
+    end
+
+    -- Fallback : passer par BuildingDef.getRooms() (ArrayList<RoomDef>)
+    local def = nil
+    pcall(function() def = building:getDef() end)
+    if def then
+        local roomsArr = nil
+        pcall(function() roomsArr = def:getRooms() end)
+        if roomsArr then
+            local n = 0
+            pcall(function() n = roomsArr:size() end)
+            for i = 0, n - 1 do
+                local roomDef = nil
+                pcall(function() roomDef = roomsArr:get(i) end)
+                if roomDef then
+                    local isoRoom = nil
+                    pcall(function() isoRoom = roomDef:getIsoRoom() end)
+                    if isoRoom then
+                        local sq = nil
+                        pcall(function() sq = isoRoom:getRandomFreeSquare() end)
+                        if sq then
+                            local rx, ry, rz = 0, 0, 0
+                            local ok = false
+                            pcall(function()
+                                rx = sq:getX(); ry = sq:getY(); rz = sq:getZ(); ok = true
+                            end)
+                            if ok then return rx + 0.5, ry + 0.5, rz end
                         end
                     end
                 end
             end
         end
     end
-    return count
+
+    return nil
 end
 
 -- ============================================================
--- 4. Trouver une case libre dans une room safe d'un IsoBuilding
---    API correcte B42.18 : getRoomsNumber() + getRoom(i) -> IsoRoom
--- ============================================================
-function PHNPC.findSafeRoomSquare(building, npc)
-    if not building then return nil end
-    local n = building:getRoomsNumber()
-    if not n or n == 0 then return nil end
-
-    local bestX, bestY, bestZ = nil, nil, nil
-    local bestZombies = 9999
-    local cell = getCell()
-
-    for i = 0, n - 1 do
-        local room = building:getRoom(i)
-        if room then
-            local sq = room:getRandomFreeSquare()
-            if sq then
-                local rx, ry, rz = sq:getX(), sq:getY(), sq:getZ()
-                local zombieCount = countZombiesNear(cell, rx, ry, rz, 4)
-                if zombieCount < bestZombies then
-                    bestZombies = zombieCount
-                    bestX = rx + 0.5
-                    bestY = ry + 0.5
-                    bestZ = rz
-                    if zombieCount == 0 then break end  -- room parfaite
-                end
-            end
-        end
-    end
-    return bestX, bestY, bestZ
-end
-
--- ============================================================
--- 5. Choisir un point de mise a l'abri pour un NPC
+-- 4. Choisir un point de mise a l'abri pour un NPC
 -- ============================================================
 function PHNPC.pickShelterPoint(npc)
     if not npc then return nil end
@@ -162,4 +163,4 @@ function PHNPC.pickShelterPoint(npc)
     return nil
 end
 
-print("[PHNPC] Building v0.0.9m loaded")
+print("[PHNPC] Building v0.0.9n loaded")
