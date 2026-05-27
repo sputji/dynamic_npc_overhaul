@@ -1,110 +1,134 @@
 --[[
-    PHNPC_Loot.lua  -  v0.0.9k
+    PHNPC_Loot.lua  -  v0.0.9m
     ----------------------------------------------------------------
     Drop l'inventaire complet du NPC quand il meurt.
 
-    Comportement :
-      - Au moment de la mort (OnZombieDead) on transfere TOUS les items de
-        l'inventaire du NPC :
-          1) en priorite dans le IsoDeadBody que le moteur vient de creer
-             sur la case (getSquare():getDeadBodys()),
-          2) sinon, on les drop au sol via AddWorldInventoryItem.
-      - Marque le NPC comme deja loote (md.PHNPC_Looted) pour eviter le
-        double drop si l'event est rappele plusieurs fois.
+    v0.0.9m REFONTE :
+      - Pattern Bandits ZADrop confirme : sq:AddWorldInventoryItem(item, rx, ry, 0)
+      - Drop AU SOL en priorite (toujours fiable), avec offset aleatoire.
+      - Drop aussi les WORN ITEMS (vetements, armures).
+      - 2eme passe via OnIsoZombieUpdate juste apres mort si OnZombieDead n'a pas
+        ete declenche (cas multi-shot/explosion).
+      - Logs INFO explicites a chaque etape pour diagnostic.
+      - Retrait pcall (cause d'echec silencieux v0.0.9k/l) - les API utilisees
+        sont stables en B42.18.
 
-    Fonctions :
-      PHNPC.dropNPCInventory(npc)  -  appel direct si besoin
-      Events.OnZombieDead          -  handler global
-
-    Note B42.18 : IsoZombie:getInventory() est herite de IsoGameCharacter.
-    IsoDeadBody:getContainer() retourne l'ItemContainer ou ajouter les items.
-    IsoGridSquare:getDeadBodys() retourne la liste des corps sur la case.
+    Verifie cote IsoZombie B42.18 :
+      getInventory()    -> ItemContainer
+      getWornItems()    -> List<WornItem>
+      getSquare()       -> IsoGridSquare
+    Verifie cote IsoGridSquare B42.18 :
+      AddWorldInventoryItem(item, dx, dy, dz) -> drop visible au sol
 ]]
 
 PHNPC = PHNPC or {}
 
--- pcall fallback (cohérence avec Core/Update : Kahlua peut perdre pcall)
-local _pcall = pcall
-local function safePcall(fn) local ok, err = _pcall(fn); return ok, err end
+local function dropItemOnGround(sq, item)
+    if not sq or not item then return false end
+    -- Offset aleatoire pour ne pas empiler tout au meme pixel
+    local rx = ZombRandFloat(0.1, 0.9)
+    local ry = ZombRandFloat(0.1, 0.9)
+    sq:AddWorldInventoryItem(item, rx, ry, 0)
+    return true
+end
 
--- ============================================================
--- DROP INVENTAIRE
--- ============================================================
 function PHNPC.dropNPCInventory(npc)
     if not npc then return end
     local md = npc:getModData()
     if not md.PHNPC_IsNPC then return end
-    if md.PHNPC_Looted then return end
+    if md.PHNPC_Looted then
+        if PHNPC.Log then PHNPC.Log.debug("Loot", tostring(md.PHNPC_Name) .. " deja loote, skip") end
+        return
+    end
     md.PHNPC_Looted = true
 
-    local inv = nil
-    safePcall(function() inv = npc:getInventory() end)
-    if not inv then return end
+    local name = tostring(md.PHNPC_Name or "NPC")
+    if PHNPC.Log then PHNPC.Log.info("Loot", name .. " mort - debut drop inventaire") end
 
-    local items = nil
-    safePcall(function() items = inv:getItems() end)
-    if not items or items:size() == 0 then
-        if PHNPC.Log then PHNPC.Log.info("Loot", tostring(md.PHNPC_Name) .. " no items to drop") end
+    local sq = npc:getSquare()
+    if not sq then
+        if PHNPC.Log then PHNPC.Log.info("Loot", name .. " ECHEC : pas de square") end
         return
     end
 
-    local sq = nil
-    safePcall(function() sq = npc:getSquare() end)
-    if not sq then return end
+    local total = 0
+    local dropped = 0
 
-    -- 1) Essayer de transferer dans le corpse fraichement cree
-    local target = nil
-    safePcall(function()
-        local bodies = sq:getDeadBodys()
-        if bodies and bodies:size() > 0 then
-            local body = bodies:get(bodies:size() - 1)  -- le plus recent
-            if body then target = body:getContainer() end
+    -- 1) WORN ITEMS (vetements/armures) en priorite : ils restent attaches sinon
+    local worn = npc:getWornItems()
+    if worn and worn:size() > 0 then
+        if PHNPC.Log then PHNPC.Log.info("Loot", name .. " - " .. worn:size() .. " worn items detectes") end
+        local snapshot = {}
+        for i = 0, worn:size() - 1 do
+            local wi = worn:get(i)
+            if wi and wi:getItem() then snapshot[#snapshot + 1] = wi:getItem() end
         end
-    end)
+        for _, it in ipairs(snapshot) do
+            total = total + 1
+            if dropItemOnGround(sq, it) then dropped = dropped + 1 end
+        end
+        -- Vider le worn container (le NPC ne porte plus rien)
+        npc:resetEquippedHandsModels()
+    end
 
-    local x, y, z = npc:getX(), npc:getY(), npc:getZ()
-    local total = items:size()
-    local moved = 0
-
-    -- Copie la liste car on va vider l'inventaire
-    local snapshot = {}
-    for i = 0, total - 1 do snapshot[#snapshot + 1] = items:get(i) end
-
-    for _, item in ipairs(snapshot) do
-        if item then
-            local ok = false
-            if target then
-                safePcall(function() target:addItem(item); ok = true end)
+    -- 2) INVENTAIRE principal
+    local inv = npc:getInventory()
+    if inv then
+        local items = inv:getItems()
+        if items and items:size() > 0 then
+            if PHNPC.Log then PHNPC.Log.info("Loot", name .. " - " .. items:size() .. " items en inventaire") end
+            local snapshot = {}
+            for i = 0, items:size() - 1 do
+                local it = items:get(i)
+                if it then snapshot[#snapshot + 1] = it end
             end
-            if not ok then
-                safePcall(function() sq:AddWorldInventoryItem(item, 0.0, 0.0, 0.0); ok = true end)
+            for _, it in ipairs(snapshot) do
+                total = total + 1
+                if dropItemOnGround(sq, it) then
+                    dropped = dropped + 1
+                    inv:Remove(it)
+                end
             end
-            if ok then
-                safePcall(function() inv:Remove(item) end)
-                moved = moved + 1
-            end
+            inv:setDrawDirty(true)
         end
     end
 
+    -- 3) ARME EN MAIN (au cas ou : Bandit pattern clearAttachedItems)
+    npc:setPrimaryHandItem(nil)
+    npc:setSecondaryHandItem(nil)
+    npc:clearAttachedItems()
+
     if PHNPC.Log then
-        PHNPC.Log.info("Loot", string.format("%s mort : %d/%d items %s",
-            tostring(md.PHNPC_Name), moved, total,
-            target and "transferes dans le corps" or "droppe au sol"))
+        PHNPC.Log.info("Loot", string.format("%s : %d/%d items droppes au sol", name, dropped, total))
     end
 end
 
 -- ============================================================
--- EVENT : detection mort NPC
+-- EVENT : detection mort NPC (handler principal)
 -- ============================================================
 local function onZombieDead(zombie)
     if not zombie then return end
-    local md = nil
-    safePcall(function() md = zombie:getModData() end)
+    local md = zombie:getModData()
     if not md or not md.PHNPC_IsNPC then return end
-    -- Petit delai pour laisser le moteur creer le IsoDeadBody
     PHNPC.dropNPCInventory(zombie)
 end
 
 Events.OnZombieDead.Add(onZombieDead)
 
-print("[PHNPC] Loot v0.0.9l loaded")
+-- ============================================================
+-- BACKUP : OnZombieUpdate detecte les NPC morts sans OnZombieDead
+-- (cas connus en B42 : explosions, multi-degats simultanes)
+-- ============================================================
+local function onZombieUpdateLootCheck(zombie)
+    if not zombie then return end
+    local md = zombie:getModData()
+    if not md or not md.PHNPC_IsNPC or md.PHNPC_Looted then return end
+    if zombie:isDead() or zombie:getHealth() <= 0 then
+        if PHNPC.Log then PHNPC.Log.info("Loot", "Detection mort via OnZombieUpdate (OnZombieDead manque)") end
+        PHNPC.dropNPCInventory(zombie)
+    end
+end
+
+Events.OnZombieUpdate.Add(onZombieUpdateLootCheck)
+
+print("[PHNPC] Loot v0.0.9m loaded")

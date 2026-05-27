@@ -1,5 +1,5 @@
 --[[
-    PHNPC_Update.lua  v0.0.9d  (client)
+    PHNPC_Update.lua  v0.0.9m  (client)
     Boucles de mise a jour principales :
       OnZombieUpdate => enforce comportement NPC chaque tick
       OnTick         => IA suivi + etats comportement + patrouille
@@ -128,7 +128,11 @@ Events.OnTick.Add(function()
                         if movedSq >= (threshold * threshold) then
                             md.PHNPC_LastPX = cpx
                             md.PHNPC_LastPY = cpy
-                            PHNPC.startFollowing(npc, player)
+                            -- v0.0.9m : forcer "Run" quand le joueur est tres loin
+                            -- (sinon le NPC marche et reste en arriere indefiniment).
+                            local runDist = PHNPC.RUN_DISTANCE or 6
+                            local wt = (dist > runDist) and "Run" or "Walk"
+                            PHNPC.startFollowing(npc, player, wt)
                         end
                     end
                 end
@@ -372,4 +376,4 @@ Events.OnGameStart.Add(function()
     print("[PHNPC] v0.0.9h pret")
 end)
 
-print("[PHNPC] Update v0.0.9l loaded")
+print("[PHNPC] Update v0.0.9m loaded")

@@ -1,8 +1,15 @@
 --[[
-    PHNPC_Actions.lua  v0.0.9e  (client)
+    PHNPC_Actions.lua  v0.0.9m  (client)
     Helpers de deplacement NPC : startFollowing / startMovingTo / stopMoving
     + findNearestZombie + checkAndOpenDoors + handleStuck
 
+    v0.0.9m :
+      - SPLIT applyMoveSetup en applyMoveStart (au lancement, anim setup complet)
+        + applyMoveTick (chaque tick, idempotent, sans setBumpType/faceLocationF).
+        Pattern Bandits ZAGoTo.onStart confirme : ne PAS re-setBumpType ni
+        faceLocationF tant que le NPC est en mouvement (causait les saccades).
+      - startFollowing accepte forceWalkType ("Run"/"Walk") pour permettre a
+        Update.lua de forcer la course quand le joueur est tres loin.
     v0.0.9e :
       - startFollowing utilise pathToCharacter(player) — standard IsoZombie→IsoCharacter
         confirme par NPC_Helper_Mod B42.18 (GCUpdateAI.lua + GCCoreActions.lua).
@@ -55,20 +62,33 @@ local function pickWalkType(npc, md, dist)
 end
 PHNPC._pickWalkType = pickWalkType
 
--- Applique tous les set* pour mettre le NPC en mouvement avec un walkType donne.
--- Centralise la logique pour Walk vs Run (Bandits ZAGoTo/ZAMove).
-local function applyMoveSetup(npc, x, y, walkType)
-    -- Variables AnimSet : essentielles pour B42 (Bandits BanditWalkType + nos AnimSet XMLs)
+-- v0.0.9m : SPLIT en 2 fonctions pour eviter les saccades.
+--
+-- applyMoveStart : appele UNE FOIS au lancement d'un path. Configure tout :
+--   setVariable + setWalkType + setRunning + faceLocationF + setBumpType.
+--   Pattern Bandits ZAGoTo.onStart : faceLocationF + setBumpType seulement
+--   au START et seulement si NPC pas deja en mouvement.
+--
+-- applyMoveTick : appele chaque tick (idempotent, ne touche PAS l'anim).
+--   Maintient juste setRunning + BanditWalkType (au cas ou Enforce les reset).
+--   PAS de faceLocationF (= re-rotation sur place) ni setBumpType (= reset anim).
+local function applyMoveStart(npc, x, y, walkType)
     pcall(function() npc:setVariable("BanditWalkType", walkType) end)
     pcall(function() npc:setVariable("PHNPC_WalkType", walkType) end)
     pcall(function() npc:setWalkType(walkType) end)
     pcall(function() npc:setRunning(walkType == "Run") end)
-    -- Orientation visuelle (evite la rotation sur place)
     pcall(function() npc:faceLocationF(x, y) end)
-    -- BumpType selon walkType
     pcall(function() npc:setBumpType(walkType == "Run" and "IdleToRun" or "IdleToWalk") end)
 end
-PHNPC._applyMoveSetup = applyMoveSetup
+local function applyMoveTick(npc, walkType)
+    pcall(function() npc:setVariable("BanditWalkType", walkType) end)
+    pcall(function() npc:setRunning(walkType == "Run") end)
+end
+PHNPC._applyMoveStart = applyMoveStart
+PHNPC._applyMoveTick  = applyMoveTick
+-- Alias retrocompat pour autres fichiers qui utilisaient l'ancien helper
+PHNPC._applyMoveSetup = applyMoveStart
+local applyMoveSetup  = applyMoveStart
 
 -- Doit-on (re)lancer un pathfind ? Vrai si destination differente ou NPC a l'arret.
 -- v0.0.9l : ajoute cooldown 8 ticks anti-spam (evite saccades quand le moteur
@@ -95,7 +115,8 @@ end
 PHNPC._needNewPath = needNewPath
 
 -- startFollowing : faire suivre le NPC vers le joueur (path-once pattern)
-function PHNPC.startFollowing(npc, player)
+-- v0.0.9m : accepte forceWalkType pour forcer la course quand le joueur est loin.
+function PHNPC.startFollowing(npc, player, forceWalkType)
     local md = npc:getModData()
     npc:setUseless(false)
 
@@ -113,7 +134,7 @@ function PHNPC.startFollowing(npc, player)
     local nx, ny = dx / d, dy / d
     local tx = px - nx * stopDist
     local ty = py - ny * stopDist
-    local walkType = pickWalkType(npc, md, d)
+    local walkType = forceWalkType or pickWalkType(npc, md, d)
 
     if needNewPath(npc, md, tx, ty, pz) then
         -- Nouveau path : reset target/aggro UNE FOIS (pas chaque tick)
@@ -135,8 +156,9 @@ function PHNPC.startFollowing(npc, player)
         md.PHNPC_LastMoveY  = npc:getY()
         PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> "..walkType.." follow offset (" .. string.format("%.1f,%.1f", tx, ty) .. ")")
     else
-        -- Path deja en cours : juste maintenir le walkType (au cas ou Enforce l'a touche)
-        applyMoveSetup(npc, md.PHNPC_PathX, md.PHNPC_PathY, md.PHNPC_WalkType or walkType)
+        -- v0.0.9m : path en cours, maintenance idempotente UNIQUEMENT (pas de re-setBumpType
+        -- ni faceLocationF qui reset l'anim chaque tick = saccade).
+        applyMoveTick(npc, md.PHNPC_WalkType or walkType)
     end
 end
 
@@ -173,7 +195,8 @@ function PHNPC.startMovingTo(npc, x, y, z, forceWalkType)
         md.PHNPC_LastMoveY  = npc:getY()
         PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> "..walkType.." pathToLocationF(" .. string.format("%.1f,%.1f", x, y) .. ")")
     else
-        applyMoveSetup(npc, x, y, md.PHNPC_WalkType or walkType)
+        -- v0.0.9m : path deja lance, ne touche PLUS setBumpType/faceLocationF (saccade).
+        applyMoveTick(npc, md.PHNPC_WalkType or walkType)
     end
 end
 

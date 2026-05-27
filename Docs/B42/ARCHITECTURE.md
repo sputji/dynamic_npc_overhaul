@@ -1,4 +1,11 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.9k
+# Architecture B42 — Dynamic NPC Overhaul v0.0.9m
+
+> **v0.0.9m (2026-05-27)** — Trois fixes critiques majeurs :
+>
+> 1. **`PHNPC_Building.lua`** — l'API `IsoBuilding` (retournee par `getCurrentBuilding()`) n'a **pas** de `getRooms()`. Reecrit avec `getRoomsNumber()` + `getRoom(i)` + `IsoRoom:getRandomFreeSquare()`. Le crash en boucle (chaque frame) est resolu.
+> 2. **`PHNPC_Actions.lua`** — split `applyMoveSetup` -> `applyMoveStart` (au lancement, anim setup complet) + `applyMoveTick` (chaque tick, idempotent). Les saccades viennent de `setBumpType` + `faceLocationF` re-appeles chaque tick (confirme par audit Bandits `ZAGoTo.onStart`). Ajoute `forceWalkType` a `startFollowing`.
+> 3. **`PHNPC_Loot.lua`** — refonte sur pattern Bandits `ZADrop` : `IsoGridSquare:AddWorldInventoryItem` au sol, drop des worn items, backup via `OnZombieUpdate`, retrait de `safePcall` (echec silencieux).
+> 4. **`PHNPC_Update.lua`** — handler `following` force `"Run"` quand `dist > RUN_DISTANCE` (6 tuiles).
 
 ## Structure des fichiers
 

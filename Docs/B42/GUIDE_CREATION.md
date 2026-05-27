@@ -1,5 +1,18 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.0.9g_
+_Version 0.0.9m_
+
+> **Mise a jour v0.0.9m** : 3 pieges critiques identifies lors de l'audit complet de l'API B42.18.
+>
+> ### Piege 1 — `npc:getCurrentBuilding()` retourne un `IsoBuilding`, **pas** un `BuildingDef`
+> `IsoBuilding` n'a **pas** de methode `getRooms()`. Utiliser `getRoomsNumber()` + `getRoom(int)` (qui renvoie `IsoRoom`). Sur l'`IsoRoom`, utiliser `getRandomFreeSquare()` pour obtenir une case libre. Verifie par extraction des `.class` du moteur.
+>
+> ### Piege 2 — Ne JAMAIS re-appeler `setBumpType` ou `faceLocationF` chaque tick pendant un path
+> Cause directe des "saccades" : ces appels reinitialisent l'animation a chaque frame. Pattern Bandits `ZAGoTo.onStart` confirme : `setBumpType("IdleToRun")` n'est appele qu'au **lancement** du path et seulement si le NPC n'est pas deja en mouvement. Architecture recommandee : un helper `applyMoveStart` (au lancement, anim setup complet) et un `applyMoveTick` (chaque tick, idempotent, **uniquement** `setVariable("BanditWalkType",...)` + `setRunning(...)`).
+>
+> ### Piege 3 — Drop loot a la mort : `OnZombieDead` precede la creation du `IsoDeadBody`
+> Au moment ou `OnZombieDead(zombie)` est appele, `zombie:getDeadBody()` est encore `nil`. Pattern fiable (Bandits `ZADrop.lua`) : drop direct au sol via `sq:AddWorldInventoryItem(item, randX, randY, 0)`. Ne pas oublier les `getWornItems()` (vetements/armures). Eviter `pcall`/wrappers silencieux qui masquent les vraies causes d'echec.
+>
+> _Version 0.0.9g_ : guide ecrit initialement pour cette version, complete avec les fixes v0.0.9i-l-m.
 
 > Ce guide explique le fonctionnement du système NPC tel qu'implémenté en v0.0.9i.
 > Pattern copié EXACTEMENT depuis NPC_Helper_Mod (GCCoreConvert + GCCoreEnforceMain + GCCoreSpawn + GCUpdate),

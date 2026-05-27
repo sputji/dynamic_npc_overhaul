@@ -1,5 +1,62 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9m] — 2026-05-27
+
+### Correctifs post-v0.0.9l (3 bugs critiques persistants apres test)
+
+Apres v0.0.9l le joueur confirme : crash shelter toujours present + saccades sur "Va la-bas" + NPC ne court pas en follow + items non droppes a la mort.
+Audit complet realise sur l'API B42.18 par extraction des `.class` du moteur, comparaison avec `mod example/B42/Bandits/42.18` (`ZAGoTo`, `ZAMove`, `BanditUpdate.OnZombieDead`, `ZADrop`).
+
+### Corrections principales
+
+- **`PHNPC_Building.lua` — crash `getRooms()` en boucle (chaque frame)**
+  - **Cause racine confirmee** : `IsoGameCharacter:getCurrentBuilding()` retourne un `IsoBuilding` (et non un `BuildingDef`). `IsoBuilding` n'a **pas** de methode `getRooms()`. API reelle (verifie par extraction `.class`) : `getRoomsNumber():int`, `getRoom(int):IsoRoom`, `getRandomRoom()`, `getRoomByID(int)`, `getFreeTile()`, `getRandomFirstFloorWindow()`.
+  - `IsoRoom` (et non `RoomDef`) expose `getRandomFreeSquare():IsoGridSquare`.
+  - **Fix** : `findSafeRoomSquare` reecrit pour iterer `0..getRoomsNumber()-1` et utiliser `building:getRoom(i):getRandomFreeSquare()`.
+  - **Bonus** : retrait des wrappers `spc`/`safePcall` du fichier (cause de cascades d'erreurs en Kahlua quand `pcall` est temporairement indisponible).
+
+- **`PHNPC_Actions.lua` — saccades sur "Va la-bas" et "Suis-moi"**
+  - **Cause racine** : `applyMoveSetup` etait re-appele a chaque tick dans la branche "path en cours" et incluait `setBumpType("IdleToRun")` + `faceLocationF(x,y)`. Pattern Bandits `ZAGoTo.onStart` (mod example) confirme : `setBumpType` ne doit etre appele **que** quand le NPC n'est pas deja en mouvement, et `faceLocationF` jamais en boucle.
+  - **Fix** : split en deux helpers :
+    - `applyMoveStart(npc, x, y, walkType)` -> appele **une seule fois** au lancement d'un nouveau path : `setVariable("BanditWalkType",...)` + `setWalkType` + `setRunning` + `faceLocationF` + `setBumpType`.
+    - `applyMoveTick(npc, walkType)` -> appele chaque tick (idempotent) : juste `setVariable("BanditWalkType",...)` + `setRunning(...)`. **Aucun reset d'animation**.
+  - Les branches `else` de `startFollowing` et `startMovingTo` (path deja lance) utilisent desormais `applyMoveTick`.
+
+- **`PHNPC_Update.lua` — le NPC ne court pas quand le joueur est loin**
+  - **Cause racine** : `startFollowing(npc, player)` etait appele sans `walkType`. La fonction calculait ensuite `walkType` via `pickWalkType` qui retourne "Run" si dist>6 mais le walkType etait recompute a partir de la dist post-offset (toujours `stopDist=3`) et tombait en "Walk".
+  - **Fix** : `startFollowing` accepte maintenant un parametre `forceWalkType`. Le handler `following` dans `PHNPC_Update.lua` passe explicitement `"Run"` quand `dist > PHNPC.RUN_DISTANCE` (=6 tuiles), `"Walk"` sinon.
+
+- **`PHNPC_Loot.lua` — items non droppes a la mort du NPC**
+  - **Cause racine** : `safePcall` masquait les erreurs (echec silencieux). De plus la tentative de transfert dans `IsoDeadBody:getContainer()` echouait souvent car `OnZombieDead` est declenche **avant** la creation du cadavre.
+  - **Fix** : refonte complete sur le pattern Bandits `ZADrop.lua` (`sq:AddWorldInventoryItem(item, rx, ry, 0)`) :
+    - Drop direct **au sol** via `IsoGridSquare:AddWorldInventoryItem(item, randX, randY, 0)` (toujours fiable, items visibles).
+    - Drop des **WORN ITEMS** (vetements/armures) - oublies en v0.0.9k/l.
+    - Drop des items en main via `setPrimaryHandItem(nil)` + `setSecondaryHandItem(nil)` + `clearAttachedItems()`.
+    - **Backup** : second handler sur `OnZombieUpdate` qui detecte la mort si `OnZombieDead` n'est pas declenche (cas explosions/multi-degats en B42).
+    - **Logs INFO explicites** a chaque etape pour diagnostic : nombre de worn items, nombre d'items inventaire, total droppes.
+    - Retrait de `safePcall` (cause d'echec silencieux).
+
+### Fichiers modifies
+
+- `B42/42/media/lua/client/PHNPC_Building.lua` (reecriture API IsoBuilding)
+- `B42/42/media/lua/client/PHNPC_Actions.lua` (split applyMoveStart/Tick + forceWalkType)
+- `B42/42/media/lua/client/PHNPC_Update.lua` (force "Run" dans follow handler)
+- `B42/42/media/lua/client/PHNPC_Loot.lua` (refonte pattern Bandits ZADrop + worn + backup OnZombieUpdate)
+
+### API B42.18 verifiees (extraction `.class`)
+
+| Methode | Classe reelle | Note |
+| --- | --- | --- |
+| `IsoGameCharacter:getCurrentBuilding()` | retourne `IsoBuilding` | **PAS `BuildingDef`** |
+| `IsoBuilding:getRoomsNumber()` | int | |
+| `IsoBuilding:getRoom(int)` | `IsoRoom` | |
+| `IsoBuilding:getRandomRoom()` | `IsoRoom` | |
+| `IsoRoom:getRandomFreeSquare()` | `IsoGridSquare` ou null | |
+| `IsoZombie:getDeadBody()` | `IsoDeadBody` ou null | Existe en B42.18 mais null durant OnZombieDead |
+| `IsoGridSquare:AddWorldInventoryItem(item, rx, ry, rz)` | `IsoWorldInventoryObject` | Pattern Bandits ZADrop |
+
+---
+
 ## [0.0.9l] — 2026-05-27
 
 ### Correctifs post-v0.0.9k (rapport de test joueur)
