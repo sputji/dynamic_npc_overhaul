@@ -1,5 +1,64 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9l] — 2026-05-27
+
+### Correctifs post-v0.0.9k (rapport de test joueur)
+
+La v0.0.9k a introduit le systeme de batiments et la course mais 2 bugs persistaient en jeu :
+- crash total lors de l'ordre "Mets-toi a l'abri"
+- ordre "Va la-bas" : le NPC court mais avec saccades + impression de retour-aller
+
+### Corrections principales
+
+- **CRASH `PHNPC_Building.lua` — "Mets-toi a l'abri" plantait le mod**
+  - **Cause racine** : le wrapper interne `local function spc(fn) local ok, err = _pcall(fn); return ok, err end` reposait sur `local _pcall = pcall` capture au chargement. Dans certains contextes Kahlua B42, `pcall` peut etre `nil` au moment du load du chunk -> `_pcall = nil` -> chaque appel `spc(...)` levait `Object tried to call nil in spc` (PHNPC_Building.lua:30).
+  - **Stack trace observe** :
+    ```
+    spc(PHNPC_Building.lua:99)
+    spc(PHNPC_Building.lua:30)        <- _pcall(fn) avec _pcall=nil
+    findSafeRoomSquare(...:99)
+    pickShelterPoint(...:170)
+    ```
+  - **Fix** : reecriture complete de `PHNPC_Building.lua` **sans aucun `pcall`**. Toutes les API Java utilisees (`getCurrentBuilding`, `getSquare`, `getBuilding`, `getRooms`, `getRandomFreeSquare`, `isFree`, `getGridSquare`, `getMovingObjects`) sont verifiees presentes en B42.18 via extraction `.class`. Les retours nullables sont gardes par `if obj then ... end` au niveau Lua.
+
+- **SACCADES "Va la-bas" / "Mets-toi a l'abri" — NPC court mais saccade + revient**
+  - **Cause racine #1** : `PHNPC_Enforce.lua` handler `actionStateName == "idle"` appelait `PHNPC.stopMoving(zombie)` au **premier** tick d'idle. Or le moteur `PathFindBehavior2` alterne occasionnellement les etats `idle`/`pathfind` entre 2 steps de marche. `stopMoving` brutal reset `md.PHNPC_PathX/Y` + `md.PHNPC_Moving=false` -> le tick suivant `Update.lua` re-call `startMovingTo` -> `pathToLocationF` est appele en boucle (log `console.txt` montrait 100+ appels consecutifs f:5595 -> f:5878).
+  - **Fix** : compteur `md.PHNPC_IdleTicks`. `stopMoving` declenche seulement apres **15 ticks** idle consecutifs. Reset a 0 en cas de `pathfind` ou de mouvement.
+  - **Cause racine #2** : `PHNPC_Actions.lua::needNewPath` retournait `true` des que `md.PHNPC_Moving == false`, sans cooldown. Combine avec le bug #1 ci-dessus, chaque oscillation idle/pathfind reset le path immediatement.
+  - **Fix** : ajout d'un compteur global `PHNPC._pathTickCounter` (incremente OnTick). `needNewPath` exige maintenant un cooldown minimum de **8 ticks** entre 2 `pathToLocationF` aux memes coordonnees. Seuil de difference de destination assoupli de `dx*dx+dy*dy > 1` a `> 4` (2 tuiles) pour eviter les micro-recalculs.
+
+### Detail technique
+
+- `PHNPC_Building.lua` : suppression de `local _pcall = pcall` et `local function spc(fn)`. Les 9 anciens appels `spc(function() ... end)` sont remplaces par des appels Java directs avec garde `if obj then`.
+- `PHNPC_Enforce.lua` idle handler : `if md.PHNPC_Moving then md.PHNPC_IdleTicks = (md.PHNPC_IdleTicks or 0) + 1; if md.PHNPC_IdleTicks >= 15 then ... PHNPC.stopMoving(zombie) end else md.PHNPC_IdleTicks = 0 end`. Reset additionnel dans le bloc `pathfind`.
+- `PHNPC_Actions.lua` : `PATH_COOLDOWN = 8`. `md.PHNPC_LastPathTick = PHNPC._pathTickCounter` ecrit a chaque `pathToLocationF` (dans `startMovingTo` et `startFollowing`).
+- `PHNPC_Update.lua` OnTick : `PHNPC._pathTickCounter = (PHNPC._pathTickCounter or 0) + 1` en tete de handler.
+- Banniere `[PHNPC] ... v0.0.9l loaded` sur les 10 fichiers Lua (Actions, Combat, Core, Enforce, Log, Loot, Building, Orders, Stats, Update).
+
+### Fichiers modifies
+
+| Fichier | Changement |
+|---------|-----------|
+| `PHNPC_Building.lua` | **Reecriture complete** : suppression wrapper `spc`/`_pcall`, appels Java directs |
+| `PHNPC_Enforce.lua` | Idle handler avec compteur `PHNPC_IdleTicks` (seuil 15 ticks) |
+| `PHNPC_Actions.lua` | `needNewPath` avec cooldown 8 ticks via `_pathTickCounter`, seuil dist 2 tuiles |
+| `PHNPC_Update.lua` | Incrementation `PHNPC._pathTickCounter` chaque `OnTick` |
+
+### API B42.18 reconfirmees (sans pcall)
+
+- `IsoGameCharacter:getCurrentBuilding()` : retourne `BuildingDef` ou `nil` (jamais d'exception)
+- `IsoGridSquare:getBuilding()` / `getMovingObjects()` : retourne `null`/liste vide
+- `BuildingDef:getRooms()` + `RoomDef:getRandomFreeSquare()` : surs (gardes nil au niveau Lua)
+- `IsoCell:getGridSquare(x,y,z)` : retourne `null` hors map
+
+### Lecons retenues
+
+- En Kahlua B42, `local _pcall = pcall` capture au load peut donner `nil` dans certains scopes. Plutot que de wrapper avec fallback, **mieux vaut ne pas utiliser pcall du tout** quand les API sont verifiees existantes et que les retours nuls sont gerables.
+- `actionStateName == "idle"` peut etre transitoirement vrai pendant un pathfind actif. Ne jamais reagir au premier tick : compter les ticks consecutifs.
+- Tout appel `pathToLocationF` doit etre throttle par un cooldown pour eviter qu'une oscillation d'etat ne le declenche en boucle.
+
+---
+
 ## [0.0.9k] — 2026-05-27
 
 ### REFONTE GAMEPLAY — ordres / course / loot / batiments
