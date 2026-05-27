@@ -44,9 +44,8 @@ function PHNPC.startFollowing(npc, player)
     -- Sinon le moteur LungeState reoriente vers le joueur et override pathToLocationF.
     pcall(function() npc:setTarget(nil) end)
     pcall(function() npc:setAttackedBy(nil) end)
-    pcall(function() npc:setAlertedBy(nil) end)
     pcall(function() npc:clearAggroList() end)
-    pcall(function() npc:setPathTargetCharacter(nil) end)
+    -- v0.0.9j : setAlertedBy/setPathTargetCharacter n'existent pas en B42.18.
     if not md.PHNPC_Moving then
         md.PHNPC_Moving = true
         pcall(function() npc:setBumpType("IdleToWalk") end)
@@ -82,9 +81,8 @@ function PHNPC.startMovingTo(npc, x, y, z)
     -- Sans ca, le moteur AI redirige vers le joueur le plus proche.
     pcall(function() npc:setTarget(nil) end)
     pcall(function() npc:setAttackedBy(nil) end)
-    pcall(function() npc:setAlertedBy(nil) end)
     pcall(function() npc:clearAggroList() end)
-    pcall(function() npc:setPathTargetCharacter(nil) end)
+    -- v0.0.9j : setAlertedBy/setPathTargetCharacter n'existent pas en B42.18.
     -- Si le NPC est en LungeState, forcer Idle pour debloquer le pathfind.
     pcall(function()
         local st = npc:getCurrentState()
@@ -398,7 +396,7 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.9i loaded")
+print("[PHNPC] Actions v0.0.9j loaded")
 
 -- ============================================================
 -- FENETRES (v0.0.9h NEW — Bug 6)

@@ -48,10 +48,9 @@ function PHNPC.enforceNPC(zombie)
     -- Le moteur IsoZombie/AI Lunge ciblait automatiquement l'IsoPlayer local et
     -- redirigeait le pathfind, court-circuitant nos ordres Lua. Reset chaque tick.
     pcall(function() zombie:setAttackedBy(nil) end)
-    pcall(function() zombie:setAlertedBy(nil) end)
-    pcall(function() zombie:setPathTargetCharacter(nil) end)
-    pcall(function() zombie:setPrimaryTarget(nil) end)
-    pcall(function() zombie:setSecondaryTarget(nil) end)
+    -- v0.0.9j : setAlertedBy/setPathTargetCharacter/setPrimaryTarget/setSecondaryTarget
+    -- n'existent PAS en B42.18 (KahluaException non-rattrapable). Retirees.
+    pcall(function() zombie:clearAggroList() end)
     -- Si l'AnimEngine est en LungeState alors qu'on a un ordre explicite (goingto/shelter),
     -- forcer la sortie immediate vers ZombieIdleState (l'attaque parasite l'IA).
     if md.PHNPC_State == "goingto" or md.PHNPC_State == "shelter" then
@@ -146,7 +145,7 @@ function PHNPC.enforceNPC(zombie)
             -- Forcer la reinitialisation du modele 3D (essentiel pour casser la T-pose).
             pcall(function() zombie:resetModel() end)
             pcall(function() zombie:resetModelNextFrame() end)
-            pcall(function() zombie:setSkeletonResetting(true) end)
+            -- v0.0.9j : setSkeletonResetting n'existe pas en B42.18. Retire.
             zombie:changeState(ZombieIdleState.instance())
             pcall(function() zombie:setBumpType("IdleToWalk") end)
             md.PHNPC_Moving = false
@@ -203,4 +202,4 @@ function PHNPC.enforceNPC(zombie)
     zombie:setWalkType("Walk")
 end
 
-print("[PHNPC] Enforce v0.0.9i loaded")
+print("[PHNPC] Enforce v0.0.9j loaded")

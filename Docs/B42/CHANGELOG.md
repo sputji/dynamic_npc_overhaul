@@ -1,5 +1,23 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9j] — 2026-05-27
+
+### HOTFIX critique — Cascade `Object tried to call nil` (PHNPC_Update.lua:61)
+
+**Diagnostic** : la v0.0.9i appelait 5 méthodes Java qui **n'existent pas** sur `IsoZombie` en B42.18 :
+`setAlertedBy`, `setPathTargetCharacter`, `setPrimaryTarget`, `setSecondaryTarget`, `setSkeletonResetting`.
+
+Lorsque Kahlua tente d'invoquer une méthode Java inexistante, il lève une `KahluaException "Object tried to call nil"` qui **n'est PAS rattrapable par `pcall`** (contrairement aux erreurs Lua standard). Résultat : cascade infinie dans `OnZombieUpdate` à chaque tick pour chaque NPC.
+
+**Vérification** : extraction de `projectzomboid.jar` et scan des constants Utf8 de `IsoZombie.class` + `IsoGameCharacter.class` → ces 5 noms n'apparaissent nulle part.
+
+**Fix** : retrait des 9 appels dans `PHNPC_Enforce.lua` (lignes 51-54, 149) et `PHNPC_Actions.lua` (lignes 47, 49, 85, 87).
+Le neutralisation du ciblage zombie auto reste assurée par les méthodes **réellement existantes** : `setAttackedBy(nil)`, `setTarget(nil)`, `clearAggroList()`, plus le forçage `changeState(ZombieIdleState.instance())` en cas de `LungeState`.
+
+**Aucune fonction supprimée** : toute la logique Combat / Follow / Goingto / Shelter / Falldown / Free de v0.0.9i est préservée, seuls les appels Java fantômes sont retirés.
+
+---
+
 ## [0.0.9i] — 2026-05-23
 
 ### Corrections définitives Java natives (4 bugs persistants après v0.0.9h)

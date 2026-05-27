@@ -96,4 +96,4 @@ function PHNPC.initInventory(zombie, outfit)
     end)
 end
 
-print("[PHNPC] Stats v0.0.9i loaded")
+print("[PHNPC] Stats v0.0.9j loaded")
