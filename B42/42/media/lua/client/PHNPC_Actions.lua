@@ -28,31 +28,63 @@ PHNPC._attackCooldowns  = PHNPC._attackCooldowns or {}   -- [npcRef] => ticks av
 PHNPC._openInventoryNPC = nil                            -- NPC dont l'inventaire est ouvert
 
 -- ============================================================
--- HELPERS DE DEPLACEMENT (GCCoreActions.lua pattern)
+-- HELPERS DE DEPLACEMENT (Bandits B42.18 ZAGoTo/ZAMove pattern)
+-- ============================================================
+-- v0.0.9k REFONTE COMPLETE :
+--   * pathToLocationF est appele UNE FOIS au start, plus en boucle (qui annulait
+--     le pathfind en cours et faisait surplace le NPC).
+--   * setVariable("BanditWalkType", walkType) + setWalkType + setRunning :
+--     declenche les AnimSets B42 pour Walk OU Run (le NPC peut enfin courir).
+--   * faceLocationF avant pathToLocationF : evite le tour sur soi-meme.
+--   * Reset target/aggro UNIQUEMENT au lancement d'un nouveau path
+--     (destination differente OU NPC a l'arret) - plus a chaque tick.
+--   * Detection stuck dans Update.lua reclenche un re-path automatiquement.
 -- ============================================================
 
--- startFollowing : faire suivre le NPC vers le joueur
--- v0.0.9h FIX BUG 4 : remplace pathToCharacter par pathToLocationF avec
---   un point cible decale (joueur - direction * FOLLOW_STOP_DISTANCE) pour
---   eviter que le NPC se colle litteralement sur la case du joueur.
--- v0.0.9g : checkAndOpenDoors AVANT le pathfind.
--- v0.0.9h : + checkAndOpenWindows.
+-- Choisir Walk/Run selon distance + danger
+local function pickWalkType(npc, md, dist)
+    -- Force Run si en fuite/combat
+    if md.PHNPC_State == "shelter" or md.PHNPC_State == "fleeing" then return "Run" end
+    -- HP bas => Run
+    local hp = 100
+    pcall(function() hp = npc:getHealth() end)
+    if hp < (PHNPC.MAX_HEALTH or 100) * 0.5 then return "Run" end
+    -- Distance > RUN_DISTANCE => Run
+    if dist and dist > (PHNPC.RUN_DISTANCE or 6) then return "Run" end
+    return "Walk"
+end
+PHNPC._pickWalkType = pickWalkType
+
+-- Applique tous les set* pour mettre le NPC en mouvement avec un walkType donne.
+-- Centralise la logique pour Walk vs Run (Bandits ZAGoTo/ZAMove).
+local function applyMoveSetup(npc, x, y, walkType)
+    -- Variables AnimSet : essentielles pour B42 (Bandits BanditWalkType + nos AnimSet XMLs)
+    pcall(function() npc:setVariable("BanditWalkType", walkType) end)
+    pcall(function() npc:setVariable("PHNPC_WalkType", walkType) end)
+    pcall(function() npc:setWalkType(walkType) end)
+    pcall(function() npc:setRunning(walkType == "Run") end)
+    -- Orientation visuelle (evite la rotation sur place)
+    pcall(function() npc:faceLocationF(x, y) end)
+    -- BumpType selon walkType
+    pcall(function() npc:setBumpType(walkType == "Run" and "IdleToRun" or "IdleToWalk") end)
+end
+PHNPC._applyMoveSetup = applyMoveSetup
+
+-- Doit-on (re)lancer un pathfind ? Vrai si destination differente ou NPC a l'arret.
+local function needNewPath(npc, md, x, y, z)
+    if not md.PHNPC_Moving then return true end
+    if not md.PHNPC_PathX or not md.PHNPC_PathY then return true end
+    local dx = (md.PHNPC_PathX - x)
+    local dy = (md.PHNPC_PathY - y)
+    if dx*dx + dy*dy > 1 then return true end  -- nouvelle dest (> 1 tile diff)
+    return false
+end
+PHNPC._needNewPath = needNewPath
+
+-- startFollowing : faire suivre le NPC vers le joueur (path-once pattern)
 function PHNPC.startFollowing(npc, player)
     local md = npc:getModData()
     npc:setUseless(false)
-    -- v0.0.9i FIX BUG 4 : casser tout target/aggressor zombie AVANT le pathfind.
-    -- Sinon le moteur LungeState reoriente vers le joueur et override pathToLocationF.
-    pcall(function() npc:setTarget(nil) end)
-    pcall(function() npc:setAttackedBy(nil) end)
-    pcall(function() npc:clearAggroList() end)
-    -- v0.0.9j : setAlertedBy/setPathTargetCharacter n'existent pas en B42.18.
-    if not md.PHNPC_Moving then
-        md.PHNPC_Moving = true
-        pcall(function() npc:setBumpType("IdleToWalk") end)
-    end
-    -- Ouvrir les portes et fenetres AVANT le pathfind
-    pcall(function() PHNPC.checkAndOpenDoors(npc) end)
-    pcall(function() PHNPC.checkAndOpenWindows(npc) end)
 
     -- v0.0.9h : cible decalee (eviter de coller le joueur)
     local px, py, pz = player:getX(), player:getY(), player:getZ()
@@ -60,53 +92,98 @@ function PHNPC.startFollowing(npc, player)
     local dy = py - npc:getY()
     local d  = math.sqrt(dx*dx + dy*dy)
     local stopDist = (PHNPC.FOLLOW_STOP_DISTANCE or 3)
-    if d > stopDist + 0.1 then
-        local nx, ny = dx / d, dy / d
-        local tx = px - nx * stopDist
-        local ty = py - ny * stopDist
-        pcall(function() npc:pathToLocationF(tx, ty, pz) end)
-        PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> pathToLocationF offset (" .. string.format("%.1f,%.1f", tx, ty) .. ")")
-    else
-        -- Deja assez proche : arret propre, ne pas re-pathfinder
+    if d <= stopDist + 0.1 then
+        -- Deja assez proche : arret propre
         PHNPC.stopMoving(npc)
+        return
+    end
+    local nx, ny = dx / d, dy / d
+    local tx = px - nx * stopDist
+    local ty = py - ny * stopDist
+    local walkType = pickWalkType(npc, md, d)
+
+    if needNewPath(npc, md, tx, ty, pz) then
+        -- Nouveau path : reset target/aggro UNE FOIS (pas chaque tick)
+        pcall(function() npc:setTarget(nil) end)
+        pcall(function() npc:setAttackedBy(nil) end)
+        pcall(function() npc:clearAggroList() end)
+        pcall(function() PHNPC.checkAndOpenDoors(npc) end)
+        pcall(function() PHNPC.checkAndOpenWindows(npc) end)
+        applyMoveSetup(npc, tx, ty, walkType)
+        pcall(function() npc:pathToLocationF(tx, ty, pz) end)
+        md.PHNPC_Moving   = true
+        md.PHNPC_PathX    = tx
+        md.PHNPC_PathY    = ty
+        md.PHNPC_PathZ    = pz
+        md.PHNPC_WalkType = walkType
+        md.PHNPC_StuckTicks = 0
+        md.PHNPC_LastMoveX  = npc:getX()
+        md.PHNPC_LastMoveY  = npc:getY()
+        PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> "..walkType.." follow offset (" .. string.format("%.1f,%.1f", tx, ty) .. ")")
+    else
+        -- Path deja en cours : juste maintenir le walkType (au cas ou Enforce l'a touche)
+        applyMoveSetup(npc, md.PHNPC_PathX, md.PHNPC_PathY, md.PHNPC_WalkType or walkType)
     end
 end
 
--- startMovingTo : deplacer le NPC vers des coordonnees
--- v0.0.9h : + checkAndOpenWindows AVANT le pathfind.
-function PHNPC.startMovingTo(npc, x, y, z)
+-- startMovingTo : deplacer le NPC vers des coordonnees (path-once pattern)
+function PHNPC.startMovingTo(npc, x, y, z, forceWalkType)
     local md = npc:getModData()
     npc:setUseless(false)
-    -- v0.0.9i FIX BUG 2/4/5 : casser le ciblage zombie auto AVANT pathToLocationF.
-    -- Sans ca, le moteur AI redirige vers le joueur le plus proche.
-    pcall(function() npc:setTarget(nil) end)
-    pcall(function() npc:setAttackedBy(nil) end)
-    pcall(function() npc:clearAggroList() end)
-    -- v0.0.9j : setAlertedBy/setPathTargetCharacter n'existent pas en B42.18.
-    -- Si le NPC est en LungeState, forcer Idle pour debloquer le pathfind.
-    pcall(function()
-        local st = npc:getCurrentState()
-        if st and tostring(st):find("LungeState") then
-            npc:changeState(ZombieIdleState.instance())
-        end
-    end)
-    if not md.PHNPC_Moving then
-        md.PHNPC_Moving = true
-        pcall(function() npc:setBumpType("IdleToWalk") end)
+    local d = math.sqrt((x - npc:getX())^2 + (y - npc:getY())^2)
+    local walkType = forceWalkType or pickWalkType(npc, md, d)
+
+    if needNewPath(npc, md, x, y, z) then
+        pcall(function() npc:setTarget(nil) end)
+        pcall(function() npc:setAttackedBy(nil) end)
+        pcall(function() npc:clearAggroList() end)
+        -- Forcer Idle si LungeState parasite
+        pcall(function()
+            local st = npc:getCurrentState()
+            if st and tostring(st):find("LungeState") then
+                npc:changeState(ZombieIdleState.instance())
+            end
+        end)
+        pcall(function() PHNPC.checkAndOpenDoors(npc) end)
+        pcall(function() PHNPC.checkAndOpenWindows(npc) end)
+        applyMoveSetup(npc, x, y, walkType)
+        pcall(function() npc:pathToLocationF(x, y, z) end)
+        md.PHNPC_Moving   = true
+        md.PHNPC_PathX    = x
+        md.PHNPC_PathY    = y
+        md.PHNPC_PathZ    = z
+        md.PHNPC_WalkType = walkType
+        md.PHNPC_StuckTicks = 0
+        md.PHNPC_LastMoveX  = npc:getX()
+        md.PHNPC_LastMoveY  = npc:getY()
+        PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> "..walkType.." pathToLocationF(" .. string.format("%.1f,%.1f", x, y) .. ")")
+    else
+        applyMoveSetup(npc, x, y, md.PHNPC_WalkType or walkType)
     end
-    pcall(function() PHNPC.checkAndOpenDoors(npc) end)
-    pcall(function() PHNPC.checkAndOpenWindows(npc) end)
-    pcall(function() npc:pathToLocationF(x, y, z) end)
-    PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> pathToLocationF(" .. string.format("%.1f,%.1f", x, y) .. ")")
+end
+
+-- Force un re-path immediat (utilise par detection stuck dans Update)
+function PHNPC.forceRepath(npc, x, y, z, walkType)
+    local md = npc:getModData()
+    md.PHNPC_PathX = nil  -- invalider le cache pour forcer needNewPath = true
+    PHNPC.startMovingTo(npc, x, y, z, walkType)
 end
 
 -- stopMoving : arreter le deplacement du NPC proprement
 function PHNPC.stopMoving(npc)
     local md = npc:getModData()
     if md.PHNPC_Moving then
-        md.PHNPC_Moving = false
+        md.PHNPC_Moving   = false
+        md.PHNPC_PathX    = nil
+        md.PHNPC_PathY    = nil
+        md.PHNPC_PathZ    = nil
+        md.PHNPC_WalkType = "Walk"
         -- Transition Walk->Idle (NHM pattern) : Bob_WalkToStop via ZSWalkToIdle.xml
         pcall(function() npc:setBumpType("WalkToIdle") end)
+        pcall(function() npc:setRunning(false) end)
+        pcall(function() npc:setVariable("BanditWalkType", "Walk") end)
+        pcall(function() npc:setVariable("PHNPC_WalkType", "Walk") end)
+        pcall(function() npc:setWalkType("Walk") end)
         pcall(function() npc:setTarget(nil) end)
         pcall(function() npc:clearAggroList() end)
         -- v0.0.9f : refermer les portes proches apres arret du NPC
@@ -396,7 +473,7 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.9j loaded")
+print("[PHNPC] Actions v0.0.9k loaded")
 
 -- ============================================================
 -- FENETRES (v0.0.9h NEW — Bug 6)

@@ -44,13 +44,14 @@ function PHNPC.enforceNPC(zombie)
     -- 4. Prevenir comportement zombie
     zombie:setNoTeeth(true)
     pcall(function() zombie:setEatBodyTarget(nil, false) end)
-    -- v0.0.9i FIX BUG 4 : casser DEFINITIVEMENT l'attraction zombie vers le joueur.
-    -- Le moteur IsoZombie/AI Lunge ciblait automatiquement l'IsoPlayer local et
-    -- redirigeait le pathfind, court-circuitant nos ordres Lua. Reset chaque tick.
-    pcall(function() zombie:setAttackedBy(nil) end)
+    -- v0.0.9k : ne plus reset setAttackedBy/clearAggroList chaque tick si NPC en mouvement
+    --   ces resets cassaient le pathfind. On les fait UNIQUEMENT a l'arret.
+    if not md.PHNPC_Moving then
+        pcall(function() zombie:setAttackedBy(nil) end)
+        pcall(function() zombie:clearAggroList() end)
+    end
     -- v0.0.9j : setAlertedBy/setPathTargetCharacter/setPrimaryTarget/setSecondaryTarget
     -- n'existent PAS en B42.18 (KahluaException non-rattrapable). Retirees.
-    pcall(function() zombie:clearAggroList() end)
     -- Si l'AnimEngine est en LungeState alors qu'on a un ordre explicite (goingto/shelter),
     -- forcer la sortie immediate vers ZombieIdleState (l'attaque parasite l'IA).
     if md.PHNPC_State == "goingto" or md.PHNPC_State == "shelter" then
@@ -58,7 +59,6 @@ function PHNPC.enforceNPC(zombie)
             local st = zombie:getCurrentState()
             if st and tostring(st):find("LungeState") then
                 zombie:changeState(ZombieIdleState.instance())
-                zombie:setTarget(nil)
             end
         end)
     end
@@ -155,8 +155,9 @@ function PHNPC.enforceNPC(zombie)
         end
     end)
 
-    -- 6. Securite : setTarget(nil) SEULEMENT si pas en pathfind
-    if not skipSecurity then
+    -- 6. Securite : setTarget(nil) SEULEMENT si pas en pathfind ET pas en mouvement
+    -- v0.0.9k : ne PAS casser le pathfind en cours (md.PHNPC_Moving=true) avec setTarget(nil)
+    if not skipSecurity and not md.PHNPC_Moving then
         zombie:setTarget(nil)
         pcall(function() zombie:clearAggroList() end)
     end
@@ -199,7 +200,14 @@ function PHNPC.enforceNPC(zombie)
     --     Les re-appliquer ici garantit que nos AnimSet XMLs custom restent actifs.
     pcall(function() zombie:setVariable("PHNPC_IsNPC", true) end)
     pcall(function() zombie:setVariable("NoLungeTarget", true) end)
-    zombie:setWalkType("Walk")
+    -- v0.0.9k : suivre le walkType demande par Actions/Update (Walk ou Run), pas hardcoded
+    local wt = md.PHNPC_WalkType or "Walk"
+    pcall(function() zombie:setVariable("BanditWalkType", wt) end)
+    pcall(function() zombie:setVariable("PHNPC_WalkType", wt) end)
+    pcall(function() zombie:setWalkType(wt) end)
+    if md.PHNPC_Moving then
+        pcall(function() zombie:setRunning(wt == "Run") end)
+    end
 end
 
-print("[PHNPC] Enforce v0.0.9j loaded")
+print("[PHNPC] Enforce v0.0.9k loaded")

@@ -155,12 +155,31 @@ Events.OnTick.Add(function()
                         npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkArrived"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
                     end)
                 else
-                    -- v0.0.9h : recalculer path plus souvent pendant goingto pour passer
-                    -- les obstacles. Recalcul toutes les FOLLOW_TICK_RATE ticks.
-                    PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
-                    if PHNPC._followTimers[npc] >= (PHNPC.FOLLOW_TICK_RATE or 20) then
-                        PHNPC._followTimers[npc] = 0
+                    -- v0.0.9k : ne PAS rappeler pathToLocationF chaque 20 ticks (ca
+                    -- reinitialisait le pathfind en cours et faisait surplace).
+                    -- Le pathfind du moteur IsoZombie marche tout seul une fois lance.
+                    -- On surveille juste si le NPC est STUCK et on re-path alors.
+                    if not md.PHNPC_Moving then
                         PHNPC.startMovingTo(npc, md.PHNPC_GoToX, md.PHNPC_GoToY, md.PHNPC_GoToZ or npc:getZ())
+                    else
+                        local cx, cy = npc:getX(), npc:getY()
+                        local lx = md.PHNPC_LastMoveX or cx
+                        local ly = md.PHNPC_LastMoveY or cy
+                        local moved = math.sqrt((cx-lx)^2 + (cy-ly)^2)
+                        md.PHNPC_StuckTicks = (md.PHNPC_StuckTicks or 0) + 1
+                        if moved > (PHNPC.STUCK_THRESHOLD or 0.3) then
+                            md.PHNPC_StuckTicks = 0
+                            md.PHNPC_LastMoveX  = cx
+                            md.PHNPC_LastMoveY  = cy
+                        elseif md.PHNPC_StuckTicks >= (PHNPC.STUCK_TICKS or 90) then
+                            -- Bloque : forcer un nouveau path (avec Run pour debloquer)
+                            md.PHNPC_StuckTicks = 0
+                            md.PHNPC_LastMoveX  = cx
+                            md.PHNPC_LastMoveY  = cy
+                            pcall(function() npc:setBumpType("Shrug") end)
+                            PHNPC.forceRepath(npc, md.PHNPC_GoToX, md.PHNPC_GoToY, md.PHNPC_GoToZ or npc:getZ(), "Run")
+                            PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " stuck -> force repath Run")
+                        end
                     end
                 end
 
@@ -206,26 +225,35 @@ Events.OnTick.Add(function()
             -- 7. Etat "shelter" : chercher une zone safe, puis staying
             elseif md.PHNPC_State == "shelter" then
                 if not md.PHNPC_ZoneX then
-                    -- Chercher la zone safe une seule fois
-                    local sx, sy
-                    if PHNPC.findClearAreaNear then
-                        sx, sy = PHNPC.findClearAreaNear(npc:getX(), npc:getY(), npc:getZ(), 15)
+                    -- v0.0.9k : nouveau systeme via PHNPC_Building.pickShelterPoint
+                    --   (1) chambre safe si NPC deja dans batiment
+                    --   (2) batiment le plus proche dans 30 tuiles + room safe
+                    --   (3) fallback findClearAreaNear
+                    local sx, sy, sz, reason
+                    if PHNPC.pickShelterPoint then
+                        sx, sy, sz, reason = PHNPC.pickShelterPoint(npc)
                     end
-                    -- v0.0.9h : si pas de zone safe ou trop proche, choisir un
-                    -- point aleatoire a 8 tuiles pour bouger quand meme.
+                    if not sx and PHNPC.findClearAreaNear then
+                        sx, sy = PHNPC.findClearAreaNear(npc:getX(), npc:getY(), npc:getZ(), 15)
+                        sz = npc:getZ()
+                        reason = "fallback_clear"
+                    end
+                    -- Si rien : fallback aleatoire pour bouger quand meme
                     local nx0, ny0 = npc:getX(), npc:getY()
                     if not sx or ((sx - nx0)^2 + (sy - ny0)^2) < 4 then
                         local ang = math.random() * 2 * math.pi
-                        sx = nx0 + math.cos(ang) * 8
-                        sy = ny0 + math.sin(ang) * 8
+                        sx = nx0 + math.cos(ang) * 10
+                        sy = ny0 + math.sin(ang) * 10
+                        sz = npc:getZ()
+                        reason = "random"
                         PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " shelter fallback aleatoire")
                     end
                     md.PHNPC_ZoneX = sx
                     md.PHNPC_ZoneY = sy
-                    md.PHNPC_ZoneZ = npc:getZ()
+                    md.PHNPC_ZoneZ = sz
                     md.PHNPC_ZoneR = PHNPC.STAY_RADIUS or 5
-                    PHNPC.startMovingTo(npc, sx, sy, npc:getZ())
-                    PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " -> shelter (" .. string.format("%.1f,%.1f", sx, sy) .. ")")
+                    PHNPC.startMovingTo(npc, sx, sy, sz, "Run")  -- toujours courir vers l'abri
+                    PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " -> shelter ["..tostring(reason).."] (" .. string.format("%.1f,%.1f", sx, sy) .. ")")
                 else
                     local sdx = npc:getX() - md.PHNPC_ZoneX
                     local sdy = npc:getY() - md.PHNPC_ZoneY
@@ -234,11 +262,26 @@ Events.OnTick.Add(function()
                         PHNPC.stopMoving(npc)
                         PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " shelter atteint -> staying")
                     else
-                        -- v0.0.9h : retry path toutes FOLLOW_TICK_RATE ticks pour passer obstacles
-                        PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
-                        if PHNPC._followTimers[npc] >= (PHNPC.FOLLOW_TICK_RATE or 20) then
-                            PHNPC._followTimers[npc] = 0
-                            PHNPC.startMovingTo(npc, md.PHNPC_ZoneX, md.PHNPC_ZoneY, md.PHNPC_ZoneZ or npc:getZ())
+                        -- v0.0.9k : detection stuck plutot que retry toutes les 20 ticks
+                        if not md.PHNPC_Moving then
+                            PHNPC.startMovingTo(npc, md.PHNPC_ZoneX, md.PHNPC_ZoneY, md.PHNPC_ZoneZ or npc:getZ(), "Run")
+                        else
+                            local cx, cy = npc:getX(), npc:getY()
+                            local lx = md.PHNPC_LastMoveX or cx
+                            local ly = md.PHNPC_LastMoveY or cy
+                            local moved = math.sqrt((cx-lx)^2 + (cy-ly)^2)
+                            md.PHNPC_StuckTicks = (md.PHNPC_StuckTicks or 0) + 1
+                            if moved > (PHNPC.STUCK_THRESHOLD or 0.3) then
+                                md.PHNPC_StuckTicks = 0
+                                md.PHNPC_LastMoveX  = cx
+                                md.PHNPC_LastMoveY  = cy
+                            elseif md.PHNPC_StuckTicks >= (PHNPC.STUCK_TICKS or 90) then
+                                md.PHNPC_StuckTicks = 0
+                                md.PHNPC_LastMoveX  = cx
+                                md.PHNPC_LastMoveY  = cy
+                                pcall(function() npc:setBumpType("Shrug") end)
+                                PHNPC.forceRepath(npc, md.PHNPC_ZoneX, md.PHNPC_ZoneY, md.PHNPC_ZoneZ or npc:getZ(), "Run")
+                            end
                         end
                     end
                 end
@@ -326,4 +369,4 @@ Events.OnGameStart.Add(function()
     print("[PHNPC] v0.0.9h pret")
 end)
 
-print("[PHNPC] Update v0.0.9j loaded")
+print("[PHNPC] Update v0.0.9k loaded")

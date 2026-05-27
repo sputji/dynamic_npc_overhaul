@@ -41,6 +41,12 @@ PHNPC.GOTO_ARRIVE_DISTANCE = 1    -- v0.0.9h : tiles pour considerer "Va la-bas"
 PHNPC.FOLLOW_TICK_RATE     = 20   -- ticks entre deux recalculs pathfind (si joueur bouge)
 PHNPC.INTERACTION_DIST     = 3    -- tiles : rayon clic droit pour interagir
 
+-- v0.0.9k : Course / detection bloque
+PHNPC.RUN_DISTANCE         = 6    -- tiles : au-dela, NPC court (setRunning + BanditWalkType=Run)
+PHNPC.STUCK_TICKS          = 90   -- ticks : si NPC n'a pas bouge depuis ca, on re-path
+PHNPC.STUCK_THRESHOLD      = 0.3  -- tiles : deplacement min pendant STUCK_TICKS pour ne PAS etre stuck
+PHNPC.FLEE_RUN_HP_RATIO    = 0.50 -- HP < 50% => course (independant de FLEE_HP_RATIO qui declenche la fuite)
+
 -- ============================================================
 -- COMPORTEMENT ZONE (staying / free / shelter)
 -- ============================================================
@@ -244,4 +250,4 @@ function PHNPC.getOutfitStats(outfit)
     return PHNPC.OUTFIT_STATS[outfit] or PHNPC.OUTFIT_STATS["Survivor"]
 end
 
-print("[PHNPC] Core v0.0.9j loaded")
+print("[PHNPC] Core v0.0.9k loaded")

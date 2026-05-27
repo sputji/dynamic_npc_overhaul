@@ -1,5 +1,77 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.9k] — 2026-05-27
+
+### REFONTE GAMEPLAY — ordres / course / loot / batiments
+
+La v0.0.9j ne crashait plus mais les ordres "Va la-bas" et "Mets-toi a l'abri" laissaient le NPC sur place : `pathToLocationF` etait rappele toutes les 20 ticks ce qui **annulait** le pathfind en cours juste apres son demarrage. En parallele, `Enforce.lua` faisait `setWalkType("Walk")` et `setTarget(nil)` **a chaque tick**, ce qui interdisait toute course et tout deplacement durable.
+
+### Corrections principales
+
+- **`PHNPC_Actions.lua`** — refonte `startMovingTo` / `startFollowing` (pattern Bandits B42.18 ZAGoTo/ZAMove) :
+  - `pathToLocationF` appele **UNE FOIS** au lancement d'un nouveau path (memorisation de `md.PHNPC_PathX/Y/Z`)
+  - `needNewPath()` decide si on relance le pathfind (destination differente OU NPC a l'arret)
+  - `setVariable("BanditWalkType", walkType)` + `setVariable("PHNPC_WalkType", walkType)` + `setWalkType(walkType)` + `setRunning(walkType=="Run")` : declenche les AnimSets B42 pour la course
+  - `pickWalkType()` : choisit "Run" si distance > `PHNPC.RUN_DISTANCE` (=6), si HP < 50%, ou si etat shelter/fleeing
+  - `faceLocationF` avant `pathToLocationF` evite la rotation sur place
+  - `forceRepath()` expose pour debloquer un NPC stuck
+
+- **`PHNPC_Enforce.lua`** :
+  - `setTarget(nil)` + `clearAggroList()` UNIQUEMENT si NPC a l'arret (sinon le pathfind etait casse)
+  - `setAttackedBy(nil)` idem
+  - `setWalkType` suit maintenant `md.PHNPC_WalkType` (au lieu de hardcoder "Walk"), ce qui permet la course
+  - `setRunning(walkType == "Run")` re-applique chaque tick si le NPC bouge
+
+- **`PHNPC_Update.lua`** :
+  - Handler `goingto` : ne rappelle plus `startMovingTo` chaque `FOLLOW_TICK_RATE` ticks. Surveillance `STUCK_TICKS` (=90 ticks) : si le NPC n'a pas bouge de plus de `STUCK_THRESHOLD` (=0.3 tiles), on declenche un `forceRepath` en Run pour debloquer
+  - Handler `shelter` : meme logique stuck, et utilise `PHNPC.pickShelterPoint` pour cibler une chambre interieure
+
+- **`PHNPC_Combat.lua`** : le NPC court (`"Run"`) en approche du zombie cible.
+
+### Nouveaux fichiers
+
+- **`PHNPC_Loot.lua`** — drop de l'inventaire NPC a la mort :
+  - `Events.OnZombieDead` : transfere les items dans `IsoDeadBody:getContainer()` du corps fraichement cree (`sq:getDeadBodys()`), ou les drop au sol via `AddWorldInventoryItem` en fallback
+  - Marque `md.PHNPC_Looted = true` pour eviter le double drop
+
+- **`PHNPC_Building.lua`** — detection batiments pour "Mets-toi a l'abri" :
+  - `isInsideBuilding(npc)` : `getCurrentBuilding()` + fallback `sq:getBuilding()`
+  - `findNearestBuildingSquare(x,y,z,maxRadius=30)` : scan **spirale** par anneaux, retourne la premiere case interieure libre
+  - `findSafeRoomSquare(building)` : itere `building:getRooms()` et choisit `room:getRandomFreeSquare()` avec le moins de zombies a 4 tuiles
+  - `pickShelterPoint(npc)` : strategie (1) chambre safe si deja dans batiment, (2) batiment proche + chambre, (3) fallback `findClearAreaNear`
+
+### Nouvelles constantes (`PHNPC_Core.lua`)
+
+```lua
+PHNPC.RUN_DISTANCE      = 6     -- au-dela : Run
+PHNPC.STUCK_TICKS       = 90    -- ticks pour declencher repath
+PHNPC.STUCK_THRESHOLD   = 0.3   -- tiles min de deplacement
+PHNPC.FLEE_RUN_HP_RATIO = 0.50  -- HP < 50% => course (independant de FLEE_HP_RATIO)
+```
+
+### API B42.18 verifiees (extraction `.class` du jar)
+
+- `IsoGameCharacter:setRunning(bool)` : OK (course)
+- `IsoZombie:getInventory()` / `getCurrentBuilding()` : OK (loot, batiments)
+- `IsoDeadBody:getContainer()` / `addItem(item)` : OK
+- `IsoGridSquare:getDeadBodys()` / `getBuilding()` / `getRoom()` : OK
+- `BuildingDef:getRooms()` + `RoomDef:getRandomFreeSquare()` : OK
+- `Events.OnZombieDead` : OK
+
+### Fichiers modifies
+
+| Fichier | Changement |
+|---------|-----------|
+| `PHNPC_Actions.lua` | Refonte complete `startMovingTo` / `startFollowing` / `stopMoving` (path-once, walkType, setRunning) |
+| `PHNPC_Enforce.lua` | `setTarget/setAttackedBy` conditionnel, `setWalkType` dynamique |
+| `PHNPC_Update.lua` | Detection stuck remplace retry chaque 20 ticks, `pickShelterPoint` pour shelter |
+| `PHNPC_Combat.lua` | Approche zombie en `"Run"` |
+| `PHNPC_Core.lua` | Nouvelles constantes RUN/STUCK |
+| `PHNPC_Loot.lua` | **NOUVEAU** drop inventaire a la mort |
+| `PHNPC_Building.lua` | **NOUVEAU** detection batiments + chambres safe |
+
+---
+
 ## [0.0.9j] — 2026-05-27
 
 ### HOTFIX critique — Cascade `Object tried to call nil` (PHNPC_Update.lua:61)

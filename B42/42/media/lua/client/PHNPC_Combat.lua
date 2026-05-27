@@ -152,8 +152,8 @@ function PHNPC.npcCombatStep(npc)
         print("[PHNPC][COMBAT] " .. tostring(md.PHNPC_Name) .. " : " .. anim
               .. " dist=" .. string.format("%.1f", dist))
     else
-        -- Trop loin : se deplacer vers le zombie
-        PHNPC.startMovingTo(npc, target:getX(), target:getY(), target:getZ())
+        -- Trop loin : se deplacer vers le zombie EN COURANT (v0.0.9k)
+        PHNPC.startMovingTo(npc, target:getX(), target:getY(), target:getZ(), "Run")
     end
 end
 
@@ -246,4 +246,4 @@ function PHNPC.npcFlightStep(npc, player)
     end
 end
 
-print("[PHNPC] Combat v0.0.9j loaded")
+print("[PHNPC] Combat v0.0.9k loaded")
