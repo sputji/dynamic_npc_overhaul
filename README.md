@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.14-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.15-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,11 +20,11 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.14**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.15**.
 
 ---
 
-## Fonctionnalités actuelles (v0.0.14)
+## Fonctionnalités actuelles (v0.0.15)
 
 ### PNJ & Professions
 
@@ -83,7 +83,16 @@ Animations humaines complètes grâce à un système d'AnimSets custom :
 
 > Animations masculines (Bob) et féminines (Kate) supportées.
 
-### Correctifs récents (v0.0.14)
+### Correctifs récents (v0.0.15)
+
+- **Follow anti micro-saccades** : hold anti yo-yo autour de la distance d'arret + cadence minimale entre deux re-paths.
+- **Ordres verrouilles** : `goingto/shelter` proteges via `PHNPC_OrderLock` contre les retours parasites vers le joueur.
+- **Shelter stable** : quand le NPC entre dans un batiment, il passe en `staying` et ne ressort plus automatiquement.
+- **Clotures/obstacles bas** : mitigation non bloquante de `ClimbOverFenceState` (reset seulement en blocage prolonge).
+- **Auto-equip vetements** : compatibilite API B42 renforcee (`instanceof Clothing` + fallback worn API).
+- **Loot mort fiable** : transfert cadavre avec fallback `AddItem(fullType)` pour conserver armes/objets donnes.
+
+### Correctifs precedents (v0.0.14)
 
 - **Follow anti-saccades** : suppression du recalcul quasi continu du follow anchor + fenêtre anti-yo-yo au stop distance.
 - **Ordres stables** : verrou `goingto/shelter` pour empêcher les retours parasites vers le joueur.

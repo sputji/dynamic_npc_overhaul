@@ -60,7 +60,7 @@ end
 function PHNPC.snapshotNPCLoot(npc)
     if not npc then return end
     local md = npc:getModData()
-    if not md.PHNPC_IsNPC then return end
+    if not md.PHNPC_IsNPC and not md.PHNPC_DeadPendingLoot then return end
     if md.PHNPC_Looted then return end
     md.PHNPC_Looted = true
 
@@ -278,4 +278,4 @@ if Events.OnDeadBodySpawn then
 end
 Events.OnTick.Add(tickPendingLoot)
 
-print("[PHNPC] Loot v0.0.14 loaded")
+print("[PHNPC] Loot v0.0.15 loaded")

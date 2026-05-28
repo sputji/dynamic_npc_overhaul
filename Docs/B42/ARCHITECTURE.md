@@ -1,4 +1,14 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.14
+# Architecture B42 — Dynamic NPC Overhaul v0.0.15
+
+> v0.0.15 — Stabilisation post KO v0.0.14 (2026-05-28)
+>
+> Axes techniques appliques :
+>
+> 1. Follow anti-saccades renforce : cadence minimale de re-path (`FOLLOW_REPATH_TICKS`) + hold zone anti yo-yo autour de la distance d'arret.
+> 2. Clotures/obstacles bas : mitigation `ClimbOverFenceState` non bloquante (reset seulement si blocage prolonge).
+> 3. Continuite d'ordres : verrou `PHNPC_OrderLock` applique sur `goingto/shelter` (Orders + Update + Combat).
+> 4. Shelter : passage automatique en `staying` des l'entree dans un batiment + fermeture defensive portes/fenetres.
+> 5. Inventaire/loot : auto-equip vetements compatible API B42 (`instanceof Clothing` + fallback worn API), et transfert loot mort fiabilise (`DeadPendingLoot` + fallback `AddItem(fullType)`).
 
 > v0.0.14 — Stabilisation post re-test v0.0.13/v0.0.13b (2026-05-28)
 >

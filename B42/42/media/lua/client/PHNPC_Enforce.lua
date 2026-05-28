@@ -42,9 +42,9 @@ function PHNPC.enforceNPC(zombie)
     -- 2. Fix B42 : empeche marche en arriere non souhaitee (Bandits ZAMove.lua 69-74)
     pcall(function() zombie:setAnimatingBackwards(false) end)
 
-    -- v0.0.14 : mitigation anti ClimbOverFenceState non bloquante.
-    -- On laisse la transition de franchissement se faire normalement, et on ne
-    -- force un reset que si l'etat reste bloque trop longtemps.
+    -- v0.0.15 : mitigation anti ClimbOverFenceState non bloquante.
+    -- On laisse le franchissement normal se produire; reset seulement si l'etat
+    -- reste bloque trop longtemps.
     local inFenceState = false
     pcall(function()
         local st = zombie:getCurrentState()
@@ -267,4 +267,4 @@ function PHNPC.enforceNPC(zombie)
     end
 end
 
-print("[PHNPC] Enforce v0.0.14 loaded")
+print("[PHNPC] Enforce v0.0.15 loaded")

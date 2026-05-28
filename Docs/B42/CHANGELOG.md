@@ -1,5 +1,33 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.15] — Stabilisation finale follow/ordres/clotures + inventaire/loot (2026-05-28)
+
+### Correctifs gameplay
+
+- `PHNPC_Actions.lua`
+  - reduction des micro-saccades follow : hold anti yo-yo autour du stop distance + cadence min de re-path (`FOLLOW_REPATH_TICKS`).
+  - stop follow plus stable a proximite immediate du joueur.
+- `PHNPC_Enforce.lua`
+  - mitigation `ClimbOverFenceState` assouplie : reset uniquement si l'etat reste bloque, sans casser un franchissement valide.
+- `PHNPC_Orders.lua` + `PHNPC_Update.lua` + `PHNPC_Combat.lua`
+  - verrou explicite `PHNPC_OrderLock` active sur `goingto/shelter` pour empecher les retours parasites vers `following`.
+  - combat/fuite n'interrompent plus ces ordres verrouilles.
+  - shelter force `staying` des que le NPC est dans un batiment (pas d'aller-retour vers le joueur).
+
+### Correctifs inventaire / mort
+
+- `PHNPC_Inventory.lua`
+  - detection vetements via `instanceof(item, "Clothing")` + fallback `IsClothing`.
+  - equipement vetements via API classique et fallback `getWornItems():setItem(...)`.
+- `PHNPC_Health.lua` + `PHNPC_Loot.lua`
+  - conservation du contexte NPC jusqu'au snapshot (`PHNPC_DeadPendingLoot`).
+  - transfert cadavre avec fallback `AddItem(fullType)` si l'objet brut est refuse par le container.
+
+### Version
+
+- `B42/42/mod.info` -> `version=0.0.15`.
+- Banners modules alignes sur `v0.0.15 loaded`.
+
 ## [0.0.14] — Stabilisation follow/ordres + fix auto-equip/loot (2026-05-28)
 
 ### Correctifs gameplay

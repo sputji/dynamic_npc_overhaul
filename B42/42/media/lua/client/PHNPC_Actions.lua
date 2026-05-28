@@ -135,12 +135,13 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
         return
     end
 
-    -- Evite l'effet yo-yo autour du stopDist (micro re-path en boucle).
-    if (md.PHNPC_FollowHoldTicks or 0) > 0 and d <= (stopDist + 1.25) then
+    -- Evite le yo-yo autour de la distance d'arret qui provoque des micro-saccades.
+    if (md.PHNPC_FollowHoldTicks or 0) > 0 and d <= (stopDist + 1.2) then
         md.PHNPC_FollowHoldTicks = md.PHNPC_FollowHoldTicks - 1
         return
     end
     md.PHNPC_FollowHoldTicks = 0
+
     local walkType = forceWalkType or pickWalkType(npc, md, d)
 
     -- Suivi par point d'ancrage autour du joueur (evite le collage de pathToCharacter).
@@ -164,7 +165,9 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
         local lpy = md.PHNPC_LastPY or py
         local pdx = px - lpx
         local pdy = py - lpy
-        if (pdx * pdx + pdy * pdy) >= (moveThreshold * moveThreshold) then
+        local sinceLastPath = (PHNPC._pathTickCounter or 0) - (md.PHNPC_LastPathTick or -9999)
+        if (pdx * pdx + pdy * pdy) >= (moveThreshold * moveThreshold)
+            and sinceLastPath >= (PHNPC.FOLLOW_REPATH_TICKS or 20) then
             needPath = true
         elseif (md.PHNPC_StuckTicks or 0) >= (PHNPC.STUCK_TICKS or 90) then
             needPath = true
@@ -603,7 +606,7 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.14 loaded")
+print("[PHNPC] Actions v0.0.15 loaded")
 
 -- ============================================================
 -- FENETRES (v0.0.9h NEW — Bug 6)

@@ -91,7 +91,7 @@ Events.OnTick.Add(function()
         else
             local md = npc:getModData()
 
-            -- Verrou d'ordre explicite : evite les bascules parasites vers following.
+            -- Verrou d'ordre explicite pour eviter les bascules parasites d'etat.
             if md.PHNPC_OrderLock == "goingto" and md.PHNPC_GoToX and md.PHNPC_State ~= "goingto" then
                 md.PHNPC_State = "goingto"
             elseif md.PHNPC_OrderLock == "shelter"
@@ -248,7 +248,23 @@ Events.OnTick.Add(function()
 
             -- 7. Etat "shelter" : chercher une zone safe, puis staying
             elseif md.PHNPC_State == "shelter" then
-                if not md.PHNPC_ZoneX then
+                local inBuilding = false
+                pcall(function() inBuilding = npc:getCurrentBuilding() ~= nil end)
+                if inBuilding then
+                    md.PHNPC_State = "staying"
+                    md.PHNPC_ZoneX = npc:getX()
+                    md.PHNPC_ZoneY = npc:getY()
+                    md.PHNPC_ZoneZ = npc:getZ()
+                    md.PHNPC_ZoneR = PHNPC.STAY_RADIUS or 5
+                    md.PHNPC_NoPatrol = true
+                    md.PHNPC_OrderLock = nil
+                    md.PHNPC_GoToX = nil
+                    md.PHNPC_GoToY = nil
+                    md.PHNPC_GoToZ = nil
+                    PHNPC.stopMoving(npc)
+                    pcall(function() PHNPC.closeBehindNPC(npc) end)
+                    PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " shelter inside-building -> staying")
+                elseif not md.PHNPC_ZoneX then
                     -- v0.0.9k : nouveau systeme via PHNPC_Building.pickShelterPoint
                     --   (1) chambre safe si NPC deja dans batiment
                     --   (2) batiment le plus proche dans 30 tuiles + room safe
@@ -396,7 +412,7 @@ Events.OnGameStart.Add(function()
     PHNPC._openInventoryNPC = nil
     PHNPC._combatTimers     = {}
     PHNPC._attackCooldowns  = {}
-    print("[PHNPC] v0.0.14 pret")
+    print("[PHNPC] v0.0.15 pret")
 end)
 
-print("[PHNPC] Update v0.0.14 loaded")
+print("[PHNPC] Update v0.0.15 loaded")

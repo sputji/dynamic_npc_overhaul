@@ -179,4 +179,4 @@ Events.OnRefreshInventoryWindowContainers.Add(function(page, step)
     end
 end)
 
-print("[PHNPC] Inventory v0.0.14 loaded")
+print("[PHNPC] Inventory v0.0.15 loaded")

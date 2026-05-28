@@ -1,31 +1,74 @@
+🎮 Checklist de re-test en jeu — v0.0.15
+
+Avant :
+- redemarrer completement PZ,
+- copier la version repo vers `C:\Users\Nicolas\Zomboid\mods\PH_DynamicNPCOverhaul`,
+- verifier dans `console.txt` les banners `v0.0.15 loaded` (Actions/Enforce/Update/Combat/Inventory/Health/Loot).
+
+1. Suivi / recrutement
+  [ ] Le NPC garde ~2 tuiles d'ecart a l'arret, sans collage.
+  [ ] Plus de micro-saccades marche/course (pas de spam re-path toutes les secondes).
+  [ ] Changement de direction joueur fluide.
+  [ ] Franchissement clotures/obstacles bas sans blocage animation.
+
+1. Ordres de deplacement
+  [ ] "Va la-bas" atteint la cible puis reste en surveillance zone (pas de retour joueur).
+  [ ] "Mets-toi a l'abri" entre dans un batiment et bascule en `staying` sans sortir.
+  [ ] En zone cloturee : pas de boucle `ClimbOverFenceState`.
+
+1. Combat / equipement
+  [ ] Combat stable sans erreurs rouges PHNPC.
+  [ ] Le NPC garde le verrou d'ordre `goingto/shelter` en presence de zombies.
+
+1. Inventaire / tenue / mort
+  [ ] Vetements donnes au NPC portes automatiquement (slot libre/remplacement meilleur score).
+  [ ] Armes donnees visibles dans le cadavre apres mort.
+  [ ] Contenu cadavre coherent (inventaire + vetements + armes).
+
+1. Validation console
+  [ ] Banners modules `v0.0.15 loaded` visibles.
+  [ ] Aucune erreur rouge PHNPC au demarrage.
+  [ ] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif.
+
+---
+
 🎮 Checklist de re-test en jeu — v0.0.14
 
 Avant : redemarrer completement PZ, nouvelle sandbox Apocalypse, debug menu actif.
 
 1. Suivi / recrutement
-  [ ] Le NPC garde ~2 tuiles d'ecart quand le joueur s'arrete (pas de collage)
-  [ ] Marche/cours bascule proprement sans micro-saccades (plus de spam `follow anchor` en log)
-  [ ] Changement de direction joueur reste fluide
-  [ ] Franchissement d'obstacles bas/clotures fonctionne sans blocage animation
+  [❌] Le NPC garde ~2 tuiles d'ecart quand le joueur s'arrete (pas de collage) : Continue de coller le joueur.
+  [❌] Marche/cours bascule proprement sans micro-saccades (plus de spam `follow anchor` en log) : Fonctionne mais toujour des micro-saccades quand le NPC/PNJ Cours et marche, log montre un calcul a chaque secondes se qui fait les sacades il faut corriger cela !.
+  [✅] Changement de direction joueur reste fluide : Fonctionne
+  [❌] Franchissement d'obstacles bas/clotures fonctionne sans blocage animation : Ne fonctionne pas, le NPC/PNJ se bloque lorsqu'il tente de franchir des obstacles bas ou des clôtures.
 
 1. Ordres de deplacement
-  [ ] "Va la-bas" atteint la cible sans derive continue et sans retour auto vers le joueur
-  [ ] "Mets-toi a l'abri" rejoint un batiment proche et reste en staying (pas d'aller-retour)
-  [ ] Zone avec clotures : pas de boucle d'etat `ClimbOverFenceState`
+  [✅] "Va la-bas" atteint la cible sans derive continue et sans retour auto vers le joueur : Fonctionne et reste en surveillance sur la zone.
+  [❌] "Mets-toi a l'abri" rejoint un batiment proche et reste en staying (pas d'aller-retour) : Ne fonctionne pas, rentre pas les batiment tape les mur et reviens vers le joueur, il ne reste pas en staying dans le batiment.
+  [❌] Zone avec clotures : pas de boucle d'etat `ClimbOverFenceState` : Ne Fonctionne pas, le NPC/PNJ ne passe plus les barieres ou obstacles bas, il commance sont annimation pour passer de l'autres coter et reste bloqué au milieu. Voir log pour les erreurs.
 
 1. Combat / equipement
-  [ ] Le NPC equipe la meilleure arme melee disponible (inventaire mixte)
-  [ ] Le combat reste stable (pas de spam erreur rouge cote PHNPC)
+  [✅] Le NPC equipe la meilleure arme melee disponible (inventaire mixte) : Fonctionne
+  [❌] Le combat reste stable (pas de spam erreur rouge cote PHNPC) : Ne fonctionne pas, Crash, il y a des erreurs rouges dans le log.
 
 1. Inventaire / tenue / mort
-  [ ] Vetements donnes au NPC se portent automatiquement (slot libre ou remplacement meilleur score)
-  [ ] Les armes donnees au NPC sont presentes dans le cadavre apres mort
-  [ ] Le contenu du cadavre affiche inventaire + vetements + armes
+  [❌] Vetements donnes au NPC se portent automatiquement (slot libre ou remplacement meilleur score) : Ne fonctionne pas il ne portes pas les vêtements que je lui est donner dans son inventaire même si il n'a pas de vêtement, il garde sa tenue de base même si je lui donne des vêtements dans son inventaire. Voir log pour les erreurs.
+  [❌] Les armes donnees au NPC sont presentes dans le cadavre apres mort : non ne fonctionne pas, juste les items quand le NPC/PNJ spawn. 
+  [❌] Le contenu du cadavre affiche inventaire + vetements + armes : non ne fonctionne pas, juste les items quand le NPC/PNJ spawn. 
 
 1. Validation console
-  [ ] Banners `v0.0.14 loaded` visibles pour Actions/Enforce/Update/Combat/Inventory/Health/Loot
-  [ ] Aucune erreur rouge PHNPC au demarrage
-  [ ] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif
+  [⚠️] Banners `v0.0.14 loaded` visibles pour Actions/Enforce/Update/Combat/Inventory/Health/Loot
+  [❌] Aucune erreur rouge PHNPC au demarrage : Il y a des erreurs rouges a voir dans le log.
+  [❌] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif
+
+ACTIONS a Faire :
+- Corriger les micro-saccades du suivi marche/course (log `follow anchor`). : Arreter le calcul de la distance au joueur a chaque secondes, faire un calcul plus intelligent pour basculer entre marche et course sans saccade.
+- Corriger le franchissement d'obstacles bas/clotures qui bloque le NPC/PNJ : Le NPC/PNJ ne passe plus les barieres ou obstacles bas, il commance sont annimation pour passer de l'autres coter et reste bloqué au milieu. Il faut corriger cela pour que le NPC/PNJ puisse franchir les obstacles bas/clotures sans se bloquer.
+- Corriger les ordres de déplacement "Va la-bas" et "Mets-toi a l'abri" pour qu'ils fonctionnent correctement : "Va la-bas" doit atteindre la cible sans derive continue et sans retour auto vers le joueur et ce mettre en surveillance sur la zone, "Mets-toi a l'abri" doit rejoindre un batiment proche et rester en staying (pas d'aller-retour) doit rester dans le batiment refermer les portes et fenettres pour rester a l'abri ne doit pas sortire du batiment.
+- Corriger les erreurs rouges dans le log liées au combat et à l'inventaire : Il y a des erreurs rouges dans le log liées au combat et à l'inventaire, il faut les corriger pour que le combat reste stable et que l'inventaire fonctionne correctement.
+- Corriger le port automatique des vêtements donnés au NPC : Le NPC/PNJ ne portes pas les vêtements que je lui est donner dans son inventaire même si il n'a pas de vêtement, il garde sa tenue de base même si je lui donne des vêtements dans son inventaire. Il faut corriger cela pour que le NPC/PNJ porte automatiquement les vêtements donnés par le joueur si le slot est libre ou pour remplacer un vêtement de score inférieur.
+- Corriger le loot des armes dans le cadavre du NPC : Les armes que je lui donne dans son inventaire ne sont pas présentes dans le cadavre après la mort du NPC/PNJ, il y a juste les items et les vêtements par defaut au spawn du NPC/PNJ dans le cadavre. Il faut corriger cela pour que les armes données au NPC soient présentes dans le cadavre après sa mort.
+
 
 ---
 

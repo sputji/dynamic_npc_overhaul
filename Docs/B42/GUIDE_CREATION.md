@@ -1,5 +1,13 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.0.14 (stabilisation post-retest)_
+_Version 0.0.15 (stabilisation post-retest)_
+
+> Mise a jour v0.0.15 (2026-05-28) — regles ajoutees apres KO v0.0.14.
+>
+> 1. Follow : imposer une cadence minimale de re-path (`FOLLOW_REPATH_TICKS`) et une hold zone anti yo-yo au stop distance.
+> 2. Clotures : `ClimbOverFenceState` ne doit pas etre casse immediatement; reset seulement apres blocage prolonge.
+> 3. Ordres explicites : poser `PHNPC_OrderLock` a la creation d'un ordre (`goingto/shelter`) et le faire respecter par Update + Combat.
+> 4. Shelter : des qu'un NPC est in-building, forcer `staying` local + fermeture defensive.
+> 5. Mort/loot : conserver un marker pending loot jusqu'au snapshot et prevoir un fallback de transfert par fullType.
 
 > Mise a jour v0.0.14 (2026-05-28) — regles ajoutees apres re-test v0.0.13/v0.0.13b.
 >

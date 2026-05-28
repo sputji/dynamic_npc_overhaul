@@ -1,10 +1,20 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 28 mai 2026 | Version **0.0.14** | Base v0.0.13/v0.0.13b corrigee apres re-test : follow anti-saccades, verrou d'ordres explicites, mitigation clotures non bloquante, auto-equip vetements robustifie, loot mort fiabilise pour les items donnes.
+> Mise a jour : 28 mai 2026 | Version **0.0.15** | Stabilisation post KO v0.0.14 : follow anti micro-saccades renforce, verrou d'ordres `goingto/shelter`, mitigation clotures non bloquante, shelter in-building -> staying, auto-equip vetements API B42 robuste, loot mort fiabilise pour items/armes donnes.
 
 ---
 
-## Roadmap execution v0.0.13 (post-retour v0.0.12)
+## Roadmap execution v0.0.15 (post-retour v0.0.14)
+
+### Patch v0.0.15 applique (28 mai 2026)
+
+- ✅ Follow : cadence minimale de re-path + hold anti yo-yo autour du stop distance.
+- ✅ Clotures : reset `ClimbOverFenceState` uniquement en blocage prolonge.
+- ✅ Ordres : verrou explicite `PHNPC_OrderLock` sur `goingto/shelter`, respecte dans combat/fuite.
+- ✅ Shelter : bascule en `staying` des entree dans batiment + fermeture defensive.
+- ✅ Inventaire vetements : fallback API worn items (`getWornItems():setItem`).
+- ✅ Loot mort : marker `DeadPendingLoot` + fallback `AddItem(fullType)`.
+- ⏳ Validation finale via checklist v0.0.15 en jeu.
 
 ### Patch v0.0.14 applique (28 mai 2026)
 
@@ -24,9 +34,9 @@ Etat d'implementation des phases P0 a P7 :
 | P2 | ✅ applique partiel | Loot inclut armes en main + dedupe ; arme `Chef` corrigee (`TinOpener`) |
 | P3 | ✅ applique partiel | Selection meilleure arme comparee a l'arme equipee |
 | P4 | ✅ applique partiel | Auto-equipement vetements depuis inventaire (slots libres) |
-| P5 | 🟡 en cours | Retest complet checklist + verification erreurs rouges restantes |
-| P6 | 🟡 en cours | Polish interactions inventaire/loot (a finaliser selon retest) |
-| P7 | 🟡 en cours | Documentation et criteres de validation stabilises, tuning final apres retest |
+| P5 | ✅ applique | Re-test structure v0.0.15 + checklist dediee ajoutee |
+| P6 | ✅ applique | Correctifs inventaire/loot finalises cote code |
+| P7 | 🟡 en cours | Validation terrain finale + publication release stable |
 
 Objectif du prochain passage : valider en jeu l'extinction des regressions `Va la-bas`, `Abri`, et `ClimbOverFenceState` sur maps avec clotures.
 

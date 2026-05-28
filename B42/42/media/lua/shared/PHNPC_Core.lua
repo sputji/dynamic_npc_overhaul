@@ -37,6 +37,7 @@ PHNPC.Log = {
 PHNPC.FOLLOW_DISTANCE      = 6    -- tiles : redemarrer le suivi si joueur plus loin que ca
 PHNPC.FOLLOW_STOP_DISTANCE = 2    -- distance de confort au joueur (evite le collage)
 PHNPC.FOLLOW_MOVE_THRESHOLD = 2   -- tiles : seuil de deplacement joueur pour recalculer pathfind
+PHNPC.FOLLOW_REPATH_TICKS  = 20   -- ticks min entre deux re-path follow pour eviter les micro-saccades
 PHNPC.GOTO_ARRIVE_DISTANCE = 1    -- v0.0.9h : tiles pour considerer "Va la-bas" comme arrive
 PHNPC.FOLLOW_TICK_RATE     = 20   -- ticks entre deux recalculs pathfind (si joueur bouge)
 PHNPC.INTERACTION_DIST     = 3    -- tiles : rayon clic droit pour interagir
