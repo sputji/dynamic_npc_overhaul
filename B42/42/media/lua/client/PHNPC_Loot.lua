@@ -155,7 +155,20 @@ local function transferToBody(body, entry)
     local dropped = 0
     for _, item in ipairs(entry.items) do
         local ok = false
-        pcall(function() container:AddItem(item); ok = true end)
+        pcall(function()
+            local added = container:AddItem(item)
+            ok = added and true or false
+        end)
+        if (not ok) and item then
+            local fullType = nil
+            pcall(function() fullType = item:getFullType() end)
+            if fullType and fullType ~= "" then
+                pcall(function()
+                    local added2 = container:AddItem(fullType)
+                    ok = added2 and true or false
+                end)
+            end
+        end
         if ok then dropped = dropped + 1 end
     end
     pcall(function()
@@ -238,14 +251,16 @@ end
 local function onZombieDead(zombie)
     if not zombie then return end
     local md = zombie:getModData()
-    if not md or not md.PHNPC_IsNPC then return end
+    if not md then return end
+    if not md.PHNPC_IsNPC and not md.PHNPC_DeadPendingLoot then return end
     PHNPC.snapshotNPCLoot(zombie)
 end
 
 local function onZombieUpdateLootCheck(zombie)
     if not zombie then return end
     local md = zombie:getModData()
-    if not md or not md.PHNPC_IsNPC or md.PHNPC_Looted then return end
+    if not md or md.PHNPC_Looted then return end
+    if not md.PHNPC_IsNPC and not md.PHNPC_DeadPendingLoot then return end
     local dead = false
     pcall(function() dead = zombie:isDead() end)
     local hp = 100
@@ -263,4 +278,4 @@ if Events.OnDeadBodySpawn then
 end
 Events.OnTick.Add(tickPendingLoot)
 
-print("[PHNPC] Loot v0.0.9n loaded")
+print("[PHNPC] Loot v0.0.14 loaded")

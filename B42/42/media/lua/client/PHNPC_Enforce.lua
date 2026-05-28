@@ -42,10 +42,9 @@ function PHNPC.enforceNPC(zombie)
     -- 2. Fix B42 : empeche marche en arriere non souhaitee (Bandits ZAMove.lua 69-74)
     pcall(function() zombie:setAnimatingBackwards(false) end)
 
-    -- v0.0.13b : mitigation agressive anti ClimbOverFenceState.
-    -- En B42.18 les NPCs (IsoZombie banditises) peuvent declencher des NPE Java
-    -- en entree d'etat ClimbOverFenceState (BodyDamage nil). On intercepte et on
-    -- casse immediatement la transition pour eviter la boucle d'erreurs.
+    -- v0.0.14 : mitigation anti ClimbOverFenceState non bloquante.
+    -- On laisse la transition de franchissement se faire normalement, et on ne
+    -- force un reset que si l'etat reste bloque trop longtemps.
     local inFenceState = false
     pcall(function()
         local st = zombie:getCurrentState()
@@ -54,16 +53,22 @@ function PHNPC.enforceNPC(zombie)
         end
     end)
     if inFenceState then
-        md.PHNPC_Moving = false
-        md.PHNPC_PathX = nil
-        md.PHNPC_PathY = nil
-        md.PHNPC_PathZ = nil
-        md.PHNPC_FenceRecoverTicks = 180
-        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
-        pcall(function() zombie:setBumpType("Shrug") end)
-        pcall(function() zombie:setTarget(nil) end)
-        pcall(function() zombie:clearAggroList() end)
-        pcall(function() zombie:setRunning(false) end)
+        md.PHNPC_FenceStateTicks = (md.PHNPC_FenceStateTicks or 0) + 1
+        if md.PHNPC_FenceStateTicks >= 45 then
+            md.PHNPC_FenceStateTicks = 0
+            md.PHNPC_Moving = false
+            md.PHNPC_PathX = nil
+            md.PHNPC_PathY = nil
+            md.PHNPC_PathZ = nil
+            md.PHNPC_FenceRecoverTicks = 60
+            pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+            pcall(function() zombie:setBumpType("Shrug") end)
+            pcall(function() zombie:setTarget(nil) end)
+            pcall(function() zombie:clearAggroList() end)
+            pcall(function() zombie:setRunning(false) end)
+        end
+    else
+        md.PHNPC_FenceStateTicks = 0
     end
 
     if (md.PHNPC_FenceRecoverTicks or 0) > 0 then
@@ -262,4 +267,4 @@ function PHNPC.enforceNPC(zombie)
     end
 end
 
-print("[PHNPC] Enforce v0.0.9p loaded")
+print("[PHNPC] Enforce v0.0.14 loaded")

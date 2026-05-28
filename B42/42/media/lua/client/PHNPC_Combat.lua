@@ -105,6 +105,7 @@ end
 function PHNPC.npcCombatStep(npc)
     local md = npc:getModData()
     if not md.PHNPC_Recruited then return end
+    if md.PHNPC_OrderLock == "goingto" or md.PHNPC_OrderLock == "shelter" then return end
     if md.PHNPC_CombatMode == "off" then return end
     -- Pas de combat si en fuite
     if md.PHNPC_State == "fleeing" then return end
@@ -210,6 +211,7 @@ end
 function PHNPC.npcFlightStep(npc, player)
     local md = npc:getModData()
     if not md.PHNPC_Recruited then return end
+    if md.PHNPC_OrderLock == "goingto" or md.PHNPC_OrderLock == "shelter" then return end
     -- v0.0.9i FIX BUG 2/5 : ne pas interrompre les ordres explicites.
     -- Si HP critique le NPC peut quand meme fuir, mais sinon respecter goingto/shelter.
     local hpRatioOverride = (md.PHNPC_Health or 100) / (md.PHNPC_MaxHealth or 100)
@@ -291,4 +293,4 @@ function PHNPC.npcFlightStep(npc, player)
     end
 end
 
-print("[PHNPC] Combat v0.0.9l loaded")
+print("[PHNPC] Combat v0.0.14 loaded")

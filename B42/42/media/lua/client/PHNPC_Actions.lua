@@ -129,10 +129,18 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
     local dy = py - npc:getY()
     local d  = math.sqrt(dx*dx + dy*dy)
     local stopDist = (PHNPC.FOLLOW_STOP_DISTANCE or 3)
-    if d <= stopDist + 0.1 then
+    if d <= stopDist + 0.35 then
         if md.PHNPC_Moving then PHNPC.stopMoving(npc) end
+        md.PHNPC_FollowHoldTicks = 45
         return
     end
+
+    -- Evite l'effet yo-yo autour du stopDist (micro re-path en boucle).
+    if (md.PHNPC_FollowHoldTicks or 0) > 0 and d <= (stopDist + 1.25) then
+        md.PHNPC_FollowHoldTicks = md.PHNPC_FollowHoldTicks - 1
+        return
+    end
+    md.PHNPC_FollowHoldTicks = 0
     local walkType = forceWalkType or pickWalkType(npc, md, d)
 
     -- Suivi par point d'ancrage autour du joueur (evite le collage de pathToCharacter).
@@ -158,12 +166,8 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
         local pdy = py - lpy
         if (pdx * pdx + pdy * pdy) >= (moveThreshold * moveThreshold) then
             needPath = true
-        else
-            local adx = tx - (md.PHNPC_PathX or tx)
-            local ady = ty - (md.PHNPC_PathY or ty)
-            if (adx * adx + ady * ady) > 1 then
-                needPath = true
-            end
+        elseif (md.PHNPC_StuckTicks or 0) >= (PHNPC.STUCK_TICKS or 90) then
+            needPath = true
         end
     end
 
@@ -599,7 +603,7 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.9o loaded")
+print("[PHNPC] Actions v0.0.14 loaded")
 
 -- ============================================================
 -- FENETRES (v0.0.9h NEW — Bug 6)

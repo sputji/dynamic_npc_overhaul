@@ -48,11 +48,18 @@ function PHNPC.autoEquipFromInventory(npc)
     pcall(function() items = inv:getItems() end)
     if not items then return 0 end
 
+    local function isClothingItem(it)
+        if not it then return false end
+        local ok, val = pcall(function() return instanceof(it, "Clothing") end)
+        if ok and val then return true end
+        local alt = false
+        pcall(function() alt = it.IsClothing and it:IsClothing() or false end)
+        return alt and true or false
+    end
+
     local function scoreClothing(it)
         if not it then return -1 end
-        local isClothing = false
-        pcall(function() isClothing = it:IsClothing() end)
-        if not isClothing then return -1 end
+        if not isClothingItem(it) then return -1 end
 
         local bite, scratch, bullet = 0, 0, 0
         pcall(function() bite = it.getBiteDefense and it:getBiteDefense() or 0 end)
@@ -77,9 +84,7 @@ function PHNPC.autoEquipFromInventory(npc)
         local it
         pcall(function() it = items:get(i) end)
         if it then
-            local isClothing = false
-            pcall(function() isClothing = it:IsClothing() end)
-            if isClothing then
+            if isClothingItem(it) then
                 local location = nil
                 pcall(function() location = it:getBodyLocation() end)
                 if location and tostring(location) ~= "" then
@@ -93,18 +98,38 @@ function PHNPC.autoEquipFromInventory(npc)
         end
     end
 
+    local worn
+    pcall(function() worn = npc:getWornItems() end)
+
+    local function getCurrentWorn(location)
+        local current = nil
+        if npc.getWornItem then
+            pcall(function() current = npc:getWornItem(location) end)
+        end
+        if (not current) and worn and worn.getItem then
+            pcall(function() current = worn:getItem(location) end)
+        end
+        return current
+    end
+
+    local function setWorn(location, item)
+        local ok = false
+        if npc.setWornItem then
+            pcall(function() npc:setWornItem(location, item); ok = true end)
+        end
+        if (not ok) and worn and worn.setItem then
+            pcall(function() worn:setItem(location, item); ok = true end)
+        end
+        return ok
+    end
+
     local equipped = 0
-    if npc.setWornItem then
-        for location, entry in pairs(bestByLocation) do
-            local current = nil
-            if npc.getWornItem then
-                pcall(function() current = npc:getWornItem(location) end)
-            end
-            local currentScore = scoreClothing(current)
-            if entry.score > currentScore then
-                local ok = false
-                pcall(function() npc:setWornItem(location, entry.item); ok = true end)
-                if ok then equipped = equipped + 1 end
+    for location, entry in pairs(bestByLocation) do
+        local current = getCurrentWorn(location)
+        local currentScore = scoreClothing(current)
+        if entry.score > currentScore then
+            if setWorn(location, entry.item) then
+                equipped = equipped + 1
             end
         end
     end
@@ -154,4 +179,4 @@ Events.OnRefreshInventoryWindowContainers.Add(function(page, step)
     end
 end)
 
-print("[PHNPC] Inventory v0.0.9a loaded")
+print("[PHNPC] Inventory v0.0.14 loaded")

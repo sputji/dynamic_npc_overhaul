@@ -80,10 +80,10 @@ Events.OnHitZombie.Add(function(zombie, character, bodyPart, handWeapon)
             zombie:addLineChatElement(string.format(getText("UI_PHNPC_BarkDeath"), tostring(md.PHNPC_Name or "?")), 0.9, 0.2, 0.2)
         end)
 
-        -- Retirer des registres PHNPC (plus traite par enforceNPC/follow)
-        -- CRITIQUE : PHNPC_IsNPC=nil AVANT setHealth(0)
-        -- Sinon OnZombieUpdate (isNPC check) ressusciterait le NPC (setHealth(10000))
-        md.PHNPC_IsNPC = nil
+        -- Retirer des registres PHNPC (plus traite par enforceNPC/follow).
+        -- On conserve PHNPC_IsNPC jusqu'au snapshot loot (OnZombieDead), sinon
+        -- PHNPC_Loot ne reconnait pas ce NPC et les objets donnes sont perdus.
+        md.PHNPC_DeadPendingLoot = true
         PHNPC.allNPCs[zombie]   = nil
         PHNPC.recruited[zombie] = nil
 
@@ -95,4 +95,4 @@ Events.OnHitZombie.Add(function(zombie, character, bodyPart, handWeapon)
     end
 end)
 
-print("[PHNPC] Health v0.0.9a loaded")
+print("[PHNPC] Health v0.0.14 loaded")

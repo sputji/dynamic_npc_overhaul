@@ -1,5 +1,13 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.0.13 (stabilisation post-test)_
+_Version 0.0.14 (stabilisation post-retest)_
+
+> Mise a jour v0.0.14 (2026-05-28) — regles ajoutees apres re-test v0.0.13/v0.0.13b.
+>
+> 1. Follow : ne jamais declencher de re-path sur la derive locale de l'ancre. Re-path seulement si le joueur a bouge suffisamment, ou stuck detecte.
+> 2. Ordres explicites : toujours verrouiller `goingto/shelter` (`PHNPC_OrderLock`) pour empecher les bascules parasites d'etat.
+> 3. Clotures : ne pas interrompre agressivement `ClimbOverFenceState`; ne reset qu'en blocage prolonge.
+> 4. Vetements : pour B42, preferer `instanceof(item, "Clothing")` avec fallback et supporter `getWornItems():setItem(...)`.
+> 5. Loot mort : si la mort retire le NPC des registres, conserver un marker `DeadPendingLoot` jusqu'au snapshot sinon les items donnes sont perdus.
 
 > Mise a jour v0.0.13 (2026-05-28) — regles ajoutees apres retours v0.0.12.
 >

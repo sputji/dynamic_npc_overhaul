@@ -1,4 +1,14 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.13
+# Architecture B42 — Dynamic NPC Overhaul v0.0.14
+
+> v0.0.14 — Stabilisation post re-test v0.0.13/v0.0.13b (2026-05-28)
+>
+> Axes techniques appliques :
+>
+> 1. Follow anti-saccades : suppression du recalcul d'ancre quasi continu, ajout d'une fenetre anti yo-yo proche du stop distance.
+> 2. Continuite d'ordre : verrou explicite `PHNPC_OrderLock` pour `goingto`/`shelter` afin d'empecher les retours parasites vers `following`.
+> 3. Clotures : mitigation `ClimbOverFenceState` non bloquante (reset seulement en cas de blocage prolonge).
+> 4. Auto-equip vetements : detection robustifiee (`instanceof Clothing` + fallback worn API).
+> 5. Mort/loot : preservation du contexte NPC jusqu'au snapshot, correction du transfert des objets donnes vers le cadavre.
 
 > v0.0.13 — Stabilisation post-test v0.0.12 (2026-05-28)
 >

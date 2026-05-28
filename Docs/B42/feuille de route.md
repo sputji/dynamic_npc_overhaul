@@ -1,10 +1,19 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 28 mai 2026 | Version **0.0.12 (post-test v0.0.11, à tester)** | **Tests v0.0.11 échoués 6/6** : causes confirmées supplémentaires = crash combat `scoreWeapon`, `return` prématuré dans `staying`, suivi trop cadencé. v0.0.12 applique des correctifs structurants sur `PHNPC_Combat.lua`, `PHNPC_Update.lua`, `PHNPC_Actions.lua`, `PHNPC_Orders.lua`.
+> Mise a jour : 28 mai 2026 | Version **0.0.14** | Base v0.0.13/v0.0.13b corrigee apres re-test : follow anti-saccades, verrou d'ordres explicites, mitigation clotures non bloquante, auto-equip vetements robustifie, loot mort fiabilise pour les items donnes.
 
 ---
 
 ## Roadmap execution v0.0.13 (post-retour v0.0.12)
+
+### Patch v0.0.14 applique (28 mai 2026)
+
+- ✅ Follow : suppression du re-path quasi continu (`follow anchor`) + anti yo-yo de distance.
+- ✅ Ordres : ajout `PHNPC_OrderLock` (`goingto`/`shelter`) pour eviter demi-tour vers joueur.
+- ✅ Clotures : mitigation `ClimbOverFenceState` assouplie (n'interrompt plus un franchissement normal).
+- ✅ Vetements : auto-equip compatible APIs B42 (detection Clothing + fallback worn items).
+- ✅ Mort/loot : les armes/objets donnes au NPC sont captures et transferes au cadavre de facon fiable.
+- ⏳ Re-test a lancer sur checklist v0.0.14 (suivi, va la-bas, abri cloture, equipement, loot).
 
 Etat d'implementation des phases P0 a P7 :
 

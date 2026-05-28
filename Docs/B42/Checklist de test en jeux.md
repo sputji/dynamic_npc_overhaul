@@ -1,34 +1,66 @@
-🎮 Checklist de re-test en jeu — v0.0.13
+🎮 Checklist de re-test en jeu — v0.0.14
 
 Avant : redemarrer completement PZ, nouvelle sandbox Apocalypse, debug menu actif.
 
 1. Suivi / recrutement
   [ ] Le NPC garde ~2 tuiles d'ecart quand le joueur s'arrete (pas de collage)
-  [ ] Marche/cours bascule proprement sans micro-saccades
+  [ ] Marche/cours bascule proprement sans micro-saccades (plus de spam `follow anchor` en log)
   [ ] Changement de direction joueur reste fluide
+  [ ] Franchissement d'obstacles bas/clotures fonctionne sans blocage animation
 
-2. Ordres de deplacement
-  [ ] "Va la-bas" atteint la cible sans derive continue
-  [ ] "Mets-toi a l'abri" rejoint un batiment proche sans aller-retour
-  [ ] Pas d'erreur rouge `ClimbOverFenceState` liee au NPC durant ces ordres
+1. Ordres de deplacement
+  [ ] "Va la-bas" atteint la cible sans derive continue et sans retour auto vers le joueur
+  [ ] "Mets-toi a l'abri" rejoint un batiment proche et reste en staying (pas d'aller-retour)
+  [ ] Zone avec clotures : pas de boucle d'etat `ClimbOverFenceState`
 
-3. Combat / equipement
-  [ ] Le NPC equipe la meilleure arme melee disponible (si inventaire mixte)
+1. Combat / equipement
+  [ ] Le NPC equipe la meilleure arme melee disponible (inventaire mixte)
   [ ] Le combat reste stable (pas de spam erreur rouge cote PHNPC)
 
-4. Inventaire / tenue / mort
-  [ ] Vetements donnes au NPC se portent automatiquement (si slot libre)
-  [ ] Les armes donnees (main primaire/secondaire) sont presentes dans le cadavre
-  [ ] Le contenu du cadavre affiche bien inventaire + vetements + armes
+1. Inventaire / tenue / mort
+  [ ] Vetements donnes au NPC se portent automatiquement (slot libre ou remplacement meilleur score)
+  [ ] Les armes donnees au NPC sont presentes dans le cadavre apres mort
+  [ ] Le contenu du cadavre affiche inventaire + vetements + armes
 
-5. Validation console
-  [ ] Aucune erreur ROUGE reliee a PHNPC au demarrage
-  [ ] Aucune erreur ROUGE reliee a PHNPC apres 5 min de jeu actif
+1. Validation console
+  [ ] Banners `v0.0.14 loaded` visibles pour Actions/Enforce/Update/Combat/Inventory/Health/Loot
+  [ ] Aucune erreur rouge PHNPC au demarrage
+  [ ] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif
 
-6. Validation v0.0.13b
-  [ ] Donner 2+ vetements du meme slot (ex: veste faible puis veste forte) -> NPC porte le meilleur score
-  [ ] Ordre "Va la-bas" avec clotures proches -> pas de boucle d'erreur `ClimbOverFenceState`
-  [ ] Ordre "Mets-toi a l'abri" zone avec clotures -> pas de spam erreurs rouges fence
+---
+
+🎮 Checklist de re-test en jeu — v0.0.13
+
+Avant : redemarrer completement PZ, nouvelle sandbox Apocalypse, debug menu actif.
+
+1. Suivi / recrutement
+  [⚠️] Le NPC garde ~2 tuiles d'ecart quand le joueur s'arrete (pas de collage) : Le NPC/PNJ continue de coller le joueur.
+  [❌] Marche/cours bascule proprement sans micro-saccades : micro-saccades quand le NPC/PNJ Cours et marche, log montre un calcul a chaque secondes se qui fait les sacades.
+  [✅] Changement de direction joueur reste fluide : Les changement de direction du joueur sont fluide, le NPC/PNJ suit le joueur de manière fluide même quand il change de direction.
+  [❌] Le NPC/PNJ ne passe plus les barieres ou obstacles bas : GROS BUG, le NPC/PNJ ne passe plus les barieres ou obstacles bas, il commance sont annimation pour passer de l'autres coter et reste bloqué au milieu.
+
+1. Ordres de deplacement
+  [❌] "Va la-bas" atteint la cible sans derive continue : Le NPC cours en direction de la cible mais ne l'atteint jamais, il sacade pour y allez (log montre un calcul a chaque secondes se qui fait les sacades) et quand il arrive a proximite de la cible il fait demi-tour pour revenir sur le joueur
+  [❌] "Mets-toi a l'abri" rejoint un batiment proche sans aller-retour : Le NPC/PNJ vas dans le batiement le plus proche pour se mettre a l'abri, il ouvre la porte rentre et resort directment pour revenir sur le joueur.
+  [✅] Pas d'erreur rouge `ClimbOverFenceState` liee au NPC durant ces ordres : Je n'ai pas vu d'erreur `ClimbOverFenceState` dans le log pendant les tests de déplacement.
+
+1. Combat / equipement
+  [✅] Le NPC equipe la meilleure arme melee disponible (si inventaire mixte)
+  [✅] Le combat reste stable (pas de spam erreur rouge cote PHNPC) : Les deplacement sont plutot aleatoir mais le combat reste stable.
+
+1. Inventaire / tenue / mort
+  [❌] Vetements donnes au NPC se portent automatiquement (si slot libre) : Non il ne portes pas les vêtements que je lui est donner dans son inventaire même si il n'a pas de vêtement, il garde sa tenue de base même si je lui donne des vêtements dans son inventaire. Voir log pour les erreurs.
+  [❌] Les armes donnees (main primaire/secondaire) sont presentes dans le cadavre : Non il n'y a pas les armes que je lui est donner dans son inventaire dans le cadavre, il y a juste les items et les vêtements du NPC/PNJ dans le cadavre. Voir log pour les erreurs.
+  [⚠️] Le contenu du cadavre affiche bien inventaire + vetements + armes : Quand il spawn avec oui mais ce que je lui donne disparer la mort.
+
+1. Validation console
+  [⚠️] Aucune erreur ROUGE reliee a PHNPC au demarrage
+  [⚠️] Aucune erreur ROUGE reliee a PHNPC apres 5 min de jeu actif
+
+1. Validation v0.0.13b
+  [❌] Donner 2+ vetements du meme slot (ex: veste faible puis veste forte) -> NPC porte le meilleur score : Non il ne portes pas les vetements que je lui est donner dans son inven
+  [❌] Ordre "Va la-bas" avec clotures proches -> pas de boucle d'erreur `ClimbOverFenceState` : Non le NPC/PNJ ne passe plus les barieres ou obstacles bas, il commance sont annimation pour passer de l'autres coter et reste bloqué au milieu. Voir log pour les erreurs.
+  [❌] Ordre "Mets-toi a l'abri" zone avec clotures -> pas de spam erreurs rouges fence : Non le NPC/PNJ vas dans le batiement le plus proche pour se mettre a l'abri, il ouvre la porte rentre et resort directment pour revenir sur le joueur sans refermer la porte derriere lui. Voir log pour les erreurs.
 
 ---
 

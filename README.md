@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.13b-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.14-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,11 +20,11 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.13b**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.14**.
 
 ---
 
-## Fonctionnalités actuelles (v0.0.13b)
+## Fonctionnalités actuelles (v0.0.14)
 
 ### PNJ & Professions
 
@@ -83,7 +83,15 @@ Animations humaines complètes grâce à un système d'AnimSets custom :
 
 > Animations masculines (Bob) et féminines (Kate) supportées.
 
-### Correctifs récents (v0.0.13 / v0.0.13b)
+### Correctifs récents (v0.0.14)
+
+- **Follow anti-saccades** : suppression du recalcul quasi continu du follow anchor + fenêtre anti-yo-yo au stop distance.
+- **Ordres stables** : verrou `goingto/shelter` pour empêcher les retours parasites vers le joueur.
+- **Clôtures** : mitigation `ClimbOverFenceState` non bloquante (reset seulement en blocage prolongé).
+- **Auto-équip vêtements** : détection Clothing/API B42 robustifiée, remplacement meilleur score par slot.
+- **Loot mort** : les objets/armes donnés au NPC sont conservés et transférés au cadavre de façon fiable.
+
+### Correctifs précédents (v0.0.13 / v0.0.13b)
 
 - **Suivi stabilisé** : follow par point d'ancrage, stop à 2 tuiles, anti-collage et anti-spam re-path.
 - **Mitigation clôtures** : interception défensive de `ClimbOverFenceState` avec recovery cooldown — réduit les boucles d'état et les erreurs `BodyDamage nil`.
@@ -235,6 +243,7 @@ Dynamic_NPC_Overhaul/
 
 | Phase | Fonctionnalité | État |
 |-------|----------------|------|
+| v0.0.14 | Stabilisation follow/ordres + fix auto-equip vetements + fix loot des objets donnes | ✅ |
 | v0.0.13b | Mitigation `ClimbOverFenceState` + auto-équip vêtements best-stat par slot | ✅ |
 | v0.0.13 | Stabilisation follow/combat/loot, auto-équip vêtements, correction Chef | ✅ |
 | v0.0.9k | Refonte gameplay : path-once, course auto, drop inventaire mort, détection bâtiments | ✅ |
@@ -274,6 +283,7 @@ Historique complet des modifications : **[Docs/B42/CHANGELOG.md](https://github.
 
 | Version | Résumé |
 |---------|--------|
+| [v0.0.14](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md) | Stabilisation post re-test : anti-saccades follow, verrou d'ordres `goingto/shelter`, mitigation clôtures non bloquante, auto-équip vêtements API B42, transfert loot/cadavre fiabilisé |
 | [v0.0.13b](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md) | Mitigation agressive `ClimbOverFenceState` (recovery + cooldown) ; auto-équip vêtements best-stat par slot (bulletDefense > biteDefense > scratchDefense + condition) |
 | [v0.0.13](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md) | Stabilisation post-tests : follow anchor anti-collage, meilleure arme, loot des items en main, auto-équip vêtements, fix Chef (`TinOpener`) |
 | [v0.0.9k](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009k----2026-05-27) | Refonte gameplay : ordres "Va là-bas" / "Mets-toi à l'abri" fonctionnels (pathToLocationF appelé UNE FOIS au lieu d'en boucle), course auto (`setRunning` + `BanditWalkType`), drop inventaire à la mort (`PHNPC_Loot.lua`), détection bâtiments avec scan spiral et room safe (`PHNPC_Building.lua`), détection NPC stuck (re-path auto), Enforce ne casse plus le pathfind |

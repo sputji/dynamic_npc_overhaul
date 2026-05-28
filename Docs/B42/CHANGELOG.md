@@ -1,5 +1,38 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.14] — Stabilisation follow/ordres + fix auto-equip/loot (2026-05-28)
+
+### Correctifs gameplay
+
+- `PHNPC_Actions.lua` : stabilisation follow pour supprimer le re-path quasi permanent (source des micro-saccades).
+  - ajout d'une fenetre anti yo-yo (`PHNPC_FollowHoldTicks`) autour de la distance d'arret.
+  - re-path follow seulement si le joueur a vraiment bouge (ou stuck detecte), plus sur derive d'ancre continue.
+- `PHNPC_Orders.lua` + `PHNPC_Update.lua` + `PHNPC_Combat.lua` : ajout d'un verrou d'ordre (`PHNPC_OrderLock`) pour garantir la continuite de `Va la-bas` et `Mets-toi a l'abri`.
+  - empeche le retour parasite vers `following` tant que l'ordre explicite n'est pas termine.
+  - combat/fuite ne cassent plus ces ordres verrouilles.
+- `PHNPC_Enforce.lua` : mitigation fence rendue non bloquante.
+  - on laisse le franchissement normal des clotures.
+  - reset defensif seulement si `ClimbOverFenceState` reste bloque trop longtemps.
+
+### Correctifs inventaire / mort
+
+- `PHNPC_Inventory.lua` : auto-equip vetements rendu robuste API B42.
+  - detection vetements via `instanceof(item, "Clothing")` (fallback `IsClothing`).
+  - lecture/ecriture worn items avec fallback `getWornItems():getItem/setItem`.
+- `PHNPC_Health.lua` + `PHNPC_Loot.lua` : correction perte d'objets donnes au NPC a la mort.
+  - le marker NPC est conserve jusqu'au snapshot loot (`PHNPC_DeadPendingLoot`).
+  - `OnZombieDead`/`OnZombieUpdate` traitent aussi ce marker pending.
+  - transfert vers cadavre avec fallback `AddItem(fullType)` si transfert objet brut refuse.
+
+### Validation de log
+
+- Banners modules alignes sur `v0.0.14` pour eviter les faux diagnostics de version en test.
+- Sources officielles re-verifiees : Lua API / JavaDocs / Category:Modding / Build status.
+
+### Version
+
+- `B42/42/mod.info` -> `version=0.0.14`.
+
 ## [0.0.13b] — Mitigation ClimbOverFenceState + auto-equip vetements best stats (2026-05-28)
 
 ### Correctifs code

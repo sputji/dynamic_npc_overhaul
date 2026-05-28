@@ -91,6 +91,15 @@ Events.OnTick.Add(function()
         else
             local md = npc:getModData()
 
+            -- Verrou d'ordre explicite : evite les bascules parasites vers following.
+            if md.PHNPC_OrderLock == "goingto" and md.PHNPC_GoToX and md.PHNPC_State ~= "goingto" then
+                md.PHNPC_State = "goingto"
+            elseif md.PHNPC_OrderLock == "shelter"
+                and md.PHNPC_State ~= "shelter"
+                and md.PHNPC_State ~= "staying" then
+                md.PHNPC_State = "shelter"
+            end
+
             -- Auto-equip vetements donnes par le joueur (scan leger periodique).
             md.PHNPC_AutoEquipTick = (md.PHNPC_AutoEquipTick or 0) + 1
             if md.PHNPC_AutoEquipTick >= 120 then
@@ -158,6 +167,7 @@ Events.OnTick.Add(function()
                     md.PHNPC_GoToX    = nil
                     md.PHNPC_GoToY    = nil
                     md.PHNPC_GoToZ    = nil
+                    md.PHNPC_OrderLock = nil
                     PHNPC.stopMoving(npc)
                     pcall(function() PHNPC.closeBehindNPC(npc) end)
                     PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " arrive a destination -> staying (no patrol)")
@@ -274,6 +284,7 @@ Events.OnTick.Add(function()
                     if (sdx * sdx + sdy * sdy) < 4 then
                         md.PHNPC_State = "staying"  -- arrivee : passer en staying
                         md.PHNPC_NoPatrol = true     -- v0.0.11 : pas de patrouille apres shelter
+                        md.PHNPC_OrderLock = nil
                         PHNPC.stopMoving(npc)
                         pcall(function() PHNPC.closeBehindNPC(npc) end)
                         PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " shelter atteint -> staying (no patrol)")
@@ -385,7 +396,7 @@ Events.OnGameStart.Add(function()
     PHNPC._openInventoryNPC = nil
     PHNPC._combatTimers     = {}
     PHNPC._attackCooldowns  = {}
-    print("[PHNPC] v0.0.9h pret")
+    print("[PHNPC] v0.0.14 pret")
 end)
 
-print("[PHNPC] Update v0.0.9m loaded")
+print("[PHNPC] Update v0.0.14 loaded")
