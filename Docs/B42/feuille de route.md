@@ -91,6 +91,7 @@ Objectif du prochain passage : valider en jeu l'extinction des regressions `Va l
 - [ ] NPC peut ramasser des items au sol, dans les containers, les cadavres et les transporter dans son inventaire
 - [ ] NPC peut utiliser des items de son inventaire (nourriture, médicaments, outils, objets, armes contondantes, armes à feu, etc.)
 - [ ] NPC peut échanger des items avec le joueur (transfert via ISInventoryTransferUI ou methode fonctionelle en B42.18)
+- [ ] Les NPC/PNJ doivent prendre en compte la meteo et les saisons pour leur survie (ex: se mettre à l'abri quand il pleut, porter des vêtements chauds en hiver, etc.)
 
 ### 🟢 P7 — Polish v0.1.0
 

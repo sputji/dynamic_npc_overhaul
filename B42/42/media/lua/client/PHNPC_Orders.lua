@@ -51,6 +51,7 @@ function PHNPC.recruitNPC(npc)
     md.PHNPC_State      = "following"
     md.PHNPC_Moving     = false
     md.PHNPC_IdleTick   = 0
+    md.PHNPC_NoPatrol   = nil  -- v0.0.11 : reset flag arrivee
     md.PHNPC_CombatMode = md.PHNPC_CombatMode or "auto"
     PHNPC.recruited[npc] = true
     pcall(function()
@@ -75,6 +76,7 @@ function PHNPC.followNPC(npc)
     md.PHNPC_State  = "following"
     md.PHNPC_ZoneX  = nil  -- effacer la zone precedente
     md.PHNPC_ZoneY  = nil
+    md.PHNPC_NoPatrol = nil  -- v0.0.11 : reset flag arrivee
     md.PHNPC_LastPX = nil  -- forcer un recalcul immediat
     md.PHNPC_LastPY = nil
     pcall(function()
@@ -96,6 +98,7 @@ function PHNPC.stayNPC(npc)
     md.PHNPC_ZoneY = npc:getY()
     md.PHNPC_ZoneZ = npc:getZ()
     md.PHNPC_ZoneR = PHNPC.STAY_RADIUS or 5
+    md.PHNPC_NoPatrol = nil  -- v0.0.11 : "Reste ici" explicite -> patrouille active
     PHNPC.stopMoving(npc)
     pcall(function()
         npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkStay"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
@@ -117,6 +120,7 @@ function PHNPC.attackOrderNPC(npc)
     md.PHNPC_ZoneY        = npc:getY()
     md.PHNPC_ZoneZ        = npc:getZ()
     md.PHNPC_ZoneR        = PHNPC.STAY_RADIUS or 5
+    md.PHNPC_NoPatrol     = nil
     md.PHNPC_State        = "attacking"
     pcall(function()
         npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkAttack"), md.PHNPC_Name or "?"), 0.9, 0.2, 0.2)
@@ -135,6 +139,7 @@ function PHNPC.shelterNPC(npc)
     md.PHNPC_State = "shelter"
     md.PHNPC_ZoneX = nil  -- sera calcule par Update.lua
     md.PHNPC_ZoneY = nil
+    md.PHNPC_NoPatrol = nil  -- v0.0.11 : sera re-set a l'arrivee shelter
     pcall(function()
         npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkShelter"), md.PHNPC_Name or "?"), 0.2, 0.9, 0.9)
     end)
@@ -152,6 +157,7 @@ function PHNPC.freeNPC(npc)
     md.PHNPC_State = "free"
     md.PHNPC_ZoneX = nil
     md.PHNPC_ZoneY = nil
+    md.PHNPC_NoPatrol = nil  -- v0.0.11
     pcall(function()
         npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkFree"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
     end)
@@ -319,6 +325,7 @@ function PHNPC.goToLocation(npc, x, y, z)
     md.PHNPC_GoToX = x
     md.PHNPC_GoToY = y
     md.PHNPC_GoToZ = z or npc:getZ()
+    md.PHNPC_NoPatrol = nil  -- v0.0.11 : sera re-set a l'arrivee goingto
     PHNPC.startMovingTo(npc, x, y, md.PHNPC_GoToZ)
     pcall(function()
         npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkGoTo"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)

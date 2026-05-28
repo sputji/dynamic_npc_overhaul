@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.9k-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.13b-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,11 +20,11 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.9k**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.13b**.
 
 ---
 
-## Fonctionnalités actuelles (v0.0.9k)
+## Fonctionnalités actuelles (v0.0.13b)
 
 ### PNJ & Professions
 
@@ -82,6 +82,15 @@ Animations humaines complètes grâce à un système d'AnimSets custom :
 | WaveHi / Shrug / Yes / No | Expressions sociales |
 
 > Animations masculines (Bob) et féminines (Kate) supportées.
+
+### Correctifs récents (v0.0.13 / v0.0.13b)
+
+- **Suivi stabilisé** : follow par point d'ancrage, stop à 2 tuiles, anti-collage et anti-spam re-path.
+- **Mitigation clôtures** : interception défensive de `ClimbOverFenceState` avec recovery cooldown — réduit les boucles d'état et les erreurs `BodyDamage nil`.
+- **Combat** : sélection de la meilleure arme en comparant arme équipée + inventaire complet NPC.
+- **Auto-équip vêtements** : remplacement slot par slot selon score défensif (bulletDefense > biteDefense > scratchDefense + condition + isolation).
+- **Mort/loot** : items en main (primaire/secondaire) inclus dans le snapshot de transfert au cadavre.
+- **Chef** : correction item de départ (`Base.TinOpener` au lieu de `Base.CanOpener`).
 
 ---
 
@@ -226,6 +235,9 @@ Dynamic_NPC_Overhaul/
 
 | Phase | Fonctionnalité | État |
 |-------|----------------|------|
+| v0.0.13b | Mitigation `ClimbOverFenceState` + auto-équip vêtements best-stat par slot | ✅ |
+| v0.0.13 | Stabilisation follow/combat/loot, auto-équip vêtements, correction Chef | ✅ |
+| v0.0.9k | Refonte gameplay : path-once, course auto, drop inventaire mort, détection bâtiments | ✅ |
 | v0.0.8b | Fix pathToCharacter, fix setHealth conditionnel | ✅ |
 | v0.0.9 | Refacto 9 modules, fix proximité, fix getText() timing, fix anim coupée | ✅ |
 | v0.0.9a | Traductions B42.18 (JSON), fix StaggerBack NPC, tous dialogues via getText() | ✅ |
@@ -262,6 +274,8 @@ Historique complet des modifications : **[Docs/B42/CHANGELOG.md](https://github.
 
 | Version | Résumé |
 |---------|--------|
+| [v0.0.13b](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md) | Mitigation agressive `ClimbOverFenceState` (recovery + cooldown) ; auto-équip vêtements best-stat par slot (bulletDefense > biteDefense > scratchDefense + condition) |
+| [v0.0.13](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md) | Stabilisation post-tests : follow anchor anti-collage, meilleure arme, loot des items en main, auto-équip vêtements, fix Chef (`TinOpener`) |
 | [v0.0.9k](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009k----2026-05-27) | Refonte gameplay : ordres "Va là-bas" / "Mets-toi à l'abri" fonctionnels (pathToLocationF appelé UNE FOIS au lieu d'en boucle), course auto (`setRunning` + `BanditWalkType`), drop inventaire à la mort (`PHNPC_Loot.lua`), détection bâtiments avec scan spiral et room safe (`PHNPC_Building.lua`), détection NPC stuck (re-path auto), Enforce ne casse plus le pathfind |
 | [v0.0.9j](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009j----2026-05-27) | HOTFIX critique : retire 5 méthodes IsoZombie inexistantes en B42.18 (`setAlertedBy`, `setPathTargetCharacter`, `setPrimaryTarget`, `setSecondaryTarget`, `setSkeletonResetting`) qui levaient `KahluaException` non-rattrapable |
 | [v0.0.9i](https://github.com/sputji/dynamic_npc_overhaul/blob/master/Docs/B42/CHANGELOG.md#009i----2026-05-23) | Fix définitifs Java natifs : ordre Va là-bas + Mets-toi à l'abri respectés, NPC ne colle plus, T-pose résolue (BumpFall AnimSet reset) |

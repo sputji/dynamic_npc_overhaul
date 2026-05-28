@@ -82,7 +82,57 @@ end
 function PHNPC.findSafeRoomSquare(building, npc)
     if not building then return nil end
 
-    -- Tente getRandomRoom() jusqu'a 8 fois
+    -- v0.0.10 FIX BUG #5 : preferer la piece la PLUS PROCHE du NPC plutot que
+    -- random => evite l'effet "shelter direction aleatoire" rapporte au test
+    -- joueur (NPC traversait le batiment au lieu d'aller dans la piece a cote).
+    -- Strategie : enumerer toutes les rooms via BuildingDef.getRooms(), calculer
+    -- la distance entre la free square de chacune et le NPC, retourner la plus
+    -- proche. Si NPC absent ou enumeration echoue, fallback random ci-dessous.
+    if npc then
+        local nx, ny = npc:getX(), npc:getY()
+        local def = nil
+        pcall(function() def = building:getDef() end)
+        if def then
+            local roomsArr = nil
+            pcall(function() roomsArr = def:getRooms() end)
+            local n = 0
+            if roomsArr then pcall(function() n = roomsArr:size() end) end
+            local bestSq, bestDist = nil, math.huge
+            for i = 0, n - 1 do
+                local roomDef = nil
+                pcall(function() roomDef = roomsArr:get(i) end)
+                if roomDef then
+                    local isoRoom = nil
+                    pcall(function() isoRoom = roomDef:getIsoRoom() end)
+                    if isoRoom then
+                        local sq = nil
+                        pcall(function() sq = isoRoom:getRandomFreeSquare() end)
+                        if sq then
+                            local rx, ry, ok = 0, 0, false
+                            pcall(function() rx = sq:getX(); ry = sq:getY(); ok = true end)
+                            if ok then
+                                local dx, dy = rx - nx, ry - ny
+                                local d = dx*dx + dy*dy
+                                if d < bestDist then
+                                    bestDist = d
+                                    bestSq = sq
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            if bestSq then
+                local rx, ry, rz, ok = 0, 0, 0, false
+                pcall(function()
+                    rx = bestSq:getX(); ry = bestSq:getY(); rz = bestSq:getZ(); ok = true
+                end)
+                if ok then return rx + 0.5, ry + 0.5, rz end
+            end
+        end
+    end
+
+    -- Tente getRandomRoom() jusqu'a 8 fois (fallback si scan deterministe echoue)
     for attempt = 1, 8 do
         local room = nil
         pcall(function() room = building:getRandomRoom() end)
@@ -163,4 +213,4 @@ function PHNPC.pickShelterPoint(npc)
     return nil
 end
 
-print("[PHNPC] Building v0.0.9n loaded")
+print("[PHNPC] Building v0.0.10 loaded")
