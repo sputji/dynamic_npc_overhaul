@@ -1,11 +1,161 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.0.9p_
+_Version 0.0.13 (stabilisation post-test)_
 
-> **Mise a jour v0.0.9p (2026-05-27)** — Passe d'audit API B42.18 (JavaDoc officielle + PZ Wiki + patterns Bandits 42.18) : **toutes** les methodes Java utilisees par le mod sont confirmees existantes dans la build `42.18.0 rev 9d7e334cab` (2026-05-11). `console.txt` propre. Hardening pcall applique sur `PHNPC_Enforce.lua` : tous les `setTarget(nil)`, `setHealth(10000)`, `setUseless(...)`, `changeState(...)` bare sont desormais defensifs. Le for-loop `OnTick` est blinde contre toute future evolution d'API.
+> Mise a jour v0.0.13 (2026-05-28) — regles ajoutees apres retours v0.0.12.
 >
-> **Mise a jour v0.0.9o** — Methodologie consolidee : **copier directement les patterns du mod Bandits B42.18** plutot que d'extrapoler depuis la doc decompilee. Les approximations de ma part (v0.0.9k -> v0.0.9n) ont a chaque fois introduit des regressions. Reference : `D:\PZ Mods\Dynamic_NPC_Overhaul\mod example\B42\Bandits\42.18`.
+> 1. Follow anti-collage : privilegier un point d'ancrage autour du joueur (`pathToLocationF`) plutot que `pathToCharacter` en continu.
+> 2. Ne pas casser le mouvement sur etats transitoires : en `following/goingto/shelter/fleeing`, ignorer la destruction de `PHNPC_Moving` lors de `lunge/attack/eatBody`.
+> 3. Arme melee : comparer l'arme equipee ET l'inventaire complet avant equipement (sinon la premiere arme reste figee).
+> 4. Loot fiable : inclure explicitement `primaryHand` et `secondaryHand` dans le snapshot de mort.
+> 5. QoL inventaire : auto-equiper les vetements de l'inventaire quand le slot cible est libre (`setWornItem`).
+
+> **Mise à jour v0.0.12 (2026-05-28)** — Trois pièges critiques supplémentaires identifiés après test v0.0.11.
 >
-> ### Piege 0 (NOUVEAU v0.0.9o) — Les methodes `ToggleDoor`/`isLocalPlayer` plantent sur un IsoZombie
+> ### Piège -5 (CRITIQUE) — `return` dans une branche d'état peut tuer tout le tick IA
+> Dans une callback `Events.OnTick.Add(function() ... end)`, un `return` dans une branche locale (`staying`) quitte la callback entière, pas seulement la branche.
+>
+> ```lua
+> -- MAUVAIS
+> if md.PHNPC_NoPatrol then return end
+>
+> -- BON
+> if not md.PHNPC_NoPatrol then
+>   -- logique patrouille
+> end
+> ```
+>
+> ### Piège -6 (CRITIQUE) — `item:isWeapon()` n'est pas un filtre universel fiable en Kahlua
+> Certains items exposés côté Lua ne supportent pas cette méthode de manière homogène selon le type runtime. Résultat : exceptions en boucle dans `scoreWeapon`.
+>
+> **Pattern robuste** : filtrer avec `instanceof(item, "HandWeapon")`, puis lire les stats avec garde-fous (`getMaxDamage/getMinDamage`).
+>
+> ### Piège -7 — Sur-cadencer le follow côté Update alors que le helper est déjà path-once
+> Si `startFollowing` sait déjà limiter ses re-paths (ancre + seuil), le recadrer encore avec un timer global peut rendre Run/Walk et stop-distance non réactifs.
+>
+> **Règle** : laisser la logique de throttling au helper de mouvement, et appeler le helper chaque tick avec l'intention courante (`Run`/`Walk`).
+
+> **Mise à jour v0.0.11 (2026-05-28)** — Tests v0.0.10 échoués 4/5. Leçons architecturales majeures consolidées ci-dessous.
+>
+> ### Piège 0 (CRITIQUE) — NE JAMAIS recalculer une destination depuis la position courante du NPC
+> v0.0.10 : `startFollowing` faisait `tx = px - nx*stopDist` où `nx = (px-npc.x)/dist`. Comme `npc.x` change à chaque tick, `tx,ty` change → `needNewPath` voit > 2 tuiles → `pathToLocationF` re-tiré → **saccade infinie**.
+>
+> ```lua
+> -- MAUVAIS (v0.0.10) :
+> local nx = (player:getX() - npc:getX()) / d  -- npc:getX() change chaque tick
+> local tx = player:getX() - nx * stopDist     -- tx change donc
+> if needNewPath(npc, md, tx, ty, ...) then    -- toujours vrai = spam
+>     npc:pathToLocationF(tx, ty, pz)
+> end
+>
+> -- BON (v0.0.11) — pattern NPC_Helper_Mod GCCoreActions.lua :
+> if not md.PHNPC_Moving then
+>     npc:pathToCharacter(player)  -- engine-side tracking, UNE FOIS
+>     md.PHNPC_Moving = true
+>     md.PHNPC_PathX = player:getX()  -- anchor PLAYER, pas NPC
+>     md.PHNPC_PathY = player:getY()
+> elseif (player:getX()-md.PHNPC_PathX)^2 + (player:getY()-md.PHNPC_PathY)^2 >= 25 then
+>     npc:pathToCharacter(player)  -- re-path SEULEMENT si player a bougé 5+ tuiles
+>     md.PHNPC_PathX = player:getX()
+>     md.PHNPC_PathY = player:getY()
+> end
+> ```
+>
+> ### Piège -1 (CRITIQUE) — NE JAMAIS faire fermer/ouvrir portes à chaque tick + à chaque stopMoving
+> v0.0.10 : `OnTick` appelait `checkAndOpenDoors` chaque tick + `stopMoving` appelait `closeNearbyDoors`. Quand un NPC s'arrêtait près d'une porte ouverte, `stopMoving` la fermait → tick+1 `checkAndOpenDoors` la rouvrait → tick+2 `stopMoving` la refermait. 18 blocs ERROR dans console.txt.
+>
+> **Pattern correct (v0.0.11)** : portes/fenêtres ouvertes UNIQUEMENT à l'entrée d'un path (start de mouvement), fermées UNIQUEMENT via une fonction explicite `PHNPC.closeBehindNPC(npc)` appelée à la transition `staying` (arrivée goingto/shelter), JAMAIS dans `stopMoving` générique.
+>
+> ### Piège -2 — Flag de patrouille à reset dans TOUS les ordres
+> v0.0.11 introduit `md.PHNPC_NoPatrol=true` à l'arrivée d'un goingto pour bloquer la patrouille `staying` aléatoire. Tous les ordres (`recruit`/`follow`/`stay`/`attack`/`shelter`/`free`/`goingto`) doivent **reset `md.PHNPC_NoPatrol = nil`** sinon le NPC reste figé après le premier goingto.
+>
+> ### Piège -3 — Seuil idle trop court coupe l'anim
+> v0.0.10 : Enforce step 5 stop le NPC après 15 ticks idle (0.5s). Le moteur `PathFindBehavior2` alterne brièvement `idle`/`pathfind` pendant les transitions normales (passage de porte, demi-tour). Stop brutal = reset anim = cut visible chaque seconde. v0.0.11 : **60 ticks (2s)** de tolérance.
+>
+> ### Piège -4 — `tryGet` séquentiel ≠ "meilleure arme"
+> v0.0.10 `getNPCWeapon` faisait `tryGet("Base.Bat") or tryGet("Base.Axe")` → Bat retourné en premier même si Axe plus puissante. v0.0.11 : scan complet `inv:getItems()` + filtre `item:isWeapon()` + score `maxDamage*10 + condition` → meilleure arme sélectionnée.
+>
+> ---
+>
+> ### Pièges identifiés au test v0.0.9p (toujours valides)
+>
+> ### Piège 1 (CRITIQUE) — `setEquippedItem` n'existe PAS en B42.18
+> Pendant des semaines (depuis v0.0.7a) le mod appelait `npc:setEquippedItem(weapon)` dans `PHNPC_Combat.lua:131`, wrappe en `pcall`. **La methode n'existe pas sur `IsoZombie`**. Le `pcall` masquait silencieusement l'echec → le NPC n'equipait jamais ses armes et frappait toujours a mains nues.
+>
+> **Pattern correct** (verifie B42.18 + utilise dans `Convert.lua:47` + `Loot.lua:105`) :
+>
+> ```lua
+> -- BON :
+> pcall(function() npc:setPrimaryHandItem(weapon) end)
+> -- MAUVAIS (silencieux a cause du pcall) :
+> pcall(function() npc:setEquippedItem(weapon) end)
+> ```
+>
+> **Lecon transverse** : `pcall` est utile pour le hardening defensif, mais **dangereux pour les appels API critiques** qu'on suppose existants. Pour ces cas, **toujours grep le mod example Bandits** d'abord pour confirmer le nom exact de la methode B42.18.
+>
+> ### Piege 2 (CRITIQUE) — `applyMoveTick(npc, md.PHNPC_WalkType or walkType)` ignore les changements de walkType
+> Dans `startFollowing` branche `else` (NPC deja en mouvement) :
+>
+> ```lua
+> -- MAUVAIS (gele le walkType au premier path) :
+> applyMoveTick(npc, md.PHNPC_WalkType or walkType)
+> -- BON (force le nouveau walkType si fourni) :
+> if walkType then md.PHNPC_WalkType = walkType end
+> applyMoveTick(npc, md.PHNPC_WalkType)
+> ```
+>
+> Sinon : NPC commence en "Walk" au premier path, le joueur s'eloigne tres loin, le handler `following` rappelle `startFollowing(npc, player, "Run")` → ignore le "Run" → NPC continue en "Walk" et reste a la traine indefiniment.
+>
+> ### Piege 3 — `pathToCharacter(player)` colle le joueur
+> `pathToCharacter` met le NPC sur le tile **exact** du joueur. `FOLLOW_STOP_DISTANCE = 2` ne s'applique que via la condition de stop, mais entre 2 ticks le moteur a deja avance le NPC sur le tile cible. **Solution** : utiliser `pathToLocationF(px + offset, py + offset)` ou l'offset est un vecteur radial de 2-3 tuiles depuis l'angle (joueur → NPC).
+>
+> ```lua
+> local angle = math.atan2(npc:getY() - player:getY(), npc:getX() - player:getX())
+> local stopDist = PHNPC.FOLLOW_STOP_DISTANCE or 2
+> local tx = player:getX() + math.cos(angle) * stopDist
+> local ty = player:getY() + math.sin(angle) * stopDist
+> pcall(function() npc:pathToLocationF(tx, ty, npc:getZ()) end)
+> ```
+>
+> ### Piege 4 — Etats comportementaux s'ecrasent mutuellement
+> Quand un NPC en etat `goingto` rencontre un zombie, `npcCombatStep` le passe en `defending`. Si la transition `defending → previous_state` ne restaure pas aussi `md.PHNPC_GoToX/Y/Z`, le NPC perd sa destination → retourne en `following` (joueur) → bug "allez-retour".
+>
+> **Pattern recommande** : sauvegarder un snapshot complet du contexte avant transition :
+>
+> ```lua
+> if md.PHNPC_State ~= "defending" then
+>     md.PHNPC_PrevState = md.PHNPC_State
+>     md.PHNPC_PrevGoToX = md.PHNPC_GoToX  -- snapshot total
+>     md.PHNPC_PrevGoToY = md.PHNPC_GoToY
+>     md.PHNPC_PrevGoToZ = md.PHNPC_GoToZ
+>     md.PHNPC_State = "defending"
+> end
+> -- restore plus tard :
+> md.PHNPC_State = md.PHNPC_PrevState
+> md.PHNPC_GoToX = md.PHNPC_PrevGoToX  -- etc.
+> ```
+>
+> ### Piege 5 — `pickShelterPoint` retourne souvent nil
+> `getRandomRoom()` boucle 8 fois sur un `IsoBuilding` peut tout echouer si le batiment a peu de rooms ou que les rooms sont rejetees. Le fallback aleatoire prend la main → NPC va dans une direction random.
+>
+> **Pattern recommande** : combiner avec `getCell():getRoomList()` filtre par distance.
+>
+> ### Piege 6 — Variables AnimSet (`PHNPC_IsNPC`) reset par `changeState`
+> L'enforce.lua step 10 re-applique `setVariable("PHNPC_IsNPC", true)` chaque tick **apres** tous les `changeState`. Mais si les XMLs d'AnimSet dans `B42/common/media/AnimSets/zombie/idle/*.xml` ne contiennent pas de **variant conditionnel** sur cette variable, l'animation idle reste la posture zombie standard.
+>
+> **A verifier dans chaque XML d'AnimSet** :
+>
+> ```xml
+> <AnimSet name="idle">
+>   <Variant Condition="PHNPC_IsNPC == true" AnimFile="Bob_Idle.x" />  <!-- ou Kate_Idle pour femmes -->
+>   <Variant AnimFile="ZombieIdle.x" />  <!-- fallback zombie -->
+> </AnimSet>
+> ```
+>
+> Si le variant conditionnel manque, on a beau setter la variable, l'AnimSet selectionne toujours le default zombie.
+>
+> ---
+>
+> ### Piege 7 (v0.0.9o) — Les methodes `ToggleDoor`/`isLocalPlayer` plantent sur un IsoZombie
 > `IsoDoor:ToggleDoor(character)` et `IsoThumpable:ToggleDoor(character)` cast en interne le character en `IsoPlayer` pour appeler `isLocalPlayer()`. **Notre NPC est `IsoZombie`** -> `NullPointerException` non-rattrape par `pcall` qui interrompt le for-loop principal -> tous les NPCs perdent leur tick (saccades, ordres ignores).
 >
 > **Reference Bandits B42.18** (`BanditUpdate.lua:823`, `BanditServerCommands.lua:172/178/184`) :
@@ -19,7 +169,7 @@ _Version 0.0.9p_
 >
 > **Pour les fenetres**, `window:ToggleWindow(zombie)` accepte un `IsoZombie` (pattern `ZAOpenWindow.lua:21` Bandits) -> OK.
 >
-> ### Piege 0bis (NOUVEAU v0.0.9o) — Saccades sur re-path
+> ### Piege 8 (v0.0.9o) — Saccades sur re-path
 > Appeler `setBumpType` + `faceLocationF` a chaque cooldown de re-path interrompt l'anim a chaque fois -> NPC saccade visiblement. Pattern Bandits `ZAGoTo.onStart` : `setBumpType` est appele **une seule fois** au lancement, ensuite seul `pathToLocationF(newX, newY)` est rappele pour mettre a jour la destination -> le moteur enchaine sans reset d'anim.
 >
 > ```lua
@@ -31,14 +181,16 @@ _Version 0.0.9p_
 > pcall(function() npc:pathToLocationF(x, y, z) end)
 > ```
 >
-> ### Piege 1 — `npc:getCurrentBuilding()` retourne un `IsoBuilding`, **pas** un `BuildingDef`
+> ### Piege 9 — `npc:getCurrentBuilding()` retourne un `IsoBuilding`, **pas** un `BuildingDef`
 > `IsoBuilding` n'a **pas** de methode `getRooms()`. Utiliser `getRoomsNumber()` + `getRoom(int)` (qui renvoie `IsoRoom`). Sur l'`IsoRoom`, utiliser `getRandomFreeSquare()` pour obtenir une case libre. Verifie par extraction des `.class` du moteur.
 >
-> ### Piege 2 — Ne JAMAIS re-appeler `setBumpType` ou `faceLocationF` chaque tick pendant un path
-> Cause directe des "saccades" : ces appels reinitialisent l'animation a chaque frame. Pattern Bandits `ZAGoTo.onStart` confirme : `setBumpType("IdleToRun")` n'est appele qu'au **lancement** du path et seulement si le NPC n'est pas deja en mouvement. Architecture recommandee : un helper `applyMoveStart` (au lancement, anim setup complet) et un `applyMoveTick` (chaque tick, idempotent, **uniquement** `setVariable("BanditWalkType",...)` + `setRunning(...)`).
+> ### Piege 10 — Ne JAMAIS re-appeler `setBumpType` ou `faceLocationF` chaque tick pendant un path
+> Cause directe des "saccades" : ces appels reinitialisent l'animation a chaque frame. Pattern Bandits `ZAGoTo.onStart` confirme : `setBumpType("IdleToRun")` n'est appele qu'au **lancement** du path et seulement si le NPC n'est pas deja en mouvement.
 >
-> ### Piege 3 — Drop loot a la mort : `OnZombieDead` precede la creation du `IsoDeadBody`
+> ### Piege 11 — Drop loot a la mort : `OnZombieDead` precede la creation du `IsoDeadBody`
 > Au moment ou `OnZombieDead(zombie)` est appele, `zombie:getDeadBody()` est encore `nil`. Pattern fiable (Bandits `ZADrop.lua`) : drop direct au sol via `sq:AddWorldInventoryItem(item, randX, randY, 0)`. Ne pas oublier les `getWornItems()` (vetements/armures). Eviter `pcall`/wrappers silencieux qui masquent les vraies causes d'echec.
+>
+> **Methodologie consolidee depuis v0.0.9o** : copier directement les patterns du mod Bandits B42.18 plutot que d'extrapoler depuis la doc decompilee. Les approximations (v0.0.9k -> v0.0.9n) ont a chaque fois introduit des regressions. Reference : `D:\PZ Mods\Dynamic_NPC_Overhaul\mod example\B42\Bandits\42.18`.
 >
 > _Version 0.0.9g_ : guide ecrit initialement pour cette version, complete avec les fixes v0.0.9i-l-m.
 

@@ -114,69 +114,131 @@ local function needNewPath(npc, md, x, y, z)
 end
 PHNPC._needNewPath = needNewPath
 
--- startFollowing : faire suivre le NPC vers le joueur (path-once pattern)
--- v0.0.9m : accepte forceWalkType pour forcer la course quand le joueur est loin.
+-- startFollowing : faire suivre le NPC vers le joueur
+-- v0.0.11 REFONTE : pattern NPC_Helper_Mod B42.18 (GCCoreActions.lua).
+--   pathToCharacter(player) UNE FOIS au lancement => le moteur trace dynamiquement
+--   le joueur cote Java. Plus aucun pathToLocationF chaque tick (cause des saccades
+--   et de l'effet "colle au joueur" rapporte au test v0.0.10).
+--   On ne re-path que si le joueur a bouge >= 5 tuiles depuis le dernier path.
 function PHNPC.startFollowing(npc, player, forceWalkType)
     local md = npc:getModData()
     npc:setUseless(false)
 
-    -- v0.0.9h : cible decalee (eviter de coller le joueur)
     local px, py, pz = player:getX(), player:getY(), player:getZ()
     local dx = px - npc:getX()
     local dy = py - npc:getY()
     local d  = math.sqrt(dx*dx + dy*dy)
     local stopDist = (PHNPC.FOLLOW_STOP_DISTANCE or 3)
     if d <= stopDist + 0.1 then
-        -- Deja assez proche : arret propre
-        PHNPC.stopMoving(npc)
+        if md.PHNPC_Moving then PHNPC.stopMoving(npc) end
         return
     end
-    local nx, ny = dx / d, dy / d
-    local tx = px - nx * stopDist
-    local ty = py - ny * stopDist
     local walkType = forceWalkType or pickWalkType(npc, md, d)
 
-    if needNewPath(npc, md, tx, ty, pz) then
-        -- Nouveau path : reset target/aggro UNE FOIS (pas chaque tick)
-        pcall(function() npc:setTarget(nil) end)
-        pcall(function() npc:setAttackedBy(nil) end)
-        pcall(function() npc:clearAggroList() end)
-        pcall(function() PHNPC.checkAndOpenDoors(npc) end)
-        pcall(function() PHNPC.checkAndOpenWindows(npc) end)
-        -- v0.0.9o : setBumpType UNIQUEMENT au lancement initial (pattern Bandits ZAGoTo).
-        -- Si le NPC est deja en mouvement, juste retransmettre pathToLocationF
-        -- (le moteur enchaine sans reset d'anim) -> ZERO saccade.
-        if not md.PHNPC_Moving then
-            applyMoveStart(npc, tx, ty, walkType)
-        else
-            applyMoveTick(npc, walkType)
-        end
-        pcall(function() npc:pathToLocationF(tx, ty, pz) end)
-        md.PHNPC_Moving   = true
-        md.PHNPC_PathX    = tx
-        md.PHNPC_PathY    = ty
-        md.PHNPC_PathZ    = pz
-        md.PHNPC_WalkType = walkType
-        md.PHNPC_LastPathTick = PHNPC._pathTickCounter
-        md.PHNPC_StuckTicks = 0
-        md.PHNPC_LastMoveX  = npc:getX()
-        md.PHNPC_LastMoveY  = npc:getY()
-        PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> "..walkType.." follow offset (" .. string.format("%.1f,%.1f", tx, ty) .. ")")
+    -- Suivi par point d'ancrage autour du joueur (evite le collage de pathToCharacter).
+    local tx, ty
+    if d > 0.001 then
+        local ux = (npc:getX() - px) / d
+        local uy = (npc:getY() - py) / d
+        tx = px + ux * stopDist
+        ty = py + uy * stopDist
     else
-        -- v0.0.9m : path en cours, maintenance idempotente UNIQUEMENT (pas de re-setBumpType
-        -- ni faceLocationF qui reset l'anim chaque tick = saccade).
-        applyMoveTick(npc, md.PHNPC_WalkType or walkType)
+        tx = px + stopDist
+        ty = py
     end
+
+    local needPath = false
+    if not md.PHNPC_Moving then
+        needPath = true
+    else
+        local moveThreshold = PHNPC.FOLLOW_MOVE_THRESHOLD or 2
+        local lpx = md.PHNPC_LastPX or px
+        local lpy = md.PHNPC_LastPY or py
+        local pdx = px - lpx
+        local pdy = py - lpy
+        if (pdx * pdx + pdy * pdy) >= (moveThreshold * moveThreshold) then
+            needPath = true
+        else
+            local adx = tx - (md.PHNPC_PathX or tx)
+            local ady = ty - (md.PHNPC_PathY or ty)
+            if (adx * adx + ady * ady) > 1 then
+                needPath = true
+            end
+        end
+    end
+
+    if walkType and walkType ~= md.PHNPC_WalkType then
+        md.PHNPC_WalkType = walkType
+        applyMoveTick(npc, walkType)
+    end
+
+    if not needPath then return end
+
+    -- v0.0.13b : pendant recovery fence, on force une micro-redirection locale
+    -- pour casser les tentatives repetitives de franchissement de cloture.
+    if (md.PHNPC_FenceRecoverTicks or 0) > 0 and PHNPC.findFreeSquareNear then
+        local rx, ry = PHNPC.findFreeSquareNear(npc:getX(), npc:getY(), pz, 3, 8)
+        if rx then
+            tx, ty = rx, ry
+            walkType = "Walk"
+        end
+    end
+
+    pcall(function() npc:setTarget(nil) end)
+    pcall(function() npc:setAttackedBy(nil) end)
+    pcall(function() npc:clearAggroList() end)
+    pcall(function() PHNPC.checkAndOpenDoors(npc) end)
+    pcall(function() PHNPC.checkAndOpenWindows(npc) end)
+    if not md.PHNPC_Moving then
+        applyMoveStart(npc, tx, ty, walkType)
+    else
+        applyMoveTick(npc, walkType)
+    end
+    pcall(function() npc:pathToLocationF(tx, ty, pz) end)
+    md.PHNPC_Moving   = true
+    md.PHNPC_PathX    = tx
+    md.PHNPC_PathY    = ty
+    md.PHNPC_PathZ    = pz
+    md.PHNPC_LastPX   = px
+    md.PHNPC_LastPY   = py
+    md.PHNPC_WalkType = walkType
+    md.PHNPC_LastPathTick = PHNPC._pathTickCounter
+    md.PHNPC_StuckTicks = 0
+    md.PHNPC_LastMoveX  = npc:getX()
+    md.PHNPC_LastMoveY  = npc:getY()
+    PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> "..walkType.." follow anchor(" .. string.format("%.1f,%.1f", tx, ty) .. ")")
 end
 
 -- startMovingTo : deplacer le NPC vers des coordonnees (path-once pattern)
 function PHNPC.startMovingTo(npc, x, y, z, forceWalkType)
     local md = npc:getModData()
     npc:setUseless(false)
+
+    -- v0.0.13b : si recovery fence actif, on passe d'abord par une cible locale
+    -- pour eviter de re-rentrer dans ClimbOverFenceState.
+    if (md.PHNPC_FenceRecoverTicks or 0) > 0 and PHNPC.findFreeSquareNear then
+        local rx, ry = PHNPC.findFreeSquareNear(npc:getX(), npc:getY(), z or npc:getZ(), 3, 8)
+        if rx then
+            x, y = rx, ry
+            forceWalkType = "Walk"
+        end
+    end
+
     local d = math.sqrt((x - npc:getX())^2 + (y - npc:getY())^2)
     local walkType = forceWalkType or pickWalkType(npc, md, d)
 
-    if needNewPath(npc, md, x, y, z) then
+    local targetChanged = false
+    if not md.PHNPC_PathX or not md.PHNPC_PathY then
+        targetChanged = true
+    else
+        local dx = x - md.PHNPC_PathX
+        local dy = y - md.PHNPC_PathY
+        if (dx * dx + dy * dy) > 4 then
+            targetChanged = true
+        end
+    end
+
+    if (not md.PHNPC_Moving) or targetChanged then
         pcall(function() npc:setTarget(nil) end)
         pcall(function() npc:setAttackedBy(nil) end)
         pcall(function() npc:clearAggroList() end)
@@ -208,8 +270,11 @@ function PHNPC.startMovingTo(npc, x, y, z, forceWalkType)
         md.PHNPC_LastMoveY  = npc:getY()
         PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> "..walkType.." pathToLocationF(" .. string.format("%.1f,%.1f", x, y) .. ")")
     else
-        -- v0.0.9m : path deja lance, ne touche PLUS setBumpType/faceLocationF (saccade).
-        applyMoveTick(npc, md.PHNPC_WalkType or walkType)
+        -- Destination identique et path deja actif : ne pas re-fire pathToLocationF.
+        if walkType and walkType ~= md.PHNPC_WalkType then
+            md.PHNPC_WalkType = walkType
+            applyMoveTick(npc, walkType)
+        end
     end
 end
 
@@ -221,6 +286,10 @@ function PHNPC.forceRepath(npc, x, y, z, walkType)
 end
 
 -- stopMoving : arreter le deplacement du NPC proprement
+-- v0.0.11 : NE refermE PLUS les portes/fenetres ici (causait le ping-pong
+-- ouverture/fermeture rapporte au test v0.0.10). Le caller doit appeler
+-- PHNPC.closeBehindNPC(npc) explicitement quand pertinent (ex: transition
+-- vers state=staying apres arrivee a shelter).
 function PHNPC.stopMoving(npc)
     local md = npc:getModData()
     if md.PHNPC_Moving then
@@ -237,11 +306,13 @@ function PHNPC.stopMoving(npc)
         pcall(function() npc:setWalkType("Walk") end)
         pcall(function() npc:setTarget(nil) end)
         pcall(function() npc:clearAggroList() end)
-        -- v0.0.9f : refermer les portes proches apres arret du NPC
-        pcall(function() PHNPC.closeNearbyDoors(npc) end)
-        -- v0.0.9h : refermer aussi les fenetres ouvertes a portee
-        pcall(function() PHNPC.closeNearbyWindows(npc) end)
     end
+end
+
+-- v0.0.11 : fermeture differee, a appeler explicitement (transition staying)
+function PHNPC.closeBehindNPC(npc)
+    pcall(function() PHNPC.closeNearbyDoors(npc) end)
+    pcall(function() PHNPC.closeNearbyWindows(npc) end)
 end
 
 -- ============================================================

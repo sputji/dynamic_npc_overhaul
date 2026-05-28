@@ -91,9 +91,19 @@ Events.OnTick.Add(function()
         else
             local md = npc:getModData()
 
-            -- Ouvrir portes et fenetres adjacentes quand en mouvement
-            pcall(function() PHNPC.checkAndOpenDoors(npc) end)
-            pcall(function() PHNPC.checkAndOpenWindows(npc) end)
+            -- Auto-equip vetements donnes par le joueur (scan leger periodique).
+            md.PHNPC_AutoEquipTick = (md.PHNPC_AutoEquipTick or 0) + 1
+            if md.PHNPC_AutoEquipTick >= 120 then
+                md.PHNPC_AutoEquipTick = 0
+                if PHNPC.autoEquipFromInventory then
+                    pcall(function() PHNPC.autoEquipFromInventory(npc) end)
+                end
+            end
+
+            -- v0.0.11 : SUPPRIME les appels checkAndOpenDoors/Windows ici.
+            -- Ils sont desormais appeles UNIQUEMENT au lancement d'un path
+            -- (dans startFollowing/startMovingTo) -> elimine le ping-pong
+            -- ouverture/fermeture rapporte au test v0.0.10.
 
             -- Detection blocage (stuck)
             pcall(function() PHNPC.handleStuck(npc) end)
@@ -110,36 +120,22 @@ Events.OnTick.Add(function()
                 local dy   = player:getY() - npc:getY()
                 local dist = math.sqrt(dx * dx + dy * dy)
 
-                if dist <= (PHNPC.FOLLOW_STOP_DISTANCE or 2) then
+                local stopDist = (PHNPC.FOLLOW_STOP_DISTANCE or 3)
+                if dist <= stopDist then
                     -- Assez proche : stopper
                     if md.PHNPC_Moving then
                         PHNPC.stopMoving(npc)
                     end
                     PHNPC._followTimers[npc] = 0
 
-                elseif dist > (PHNPC.FOLLOW_DISTANCE or 6) then
-                    -- Joueur trop loin : recalculer pathfind SEULEMENT si le joueur
-                    -- s'est vraiment deplace (evite la rotation a chaque tick)
-                    PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
-                    if PHNPC._followTimers[npc] >= (PHNPC.FOLLOW_TICK_RATE or 20) then
-                        PHNPC._followTimers[npc] = 0
-                        local cpx, cpy = player:getX(), player:getY()
-                        local lpx = md.PHNPC_LastPX or -999
-                        local lpy = md.PHNPC_LastPY or -999
-                        local movedSq = (cpx - lpx)^2 + (cpy - lpy)^2
-                        local threshold = PHNPC.FOLLOW_MOVE_THRESHOLD or 2
-                        if movedSq >= (threshold * threshold) then
-                            md.PHNPC_LastPX = cpx
-                            md.PHNPC_LastPY = cpy
-                            -- v0.0.9m : forcer "Run" quand le joueur est tres loin
-                            -- (sinon le NPC marche et reste en arriere indefiniment).
-                            local runDist = PHNPC.RUN_DISTANCE or 6
-                            local wt = (dist > runDist) and "Run" or "Walk"
-                            PHNPC.startFollowing(npc, player, wt)
-                        end
-                    end
+                else
+                    -- v0.0.12 : relance logique follow a chaque tick.
+                    -- startFollowing est deja path-once (repath ancre a 5 tuiles),
+                    -- donc cet appel n'entraine pas de spam et garde Run/Walk reactif.
+                    local runDist = PHNPC.RUN_DISTANCE or 6
+                    local wt = (dist > runDist) and "Run" or "Walk"
+                    PHNPC.startFollowing(npc, player, wt)
                 end
-                -- Entre FOLLOW_STOP_DISTANCE et FOLLOW_DISTANCE : NPC finit son chemin
 
             -- 4. Etat "goingto" : NPC se deplace vers une destination designee
             elseif md.PHNPC_State == "goingto" and md.PHNPC_GoToX then
@@ -150,17 +146,21 @@ Events.OnTick.Add(function()
                 -- FOLLOW_STOP_DISTANCE (=3) qui faisait arriver immediatement.
                 local arriveDist = PHNPC.GOTO_ARRIVE_DISTANCE or 1
                 if dist <= arriveDist then
-                    -- Arrive : passer en "staying" autour de la destination
-                    md.PHNPC_State  = "staying"
-                    md.PHNPC_ZoneX  = md.PHNPC_GoToX
-                    md.PHNPC_ZoneY  = md.PHNPC_GoToY
-                    md.PHNPC_ZoneZ  = md.PHNPC_GoToZ or npc:getZ()
-                    md.PHNPC_ZoneR  = PHNPC.STAY_RADIUS or 5
-                    md.PHNPC_GoToX  = nil
-                    md.PHNPC_GoToY  = nil
-                    md.PHNPC_GoToZ  = nil
+                    -- Arrive : passer en "staying" SANS patrouille (v0.0.11 fix bug
+                    -- "Va la-bas" -> NPC repartait dans direction aleatoire car staying
+                    -- patrol active. NoPatrol bloque la patrouille jusqu'a nouvel ordre).
+                    md.PHNPC_State    = "staying"
+                    md.PHNPC_ZoneX    = md.PHNPC_GoToX
+                    md.PHNPC_ZoneY    = md.PHNPC_GoToY
+                    md.PHNPC_ZoneZ   = md.PHNPC_GoToZ or npc:getZ()
+                    md.PHNPC_ZoneR    = PHNPC.STAY_RADIUS or 5
+                    md.PHNPC_NoPatrol = true
+                    md.PHNPC_GoToX    = nil
+                    md.PHNPC_GoToY    = nil
+                    md.PHNPC_GoToZ    = nil
                     PHNPC.stopMoving(npc)
-                    PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " arrive a destination -> staying")
+                    pcall(function() PHNPC.closeBehindNPC(npc) end)
+                    PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " arrive a destination -> staying (no patrol)")
                     pcall(function()
                         npc:addLineChatElement(string.format(getText("UI_PHNPC_BarkArrived"), md.PHNPC_Name or "?"), 0.9, 0.9, 0.2)
                     end)
@@ -208,14 +208,18 @@ Events.OnTick.Add(function()
                         PHNPC.startMovingTo(npc, zx, zy, md.PHNPC_ZoneZ or npc:getZ())
                     end
                 else
-                    -- Dans la zone : patrouille courte et libre
-                    PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
-                    if PHNPC._followTimers[npc] >= (PHNPC.ZONE_PATROL_TICKS or 200) then
-                        PHNPC._followTimers[npc] = 0
-                        if not md.PHNPC_Moving and PHNPC.findFreeSquareNear then
-                            local pr = PHNPC.PATROL_RADIUS or 3
-                            local tx, ty = PHNPC.findFreeSquareNear(zx, zy, npc:getZ(), pr, 4)
-                            if tx then PHNPC.startMovingTo(npc, tx, ty, npc:getZ()) end
+                    -- Dans la zone : patrouille courte et libre (sauf si NoPatrol set,
+                    -- v0.0.11 : NoPatrol=true apres arrivee goingto pour eviter que le
+                    -- NPC reparte dans direction aleatoire apres "Va la-bas").
+                    if not md.PHNPC_NoPatrol then
+                        PHNPC._followTimers[npc] = (PHNPC._followTimers[npc] or 0) + 1
+                        if PHNPC._followTimers[npc] >= (PHNPC.ZONE_PATROL_TICKS or 200) then
+                            PHNPC._followTimers[npc] = 0
+                            if not md.PHNPC_Moving and PHNPC.findFreeSquareNear then
+                                local pr = PHNPC.PATROL_RADIUS or 3
+                                local tx, ty = PHNPC.findFreeSquareNear(zx, zy, npc:getZ(), pr, 4)
+                                if tx then PHNPC.startMovingTo(npc, tx, ty, npc:getZ()) end
+                            end
                         end
                     end
                 end
@@ -269,8 +273,10 @@ Events.OnTick.Add(function()
                     local sdy = npc:getY() - md.PHNPC_ZoneY
                     if (sdx * sdx + sdy * sdy) < 4 then
                         md.PHNPC_State = "staying"  -- arrivee : passer en staying
+                        md.PHNPC_NoPatrol = true     -- v0.0.11 : pas de patrouille apres shelter
                         PHNPC.stopMoving(npc)
-                        PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " shelter atteint -> staying")
+                        pcall(function() PHNPC.closeBehindNPC(npc) end)
+                        PHNPC.Log.info("Update", tostring(md.PHNPC_Name) .. " shelter atteint -> staying (no patrol)")
                     else
                         -- v0.0.9k : detection stuck plutot que retry toutes les 20 ticks
                         if not md.PHNPC_Moving then

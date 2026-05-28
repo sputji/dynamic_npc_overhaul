@@ -47,6 +47,13 @@ local function nextPendingId()
     return PHNPC._pendingLootCounter
 end
 
+local function pushUnique(items, seen, item)
+    if not item then return end
+    if seen[item] then return end
+    seen[item] = true
+    items[#items + 1] = item
+end
+
 -- ============================================================
 -- 1. SNAPSHOT INVENTAIRE (au moment de la mort)
 -- ============================================================
@@ -61,6 +68,7 @@ function PHNPC.snapshotNPCLoot(npc)
     if PHNPC.Log then PHNPC.Log.info("Loot", name .. " mort - snapshot inventaire") end
 
     local items = {}
+    local seen = {}
 
     -- 1) WORN ITEMS
     local worn
@@ -70,14 +78,19 @@ function PHNPC.snapshotNPCLoot(npc)
         for i = 0, n - 1 do
             local wi
             pcall(function() wi = worn:get(i) end)
-            if wi then
-                local it
-                pcall(function() it = wi:getItem() end)
-                if it then items[#items + 1] = it end
-            end
+            local it
+            pcall(function() it = wi:getItem() end)
+            pushUnique(items, seen, it)
         end
         pcall(function() npc:resetEquippedHandsModels() end)
     end
+
+    -- 1b) ARMES EN MAIN (pas toujours presentes dans getWornItems)
+    local primary, secondary
+    pcall(function() primary = npc:getPrimaryHandItem() end)
+    pcall(function() secondary = npc:getSecondaryHandItem() end)
+    pushUnique(items, seen, primary)
+    pushUnique(items, seen, secondary)
 
     -- 2) INVENTAIRE PRINCIPAL
     local inv
@@ -94,7 +107,7 @@ function PHNPC.snapshotNPCLoot(npc)
                 if it then snapshot[#snapshot + 1] = it end
             end
             for _, it in ipairs(snapshot) do
-                items[#items + 1] = it
+                pushUnique(items, seen, it)
                 pcall(function() inv:Remove(it) end)
             end
             pcall(function() inv:setDrawDirty(true) end)

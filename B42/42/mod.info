@@ -5,5 +5,5 @@ description=Autonomous NPCs with AI brain (FSM), Ollama dialogues, trading, hidd
 poster=poster.png
 icon=icon.png
 category=features
-version=0.0.9p
+version=0.0.13b
 versionMin=42.0

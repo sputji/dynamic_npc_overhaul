@@ -1,5 +1,179 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.13b] — Mitigation ClimbOverFenceState + auto-equip vetements best stats (2026-05-28)
+
+### Correctifs code
+
+- Mitigation agressive `ClimbOverFenceState`:
+  - `PHNPC_Enforce.lua` intercepte `getCurrentState():find("ClimbOverFenceState")`.
+  - reset immediate vers idle, purge path courant, cooldown recovery (`PHNPC_FenceRecoverTicks`).
+  - objectif: casser la boucle d'entree d'etat qui provoquait des erreurs rouges `BodyDamage nil`.
+- `PHNPC_Actions.lua`:
+  - pendant recovery fence, redirection locale vers case libre proche avant reprise de la destination d'ordre.
+  - reduction des retentatives de franchissement de cloture.
+- `PHNPC_Inventory.lua`:
+  - auto-equipement vetements upgrade: selection du meilleur item par slot (BodyLocation) selon score defensif.
+  - remplace un vetement porte si un meilleur existe dans l'inventaire NPC.
+
+### Score vetements (auto-equip)
+
+- Priorites: `bulletDefense` > `biteDefense` > `scratchDefense` + etat (condition ratio) + leger bonus isolation.
+- Comparaison slot par slot; remplacement seulement si le score du candidat est superieur au vetement actuellement porte.
+
+### Version
+
+- `B42/42/mod.info` -> `version=0.0.13b`.
+
+## [0.0.13] — Stabilisation post-retour test v0.0.12 (2026-05-28)
+
+### Correctifs gameplay
+
+- Suivi joueur refondu dans `PHNPC_Actions.lua` : abandon de `pathToCharacter` en continu, suivi par point d'ancrage autour du joueur (`pathToLocationF`) pour tenir la distance de confort et reduire le collage.
+- Distance d'arret follow retournee a 2 tuiles (`PHNPC.FOLLOW_STOP_DISTANCE=2`) pour coller a la checklist en jeu.
+- `PHNPC_Enforce.lua` durci contre les interruptions de path : les etats transitoires `lunge/attack/eatBody` ne cassent plus le deplacement quand l'ordre actif est `following/goingto/shelter/fleeing`.
+- Seuil idle pendant deplacement d'ordre explicite augmente a 120 ticks avant `stopMoving`, pour limiter les re-paths parasites.
+
+### Correctifs combat / inventaire / loot
+
+- Selection arme melee amelioree : comparaison de l'arme deja equipee avec tout l'inventaire, equipement de la meilleure arme disponible.
+- Auto-equipement des vetements depuis l'inventaire NPC ajoute (`PHNPC.autoEquipFromInventory`), appele periodiquement dans `PHNPC_Update.lua`.
+- Loot mort NPC corrige : les items en main (primary/secondary) sont maintenant inclus dans le snapshot et dedupliques avant transfert au cadavre.
+- Correction data spawn metier `Chef` : `Base.CanOpener` remplace par `Base.TinOpener` (erreur AddItem console supprimee).
+
+### Version
+
+- `B42/42/mod.info` -> `version=0.0.13`.
+
+### Notes
+
+- Les erreurs de type `ClimbOverFenceState ... getBodyDamage() is null` restent surveillees: mitigation appliquee cote IA (moins d'entrees d'etat parasites), mais ce point doit etre valide en retest intensif ordres `Va la-bas`/`Abri` sur zones avec clotures.
+
+## [0.0.12] — Correctifs post-test v0.0.11 (2026-05-28)
+
+### Résultat test joueur v0.0.11
+
+- Recrutement/suivi : **KO** (marche au lieu de course, colle joueur)
+- Va là-bas : **KO** (direction aléatoire, n'arrive pas proprement)
+- Reste ici : **KO** (retourne vers le joueur)
+- Shelter : **KO** (aller-retour, pas de fermeture porte)
+- Combat arme : **KO** (n'équipe pas correctement)
+- Console : **KO** (erreurs mod)
+
+### Causes confirmées
+
+1. `console.txt` montre des exceptions répétées `scoreWeapon/getNPCWeapon` ([PHNPC_Combat.lua](B42/42/media/lua/client/PHNPC_Combat.lua#L31)).
+2. `staying` utilisait `if md.PHNPC_NoPatrol then return end` dans [PHNPC_Update.lua](B42/42/media/lua/client/PHNPC_Update.lua), ce qui quittait tout le callback `OnTick`.
+3. `startMovingTo` pouvait re-émettre des paths trop souvent dans certains cas d'état transitoire.
+4. `following` reposait encore sur un timer global peu réactif pour la bascule course/marche.
+
+### Correctifs appliqués en v0.0.12
+
+- **`PHNPC_Combat.lua`**
+  - `scoreWeapon` durci : `instanceof(item, "HandWeapon")` + filtre `isRanged` + garde-fous `getMaxDamage/getMinDamage`.
+  - Suppression de la dépendance critique à `item:isWeapon()`.
+- **`PHNPC_Update.lua`**
+  - `following` simplifié : appel `startFollowing(...)` à chaque tick, `wt` dynamique selon distance.
+  - `staying` : suppression du `return` global quand `NoPatrol` est actif.
+- **`PHNPC_Actions.lua`**
+  - `startMovingTo` en path-once strict : nouveau path seulement si destination réellement différente (>2 tuiles) ou NPC à l'arrêt.
+  - plus de re-fire inutile sur destination identique.
+- **`PHNPC_Orders.lua`**
+  - `attackOrderNPC` reset `md.PHNPC_NoPatrol = nil`.
+- **`mod.info`**
+  - version montée à `0.0.12`.
+
+### Validation API officielle (sources)
+
+- [Lua (API)](https://pzwiki.net/wiki/Lua_(API))
+- [JavaDocs index](https://demiurgequantified.github.io/ProjectZomboidJavaDocs/index.html)
+- [Category:Modding](https://pzwiki.net/wiki/Category:Modding)
+- [Build status](https://projectzomboid.com/blog/news/2017/02/buildstatus/)
+
+## [0.0.11] — REFONTE ARCHITECTURALE "path-once" (2026-05-28)
+
+> **Tests v0.0.10 echoues à 4/5** : malgre les 5 fixes P0, les saccades, le porte-ping-pong, l'arrivée "Va là-bas" aléatoire et le shelter en boucle ont persisté. Analyse du `console.txt` v0.0.10 a montre :
+>
+> - `[Actions] -> Run follow offset (X,Y)` avec X,Y **différents** chaque ligne toutes ~40 ticks → l'offset `tx = px - nx * stopDist` est recalcule depuis la position **courante** du NPC, donc change a chaque tick = re-path infini = saccades.
+> - `[Actions] -> Run pathToLocationF(10891.5,9477.5)` avec **mêmes coords** spammees toutes les 8 ticks → `PATH_COOLDOWN=8` fait retomber `needNewPath`, donc `pathToLocationF` re-tire le même point sans cesse.
+> - **18 blocs ERROR** au moment du shelter → fermeture/ouverture/fermeture portes (ping-pong entre `stopMoving.closeNearbyDoors` et `OnTick.checkAndOpenDoors` à chaque tick).
+
+### Architecture v0.0.11 — pattern **path-once** (référence : Bandits 42.18 `ZAGoTo.lua` + NPC_Helper_Mod `GCCoreActions.lua`)
+
+| Aspect | v0.0.10 (cassé) | v0.0.11 (corrigé) |
+|--------|-----------------|-------------------|
+| Suivi joueur | `pathToLocationF(tx,ty)` avec offset recalculé chaque tick | `pathToCharacter(player)` UNE FOIS, le moteur Java trace dynamiquement |
+| Re-path follow | Toutes les ~40 ticks dès que cooldown expire | Seulement si player a bougé ≥ 5 tuiles depuis dernier path |
+| Re-path goingto | Idem, spam 8 ticks même destination identique | Anchor `md.PHNPC_PathX/Y` ; re-path uniquement si nouvelle destination > 2 tuiles |
+| Portes/fenêtres | `checkAndOpenDoors` + `checkAndOpenWindows` à **chaque tick** dans OnTick | Appelés UNIQUEMENT au lancement d'un path (dans `startFollowing`/`startMovingTo`) |
+| `stopMoving` | Fermait portes/fenêtres → tick suivant `checkAndOpenDoors` les réouvre → ping-pong | Ne ferme plus rien. Nouvelle fonction `PHNPC.closeBehindNPC(npc)` appelée explicitement à la transition `staying` (arrivée goingto/shelter) |
+| Arrivée goingto | `state="staying"` → patrouille immédiate → NPC repart direction aléatoire | Set `md.PHNPC_NoPatrol=true` ; `staying` saute la patrouille si flag présent |
+| Enforce idle stop | 15 ticks (~0.5s) → coupait l'anim toutes les secondes | 60 ticks (~2s) → tolère les transitions pathfind |
+| `getNPCWeapon` | Sequence `tryGet("Base.Bat") → tryGet("Base.Axe")` ; **premier match** | Scan complet inventaire + score `dmg*10 + condRatio` → meilleure arme |
+
+### Fixes specifiques v0.0.11
+
+- **`PHNPC_Actions.lua`** : `startFollowing` réécrite (pathToCharacter + anchor player); `startMovingTo` réécrite (anchor destination + needPath si > 2 tuiles); `stopMoving` ne ferme plus de portes/fenêtres; nouvelle fonction `PHNPC.closeBehindNPC(npc)`.
+- **`PHNPC_Update.lua`** : suppression des `checkAndOpenDoors`/`Windows` à chaque tick (OnTick); arrivée goingto set `NoPatrol=true` + `closeBehindNPC`; arrivée shelter idem; `staying` skip patrouille si `NoPatrol`.
+- **`PHNPC_Enforce.lua`** : seuil idle 15 → 60.
+- **`PHNPC_Combat.lua`** : `getNPCWeapon` refondu avec ranking (scan complet, `item:isWeapon()` + filtre `isRanged`, score `maxDamage*10 + condRatio`).
+- **`PHNPC_Orders.lua`** : tous les handlers (`recruit`, `follow`, `stay`, `attack`, `shelter`, `free`, `goingto`) reset `md.PHNPC_NoPatrol = nil` pour que les nouveaux ordres réengagent le comportement normal.
+
+---
+
+## [0.0.10] — 5 fixes P0 (regressed in test) (2026-05-27)
+
+## [0.0.9p] — RÉSULTATS DE TEST (2026-05-27)
+
+### Tests joueur réalisés (sandbox Apocalypse, langue FR, build 42.18.0)
+
+Référence complète : [Docs/B42/Checklist de test en jeux.md](Docs/B42/Checklist%20de%20test%20en%20jeux.md).
+
+| Catégorie | ✅ | ⚠️ | ❌ | Statut |
+|---|---|---|---|---|
+| 1. Chargement mod | 3 | 0 | 0 | OK (console.txt propre, bannière `Enforce v0.0.9p loaded`) |
+| 2. Spawn NPC | 4 | 1 | 0 | OK sauf **animation idle = posture zombie persistante** |
+| 3. Recrutement + suivi | 2 | 0 | 3 | **CASSÉ** — NPC ne court pas, colle le joueur, saccades sur re-path |
+| 4. Ordres de déplacement | 2 | 1 | 3 | **CASSÉ** — Va là-bas allez-retour, shelter aléatoire, casse fenêtre |
+| 5. Combat NPC | 1 | 3 | 2 | **CASSÉ** — armes non équipées, pas de `faceLocationF` effectif |
+| 6. Fuite blessé | 1 | 2 | 0 | Tourne en boucle autour du joueur au lieu de fuir |
+| 7. Mort + loot | 2 | 3 | 0 | **Items restent dans inventaire NPC**, pas transférés vers cadavre |
+| 8. Portes/fenêtres | 3 | 1 | 0 | OK mais NPC casse fenêtre si porte ouverte à côté + 0 anim humain |
+| 9. Danger module | 0 | 2 | 0 | **Zombies ignorent totalement le NPC** (Danger inopérant) |
+| 10. Stabilité | 1 | 2 | 0 | FPS OK avec 5-15 NPCs |
+| 11. Knockdown | 1 | 1 | 0 | T-pose résolue |
+| 12. Inventaire | 1 | 1 | 1 | Transfert OK, armes/vêtements non utilisés |
+| 13. Divers | 3 | 1 | 0 | Aucune erreur ROUGE console |
+
+**Bilan global** : la base technique est saine (chargement, structure, anti-crash). Le **comportement gameplay reste défaillant** sur ~60 % des points clés. La cause récurrente est un **conflit entre états comportementaux et conditions de re-path** dans `PHNPC_Update.lua`/`PHNPC_Actions.lua`.
+
+### Causes racines confirmées (audit code post-test)
+
+1. **NPC ne court pas en suivi** — [PHNPC_Actions.lua:168](B42/42/media/lua/client/PHNPC_Actions.lua) dans la branche `else` de `startFollowing` (déjà en mouvement) : `applyMoveTick(npc, md.PHNPC_WalkType or walkType)`. Si `md.PHNPC_WalkType` est déjà "Walk" du premier path, le nouveau `walkType="Run"` est **ignoré**. Fix v0.0.10 : `applyMoveTick(npc, walkType or md.PHNPC_WalkType)` + reset explicite `md.PHNPC_WalkType = walkType` quand `walkType` est fourni.
+2. **Armes non équipées en combat** — [PHNPC_Combat.lua:131](B42/42/media/lua/client/PHNPC_Combat.lua) appelle `npc:setEquippedItem(weapon)`. Cette méthode **n'existe pas** sur `IsoZombie` en B42.18 (vérifié JavaDoc). La bonne méthode est `setPrimaryHandItem(item)` (déjà utilisée correctement avec `nil` dans Convert.lua:47 et Loot.lua:105). Le `pcall` masque l'erreur silencieusement.
+3. **NPC colle le joueur (pas de stop à 2 tuiles)** — Hypothèse : `pathToCharacter(player)` recalcule en continu vers la position exacte du joueur, sans honorer `FOLLOW_STOP_DISTANCE`. `stopMoving` est bien appelé quand `dist <= 2` mais le pathfind moteur a déjà mis le NPC sur le tile du joueur avant. Fix v0.0.10 : utiliser `pathToLocationF(px + offset, py + offset)` avec offset radial 2-3 tuiles depuis l'angle joueur→NPC.
+4. **« Va là-bas » allez-retour** — Le NPC va vers la cible, croise un zombie, `npcCombatStep` met en `defending` (interrompt le path), puis le combat se résout, retour en état précédent mais `md.PHNPC_GoToX/Y` est encore set. Mais entre-temps, le handler `following` peut s'être déclenché si état réinitialisé vers "following". Cause racine probable : `md.PHNPC_PrevState` est mal restauré dans `npcCombatStep` quand on quitte `defending`.
+5. **Shelter va aléatoirement** — `PHNPC.pickShelterPoint(npc)` retourne `nil` car `findSafeRoomSquare` ne trouve aucune room dans le bâtiment scanné (boucle 8 tentatives `getRandomRoom()` qui échoue). Le fallback `findClearAreaNear` puis le fallback aléatoire (`math.cos(ang) * 10`) prennent la main → NPC va dans une direction random. Fix v0.0.10 : améliorer le scan de bâtiments via `getCell():getRoomList()` + filtrer rooms inside.
+6. **Combat ne tourne pas vers cible** — `faceLocationF` est bien appelé (Combat.lua:124) mais `enforceNPC` step 10 réapplique `setRunning` chaque tick ce qui peut neutraliser le facing. À investiguer si `setBumpType("HitLeft")` triggers une transition d'état qui annule le facing.
+7. **Animation idle = posture zombie** — Les overrides XML dans `B42/common/media/AnimSets/zombie/` doivent activer le variant humain via la variable `PHNPC_IsNPC=true`. L'enforce.lua step 10 la réapplique, mais visiblement l'AnimSet XML ne déclenche pas le bon variant. À auditer : `common/media/AnimSets/zombie/idle/*.xml` et `common/media/anims_X/Zombie/...`.
+8. **Zombies ignorent le NPC** — `PHNPC_Danger.lua` fait `obj:setTarget(npc) + obj:setAttackedBy(npc)` sur les zombies dans le rayon. Soit la fonction n'est pas appelée (timer trop long ?), soit le moteur ignore `setTarget(IsoZombie marked PHNPC_IsNPC)`. À auditer : `npcDangerStep` + cadence d'appel dans Update.lua.
+9. **Loot pas dans le cadavre** — `OnDeadBodySpawn` peut ne pas firer en B42.18 (rename event vanilla ?), ou le matching de proximité dans `_pendingLoot` échoue. Le fallback drop au sol n'est pas non plus visible selon le joueur (items restent dans le NPC). À auditer : confirmer que `OnZombieDead` fire, vérifier que `snapshotNPCLoot` retire bien les items de `inv:Remove(it)`.
+10. **Vêtements donnés non portés** — Aucune fonction n'écoute `OnReceiveItem` ou `OnInventoryChanged` côté NPC pour auto-équiper. C'est une feature manquante, pas un bug.
+
+### Conclusion v0.0.9p
+
+L'audit API était nécessaire mais a **masqué une zone grise** : `setEquippedItem` n'existe pas et le pcall a caché l'erreur en silence depuis v0.0.7a. Le grep manuel a permis de confirmer. La passe v0.0.10 doit cibler ces 10 causes racines **dans cet ordre de priorité gameplay** (cf. [feuille de route.md](feuille%20de%20route.md)).
+
+### Fichiers touchés v0.0.9p
+
+- Aucune modif de code Lua (audit + hardening pcall seulement, cf. entrée précédente).
+- [Docs/B42/CHANGELOG.md](CHANGELOG.md)
+- [Docs/B42/feuille de route.md](feuille%20de%20route.md)
+- [Docs/B42/GUIDE_CREATION.md](GUIDE_CREATION.md)
+- [Docs/B42/ARCHITECTURE.md](ARCHITECTURE.md)
+- [Docs/B42/Checklist de test en jeux.md](Checklist%20de%20test%20en%20jeux.md) — résultats annotés par le joueur
+
+---
+
 ## [0.0.9p] — 2026-05-27
 
 ### Passe d'audit API B42.18 + hardening defensif (avant tests joueur)

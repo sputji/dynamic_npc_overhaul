@@ -1,5 +1,66 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.9p
+# Architecture B42 — Dynamic NPC Overhaul v0.0.13
 
+> v0.0.13 — Stabilisation post-test v0.0.12 (2026-05-28)
+>
+> Axes techniques appliques :
+>
+> 1. Follow anti-collage : `startFollowing` utilise un point d'ancrage autour du joueur (distance de confort) au lieu d'un `pathToCharacter` relance en continu.
+> 2. Continuite d'ordre : `enforceNPC` ne casse plus le mouvement sur `lunge/attack/eatBody` quand l'ordre actif est un deplacement explicite (`following`, `goingto`, `shelter`, `fleeing`).
+> 3. Stabilite d'etat : delai idle plus large (120 ticks en ordre actif) pour eviter les cycles stop/repath.
+> 4. Boucle equipement/loot : meilleure arme comparee a l'arme equipee, auto-equipement vetements depuis inventaire, snapshot loot incluant les armes en main.
+>
+> Impact attendu en jeu :
+>
+> - NPC arrete de pousser/coller le joueur au stop.
+> - Moins d'allez-retour sur `Va la-bas` et `Mets-toi a l'abri`.
+> - Armes equipees correctement en combat et presentes au cadavre.
+> - Vetements donnes par le joueur portes automatiquement (si slot libre).
+
+> **v0.0.12 — Correctifs post-test v0.0.11 (2026-05-28, à tester)**
+>
+> Les retours joueur v0.0.11 montrent que 6/6 P0 restent cassés. Analyse de `console.txt` + code confirme trois causes racines supplémentaires :
+>
+> 1. **Crash combat en boucle** sur `scoreWeapon` ([PHNPC_Combat.lua](B42/42/media/lua/client/PHNPC_Combat.lua#L31)) : la détection d'arme via `item:isWeapon()` n'est pas fiable sur tous les objets exposés Kahlua et déclenche des exceptions répétées, ce qui perturbe toute la boucle IA.
+> 2. **Sortie prématurée de OnTick** dans l'état `staying` : un `return` dans la branche `NoPatrol` quittait tout le callback tick, interrompant la logique pour les NPCs suivants.
+> 3. **Follow trop cadencé** (timer + seuil de déplacement) : bascule Run/Walk tardive et arrêt à distance peu réactif.
+>
+> Correctifs v0.0.12 appliqués :
+>
+> - `startMovingTo` en mode **path-once strict** : nouveau path uniquement si destination a changé (>2 tuiles) ou NPC à l'arrêt ; aucun re-fire sur destination identique.
+> - `following` appelle `startFollowing` à chaque tick avec Run/Walk dynamique ; `startFollowing` garde son ancre interne (re-path joueur seulement à +5 tuiles) donc pas de spam.
+> - `staying` : suppression du `return` global ; le tick continue normalement.
+> - `getNPCWeapon` durci : `instanceof(item, "HandWeapon")` + garde-fous dégâts/condition, plus de dépendance critique à `item:isWeapon()`.
+> - `attackOrderNPC` reset désormais aussi `PHNPC_NoPatrol`.
+>
+> Références officielles re-vérifiées :
+>
+> - [Lua API](https://pzwiki.net/wiki/Lua_(API)) : rappel des règles d'exposition Java↔Lua, charge `client/shared/server`, et bonnes pratiques modding B42.
+> - [JavaDocs](https://demiurgequantified.github.io/ProjectZomboidJavaDocs/index.html) : vérification des familles de classes (`IsoZombie`, `InventoryItem`, `HandWeapon`).
+> - [Category:Modding](https://pzwiki.net/wiki/Category:Modding) : pages officielles de référence modding.
+> - [Build status](https://projectzomboid.com/blog/news/2017/02/buildstatus/) : B42.18.0 confirmée côté canal officiel.
+
+> **v0.0.11 — REFONTE ARCHITECTURALE "path-once"** (2026-05-28, non testée)
+>
+> Après échec en jeu de la v0.0.10 (4/5 P0 régressés malgré les fixes ciblés), changement de paradigme du moteur de déplacement :
+>
+> - **Suivi joueur** : `pathToCharacter(player)` UNE FOIS (engine-side tracking, pattern NPC_Helper_Mod) au lieu de `pathToLocationF(tx,ty)` avec offset recalculé chaque tick. Re-path seulement si player bouge ≥ 5 tuiles.
+> - **Va là-bas** : `pathToLocationF(x,y)` une fois ; re-path uniquement si nouvelle destination > 2 tuiles de l'ancienne. Anchor stocké dans `md.PHNPC_PathX/Y`.
+> - **Portes/fenêtres** : ouvertes UNIQUEMENT au lancement d'un path (entrée `startFollowing`/`startMovingTo`), JAMAIS à chaque tick. Fermées UNIQUEMENT à la transition `staying` (nouvelle fonction `PHNPC.closeBehindNPC`). Élimine le ping-pong qui causait 18 blocs ERROR.
+> - **Arrivée goingto/shelter** → `staying` + flag `md.PHNPC_NoPatrol=true` → pas de patrouille aléatoire. Reset à `nil` par tous les ordres pour réengager.
+> - **Enforce idle stop** : seuil 15 → 60 ticks pour tolérer les transitions pathfind du moteur.
+> - **`getNPCWeapon`** : scan complet inventaire + ranking par `dmg*10 + condRatio` au lieu du premier `tryGet` séquentiel (hache > batte si les deux présentes).
+>
+> Détails complets dans [CHANGELOG.md](CHANGELOG.md) section v0.0.11. Tests à valider : suivi sans saccade, arrivée Va là-bas immobile, shelter porte fermée UNE FOIS, combat avec meilleure arme.
+>
+> ---
+>
+> **v0.0.9p TESTÉE (2026-05-27)** — Test joueur en jeu termine. Base technique saine (chargement OK, console.txt propre, FPS stable avec 5-15 NPCs, structure XML + Lua coherente), mais **~60 % des points gameplay sont defaillants**. 10 causes racines identifiees, dont 2 trouvees post-test par audit code :
+>
+> 1. **`setEquippedItem` n'existe PAS en B42.18** ([PHNPC_Combat.lua:131](B42/42/media/lua/client/PHNPC_Combat.lua)) — methode appelee depuis v0.0.7a, masquee par pcall depuis toujours. Bonne methode : `setPrimaryHandItem(item)`. Consequence : les NPCs n'equipent JAMAIS leurs armes d'inventaire et frappent toujours a mains nues.
+> 2. **`applyMoveTick(npc, md.PHNPC_WalkType or walkType)` ignore les changements de walkType** ([PHNPC_Actions.lua:168](B42/42/media/lua/client/PHNPC_Actions.lua)) — si `md.PHNPC_WalkType` est deja "Walk" du premier path, le nouveau walkType="Run" est ignore. Consequence : NPC ne court JAMAIS en suivi.
+>
+> Les 8 autres causes racines (NPC colle joueur, allez-retour Va la-bas, shelter aleatoire, combat pas tourne vers cible, fuite en boucle, zombies ignorent NPC, loot dans NPC pas cadavre, anim idle = posture zombie) sont detaillees dans [CHANGELOG.md](CHANGELOG.md) section "RÉSULTATS DE TEST" et [feuille de route.md](feuille%20de%20route.md) section "ROADMAP v0.0.10".
+>
 > **v0.0.9p (2026-05-27)** — Passe d'audit API B42.18 + hardening pcall.
 >
 > Audit complet des 17 fichiers client + 2 shared (~3800 LOC) contre la JavaDoc officielle B42.18 (`demiurgequantified.github.io/ProjectZomboidJavaDocs`), le PZ Wiki Lua API et les patterns Bandits 42.18 / NPC_Helper_Mod. **Toutes** les methodes Java utilisees sont confirmees existantes dans la build courante (`42.18.0 rev 9d7e334cab` 2026-05-11). Le `console.txt` post-v0.0.9o est propre (aucune erreur mod). En prevention, durcissement defensif sur les derniers appels bare dans `PHNPC_Enforce.lua` (step 6 securite, step 7 setUseless, step 5 setTarget pour turnalerted/lunge/attack) : tous wrappes en pcall pour qu'une evolution future de l'API ne casse jamais le for-loop principal d'`OnTick`.

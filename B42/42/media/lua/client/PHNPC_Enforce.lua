@@ -30,12 +30,45 @@
 -- ============================================================
 function PHNPC.enforceNPC(zombie)
     local md = zombie:getModData()
+    local behaviorState = tostring(md.PHNPC_State or "idle")
+    local orderMovingState = (behaviorState == "following"
+        or behaviorState == "goingto"
+        or behaviorState == "shelter"
+        or behaviorState == "fleeing")
 
     -- 1. Activer le moteur pour TOUS (NHM GCCoreEnforceMain.lua ligne 9 EXACT)
     zombie:setUseless(false)
 
     -- 2. Fix B42 : empeche marche en arriere non souhaitee (Bandits ZAMove.lua 69-74)
     pcall(function() zombie:setAnimatingBackwards(false) end)
+
+    -- v0.0.13b : mitigation agressive anti ClimbOverFenceState.
+    -- En B42.18 les NPCs (IsoZombie banditises) peuvent declencher des NPE Java
+    -- en entree d'etat ClimbOverFenceState (BodyDamage nil). On intercepte et on
+    -- casse immediatement la transition pour eviter la boucle d'erreurs.
+    local inFenceState = false
+    pcall(function()
+        local st = zombie:getCurrentState()
+        if st and tostring(st):find("ClimbOverFenceState") then
+            inFenceState = true
+        end
+    end)
+    if inFenceState then
+        md.PHNPC_Moving = false
+        md.PHNPC_PathX = nil
+        md.PHNPC_PathY = nil
+        md.PHNPC_PathZ = nil
+        md.PHNPC_FenceRecoverTicks = 180
+        pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+        pcall(function() zombie:setBumpType("Shrug") end)
+        pcall(function() zombie:setTarget(nil) end)
+        pcall(function() zombie:clearAggroList() end)
+        pcall(function() zombie:setRunning(false) end)
+    end
+
+    if (md.PHNPC_FenceRecoverTicks or 0) > 0 then
+        md.PHNPC_FenceRecoverTicks = md.PHNPC_FenceRecoverTicks - 1
+    end
 
     -- 3. Genre + vitesse (pas les variables AnimSet — celles-ci vont en step 10 apres changeState)
     pcall(function() zombie:setFemaleEtc(md.PHNPC_Female or false) end)
@@ -74,14 +107,14 @@ function PHNPC.enforceNPC(zombie)
         if asn ~= "bumped" then md.PHNPC_BumpTick = 0 end
 
         if asn == "idle" then
-            -- v0.0.9l : ne PAS stopMoving au premier tick "idle" - le moteur
-            -- PathFindBehavior2 alterne occasionnellement idle/pathfind entre
-            -- 2 steps de marche. stopMoving brutal reset md.PHNPC_PathX et
-            -- relance pathToLocationF chaque tick (saccades).
-            -- => compter les ticks idle consecutifs ; stop seulement si > 15.
+            -- v0.0.11 : seuil 60 (au lieu de 15) - moteur PathFindBehavior2 peut alterner
+            -- idle/pathfind sur de plus longues fenetres pendant les redirections.
+            -- 60 ticks = 2 sec evite le stopMoving brutal qui coupait l'anim toutes
+            -- les secondes au test v0.0.10.
             if md.PHNPC_Moving then
                 md.PHNPC_IdleTicks = (md.PHNPC_IdleTicks or 0) + 1
-                if md.PHNPC_IdleTicks >= 15 then
+                local idleLimit = orderMovingState and 120 or 60
+                if md.PHNPC_IdleTicks >= idleLimit then
                     md.PHNPC_IdleTicks = 0
                     PHNPC.stopMoving(zombie)
                 end
@@ -122,7 +155,12 @@ function PHNPC.enforceNPC(zombie)
             pcall(function() zombie:setTarget(nil) end)
 
         elseif asn == "lunge" then
-            if md.PHNPC_Moving then
+            if orderMovingState then
+                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+                pcall(function() zombie:clearAggroList() end)
+                pcall(function() zombie:setTarget(nil) end)
+                skipSecurity = md.PHNPC_Moving and true or false
+            elseif md.PHNPC_Moving then
                 skipSecurity = true
             else
                 pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
@@ -135,7 +173,9 @@ function PHNPC.enforceNPC(zombie)
             pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
             pcall(function() zombie:clearAggroList() end)
             pcall(function() zombie:setTarget(nil) end)
-            md.PHNPC_Moving = false
+            if not orderMovingState then
+                md.PHNPC_Moving = false
+            end
 
         elseif asn == "falldown" or asn == "staggerback" or asn == "down" then
             -- v0.0.9i FIX BUG 3 : T-pose lors de la transition falldown -> idle.

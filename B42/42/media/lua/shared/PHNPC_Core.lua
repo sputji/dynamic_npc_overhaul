@@ -35,7 +35,7 @@ PHNPC.Log = {
 -- CONFIG IA
 -- ============================================================
 PHNPC.FOLLOW_DISTANCE      = 6    -- tiles : redemarrer le suivi si joueur plus loin que ca
-PHNPC.FOLLOW_STOP_DISTANCE = 3    -- v0.0.9h : 2 -> 3 (le NPC collait au joueur)
+PHNPC.FOLLOW_STOP_DISTANCE = 2    -- distance de confort au joueur (evite le collage)
 PHNPC.FOLLOW_MOVE_THRESHOLD = 2   -- tiles : seuil de deplacement joueur pour recalculer pathfind
 PHNPC.GOTO_ARRIVE_DISTANCE = 1    -- v0.0.9h : tiles pour considerer "Va la-bas" comme arrive
 PHNPC.FOLLOW_TICK_RATE     = 20   -- ticks entre deux recalculs pathfind (si joueur bouge)
@@ -125,7 +125,7 @@ PHNPC.OUTFIT_STATS = {
     Farmer          = { speed=0.62, strength=7,  health=90,  maxWeight=15.0,
                         items={"Base.Shovel","Base.Trowel"} },
     Chef            = { speed=0.62, strength=6,  health=90,  maxWeight=15.0,
-                        items={"Base.KitchenKnife","Base.CanOpener"} },
+                        items={"Base.KitchenKnife","Base.TinOpener"} },
     Mechanic        = { speed=0.65, strength=8,  health=100, maxWeight=20.0,
                         items={"Base.Wrench","Base.HandTorch"} },
     ConstructionWorker = { speed=0.65, strength=9, health=105, maxWeight=22.0,

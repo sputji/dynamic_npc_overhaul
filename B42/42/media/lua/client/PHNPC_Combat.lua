@@ -22,30 +22,61 @@
 -- ============================================================
 
 -- Retourne l'arme la plus adaptee dans l'inventaire NPC
--- Priorite : arme equipee en main > arme corps a corps > baton/couteau > poings
+-- v0.0.12 : durcissement Kahlua B42
+--   - Evite item:isWeapon() (non fiable selon type d'item expose Lua)
+--   - Utilise instanceof(item, "HandWeapon") + garde-fous methodes
+--   - Plus de crash en boucle sur scoreWeapon/getNPCWeapon
+local function scoreWeapon(item)
+    if not item then return 0 end
+
+    local isHandWeapon = false
+    pcall(function() isHandWeapon = instanceof(item, "HandWeapon") end)
+    if not isHandWeapon then return 0 end
+
+    local isRanged = false
+    pcall(function() isRanged = item:isRanged() end)
+    if isRanged then return 0 end  -- pas d'armes a feu en combat melee NPC pour l'instant
+
+    local dmg = 1.0
+    pcall(function()
+        local maxD = item.getMaxDamage and item:getMaxDamage() or nil
+        local minD = item.getMinDamage and item:getMinDamage() or nil
+        dmg = maxD or minD or 1.0
+    end)
+
+    local cond, condMax = 1, 1
+    pcall(function() cond = item:getCondition() or 1 end)
+    pcall(function() condMax = item:getConditionMax() or 1 end)
+    local condRatio = (condMax > 0) and (cond / condMax) or 0.5
+    return (dmg * 10) + (condRatio * 1)
+end
+
 local function getNPCWeapon(npc)
-    -- Arme deja en main ?
-    local ok1, primary = pcall(function() return npc:getPrimaryHandItem() end)
-    if ok1 and primary then
-        local ok2, isWeapon = pcall(function() return primary:isWeapon() end)
-        if ok2 and isWeapon then return primary end
+    local primary
+    pcall(function() primary = npc:getPrimaryHandItem() end)
+    local bestItem = primary
+    local bestScore = scoreWeapon(primary)
+
+    local inv
+    pcall(function() inv = npc:getInventory() end)
+    if not inv then return bestItem end
+
+    -- Scan complet et selection du meilleur score
+    local items
+    pcall(function() items = inv:getItems() end)
+    if not items then return bestItem end
+    local n = 0
+    pcall(function() n = items:size() end)
+    for i = 0, n - 1 do
+        local it
+        pcall(function() it = items:get(i) end)
+        local s = scoreWeapon(it)
+        if s > bestScore then
+            bestScore = s
+            bestItem = it
+        end
     end
-    -- Chercher dans l'inventaire
-    local inv = npc:getInventory()
-    if not inv then return nil end
-    -- Essayer arme corps a corps d'abord
-    local function tryGet(typeName)
-        local ok, item = pcall(function() return inv:getFirstTypeRecurse(typeName) end)
-        return ok and item or nil
-    end
-    return tryGet("Base.Bat")
-        or tryGet("Base.Axe")
-        or tryGet("Base.Crowbar")
-        or tryGet("Base.Knife")
-        or tryGet("Base.PoliceBaton")
-        or tryGet("Base.Shovel")
-        or tryGet("Base.Hammer")
-        or nil
+    return bestItem
 end
 
 -- Variantes d'attaque selon le type d'arme
@@ -101,6 +132,15 @@ function PHNPC.npcCombatStep(npc)
         if md.PHNPC_State == "defending" then
             md.PHNPC_State = md.PHNPC_PrevState or "following"
             md.PHNPC_PrevState = nil
+            -- v0.0.10 FIX BUG #4 : forcer un nouveau pathfind apres sortie du combat.
+            -- Pendant defending, pathToLocationF a ete appele sur les coords du
+            -- zombie => PathX/PathY pointe maintenant n'importe ou. Si on ne
+            -- reset pas, Update.lua "goingto" voit needNewPath=false et reste
+            -- planté (effet "allez-retour bizarre" rapporte au test joueur).
+            md.PHNPC_PathX = nil
+            md.PHNPC_PathY = nil
+            md.PHNPC_PathZ = nil
+            md.PHNPC_Moving = false
         end
         if md.PHNPC_Moving then
             PHNPC.stopMoving(npc)
@@ -126,9 +166,14 @@ function PHNPC.npcCombatStep(npc)
         pcall(function() npc:faceLocationF(target:getX(), target:getY()) end)
 
         -- Equiper l'arme si disponible
+        -- v0.0.10 FIX BUG #3 : setEquippedItem N'EXISTE PAS en B42.18 sur IsoZombie.
+        -- Depuis v0.0.7a, l'appel etait masque silencieusement par pcall =>
+        -- les NPCs n'equipaient JAMAIS leur arme et frappaient toujours a mains
+        -- nues. La bonne methode est setPrimaryHandItem (verifie : utilise dans
+        -- PHNPC_Convert.lua:47 et PHNPC_Loot.lua:105).
         local weapon = getNPCWeapon(npc)
         if weapon then
-            pcall(function() npc:setEquippedItem(weapon) end)
+            pcall(function() npc:setPrimaryHandItem(weapon) end)
         end
 
         local anim = getAttackAnim(weapon)
