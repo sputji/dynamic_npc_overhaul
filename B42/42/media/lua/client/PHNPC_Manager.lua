@@ -18,4 +18,4 @@
       PHNPC_Update.lua       -- events OnZombieUpdate / OnTick / OnGameStart
     Necessite (shared) : PHNPC_Core.lua  PHNPC_Stats.lua
 ]]
-print("[PHNPC] Manager v0.0.16 loaded")
+print("[PHNPC] Manager v0.0.17 loaded")

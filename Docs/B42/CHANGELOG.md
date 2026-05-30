@@ -1,5 +1,37 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.17] — Stabilisation runtime B42 + suivi/combat/XP/outfits (2026-05-30)
+
+### Correctifs critiques
+
+- `PHNPC_Core.lua`
+  - ajout de helpers `PHNPC.hasMethod(obj, methodName)` et `PHNPC.tryCall(obj, methodName, ...)` pour eviter les appels Java non exposes en B42.
+  - tuning suivi: `FOLLOW_MOVE_THRESHOLD=2.5`, `FOLLOW_REPATH_TICKS=45` pour limiter le repath spam.
+- `PHNPC_Actions.lua`
+  - `startFollowing` ne relance plus un path immediatement apres une transition idle courte.
+  - anti-saccade: le re-path est conditionne par `FOLLOW_REPATH_TICKS` meme si `PHNPC_Moving=false` temporairement.
+- `PHNPC_Update.lua`
+  - cadence de follow maitrisee (`PHNPC_FollowTick`) avec declenchement immediat seulement si distance tres grande.
+  - garde-fou explicite avant appels `sayWeatherBark` et `npcCombatStep`.
+- `PHNPC_Barks.lua`
+  - detection meteo migree vers `ClimateManager.getInstance()` (fallback `GameTime`) pour compat B42.
+  - suppression des appels meteo fragiles non disponibles selon contexte.
+- `PHNPC_Combat.lua`
+  - selection d'arme contextuelle : priorite ranged a distance si munitions + skill.
+  - ajout `consumeAmmoForWeapon` avec fallback d'API inventaire (`Remove` / `RemoveOneOf`).
+  - ajout gain XP en combat (`Aiming`, `Blunt`, `Strength`, `Fitness`, `Maintenance`).
+  - hardening des degats via verif d'existence methodes (`setHealth`, `knockDown`, `setPrimaryHandItem`).
+- `PHNPC_Stats.lua`
+  - `getSkillSummary(npc)` affiche maintenant les 13 competences meme a 0 (conforme checklist debug).
+- `PHNPC_Outfits.lua` + `PHNPC_Debug.lua`
+  - nouveau `getOutfitDefenseSummary(npc)` expose les scores defensifs par slot.
+  - affichage du resume dans debug (`OutfitDef`).
+
+### Version
+
+- `B42/42/mod.info` -> `version=0.0.17`.
+- Banners modules principaux alignes sur `v0.0.17 loaded`.
+
 ## [0.0.16] — Refactoring modulaire : IA armes a feu, progression XP, vetements auto, barks meteo (2026-05-30)
 
 ### Nouveaux modules

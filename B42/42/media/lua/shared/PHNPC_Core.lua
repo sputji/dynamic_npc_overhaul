@@ -14,6 +14,23 @@ PHNPC.allNPCs   = PHNPC.allNPCs or {}   -- [npcRef] = true  (tous les NPCs actif
 PHNPC.recruited = PHNPC.recruited or {}  -- [npcRef] = true  (recrutes)
 
 -- ============================================================
+-- HELPERS D'APPEL SECURISES (B42 / Kahlua)
+-- Evite les crashs "Object tried to call nil in pcall" quand une methode
+-- Java n'est pas exposee sur un objet dans certains contextes.
+-- ============================================================
+function PHNPC.hasMethod(obj, methodName)
+    if not obj or not methodName then return false end
+    return type(obj[methodName]) == "function"
+end
+
+function PHNPC.tryCall(obj, methodName, ...)
+    if not obj or not methodName then return nil, false end
+    local fn = obj[methodName]
+    if type(fn) ~= "function" then return nil, false end
+    return fn(obj, ...), true
+end
+
+-- ============================================================
 -- LOGGING MINIMAL (etendu par client/PHNPC_Log.lua)
 -- Disponible des le chargement de Core (shared, premier fichier charge)
 -- ============================================================
@@ -36,8 +53,8 @@ PHNPC.Log = {
 -- ============================================================
 PHNPC.FOLLOW_DISTANCE      = 6    -- tiles : redemarrer le suivi si joueur plus loin que ca
 PHNPC.FOLLOW_STOP_DISTANCE = 2    -- distance de confort au joueur (evite le collage)
-PHNPC.FOLLOW_MOVE_THRESHOLD = 2   -- tiles : seuil de deplacement joueur pour recalculer pathfind
-PHNPC.FOLLOW_REPATH_TICKS  = 20   -- ticks min entre deux re-path follow pour eviter les micro-saccades
+PHNPC.FOLLOW_MOVE_THRESHOLD = 2.5 -- tiles : seuil de deplacement joueur pour recalculer pathfind
+PHNPC.FOLLOW_REPATH_TICKS  = 45   -- ticks min entre deux re-path follow pour eviter les micro-saccades
 PHNPC.GOTO_ARRIVE_DISTANCE = 1    -- v0.0.9h : tiles pour considerer "Va la-bas" comme arrive
 PHNPC.FOLLOW_TICK_RATE     = 20   -- ticks entre deux recalculs pathfind (si joueur bouge)
 PHNPC.INTERACTION_DIST     = 3    -- tiles : rayon clic droit pour interagir
@@ -252,4 +269,4 @@ function PHNPC.getOutfitStats(outfit)
     return PHNPC.OUTFIT_STATS[outfit] or PHNPC.OUTFIT_STATS["Survivor"]
 end
 
-print("[PHNPC] Core v0.0.16 loaded")
+print("[PHNPC] Core v0.0.17 loaded")

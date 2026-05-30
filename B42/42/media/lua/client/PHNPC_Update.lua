@@ -114,7 +114,7 @@ Events.OnTick.Add(function()
                 md.PHNPC_WeatherBarkTimer = (md.PHNPC_WeatherBarkTimer or 0) + 1
                 if md.PHNPC_WeatherBarkTimer >= 1000 then
                     md.PHNPC_WeatherBarkTimer = 0
-                    if PHNPC.sayWeatherBark then
+                    if type(PHNPC.sayWeatherBark) == "function" then
                         pcall(function() PHNPC.sayWeatherBark(npc) end)
                     end
                 end
@@ -132,7 +132,9 @@ Events.OnTick.Add(function()
             pcall(function() PHNPC.npcFlightStep(npc, player) end)
 
             -- 2. Evaluation combat (si pas en fuite)
-            pcall(function() PHNPC.npcCombatStep(npc) end)
+            if type(PHNPC.npcCombatStep) == "function" then
+                pcall(function() PHNPC.npcCombatStep(npc) end)
+            end
 
             -- 3. Suivi joueur (etat "following")
             if md.PHNPC_State == "following" then
@@ -149,12 +151,16 @@ Events.OnTick.Add(function()
                     PHNPC._followTimers[npc] = 0
 
                 else
-                    -- v0.0.12 : relance logique follow a chaque tick.
-                    -- startFollowing est deja path-once (repath ancre a 5 tuiles),
-                    -- donc cet appel n'entraine pas de spam et garde Run/Walk reactif.
+                    -- v0.0.17 : cadence de follow controlee pour eviter les
+                    -- micro-saccades dues aux relances trop frequentes.
                     local runDist = PHNPC.RUN_DISTANCE or 6
                     local wt = (dist > runDist) and "Run" or "Walk"
-                    PHNPC.startFollowing(npc, player, wt)
+                    md.PHNPC_FollowTick = (md.PHNPC_FollowTick or 0) + 1
+                    local forceImmediate = dist > (runDist + 4)
+                    if forceImmediate or md.PHNPC_FollowTick >= (PHNPC.FOLLOW_TICK_RATE or 20) then
+                        md.PHNPC_FollowTick = 0
+                        PHNPC.startFollowing(npc, player, wt)
+                    end
                 end
 
             -- 4. Etat "goingto" : NPC se deplace vers une destination designee
@@ -426,4 +432,4 @@ Events.OnGameStart.Add(function()
     print("[PHNPC] v0.0.15 pret")
 end)
 
-print("[PHNPC] Update v0.0.15 loaded")
+print("[PHNPC] Update v0.0.17 loaded")

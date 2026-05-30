@@ -137,12 +137,39 @@ local WEATHER_FOG_THRESHOLD    = 0.3   -- intensite brouillard au-dessus = broui
 function PHNPC.getWeatherState()
     local state = "clear"
     pcall(function()
-        local gt = GameTime.getInstance()
-        if not gt then return end
+        local rainIntensity, fog, temp = 0, 0, 20
+
+        local cm = nil
+        pcall(function() cm = ClimateManager.getInstance() end)
+
+        if cm then
+            if PHNPC.hasMethod and PHNPC.hasMethod(cm, "getRainIntensity") then
+                pcall(function() rainIntensity = cm:getRainIntensity() end)
+            end
+            if PHNPC.hasMethod and PHNPC.hasMethod(cm, "getFogIntensity") then
+                pcall(function() fog = cm:getFogIntensity() end)
+            end
+            if PHNPC.hasMethod and PHNPC.hasMethod(cm, "getTemperature") then
+                pcall(function() temp = cm:getTemperature() end)
+            end
+        end
+
+        -- Fallback GameTime si ClimateManager non disponible.
+        if not cm then
+            local gt = GameTime.getInstance()
+            if not gt then return end
+            if PHNPC.hasMethod and PHNPC.hasMethod(gt, "getRainIntensity") then
+                pcall(function() rainIntensity = gt:getRainIntensity() end)
+            end
+            if PHNPC.hasMethod and PHNPC.hasMethod(gt, "getFogIntensity") then
+                pcall(function() fog = gt:getFogIntensity() end)
+            end
+            if PHNPC.hasMethod and PHNPC.hasMethod(gt, "getTemperature") then
+                pcall(function() temp = gt:getTemperature() end)
+            end
+        end
 
         -- Verifier la pluie / orage
-        local rainIntensity = 0
-        pcall(function() rainIntensity = gt:getRainIntensity() end)
         if rainIntensity > WEATHER_STORM_THRESHOLD then
             state = "storm"
             return
@@ -152,8 +179,6 @@ function PHNPC.getWeatherState()
         end
 
         -- Verifier la neige (temperature basse + precipitations)
-        local temp = 20
-        pcall(function() temp = gt:getTemperature() end)
         if temp < WEATHER_SNOW_TEMP and rainIntensity > WEATHER_SNOW_RAIN_MIN then
             state = "snow"
             return
@@ -166,8 +191,6 @@ function PHNPC.getWeatherState()
         end
 
         -- Brouillard
-        local fog = 0
-        pcall(function() fog = gt:getFogIntensity() end)
         if fog and fog > WEATHER_FOG_THRESHOLD then
             state = "fog"
             return
@@ -193,4 +216,4 @@ function PHNPC.sayWeatherBark(npc)
     PHNPC.sayBark(npc, barkState, 0.6, 0.8, 1.0)
 end
 
-print("[PHNPC] Barks v0.0.16 loaded")
+print("[PHNPC] Barks v0.0.17 loaded")

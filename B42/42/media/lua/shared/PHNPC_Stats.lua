@@ -179,9 +179,7 @@ function PHNPC.getSkillSummary(npc)
     local parts = {}
     for _, skillName in ipairs(ALL_SKILLS) do
         local lvl = md["PHNPC_Skill_" .. skillName] or 0
-        if lvl > 0 then
-            parts[#parts+1] = skillName .. ":" .. lvl
-        end
+        parts[#parts+1] = skillName .. ":" .. lvl
     end
     return table.concat(parts, " ")
 end
@@ -275,4 +273,4 @@ function PHNPC.initInventory(zombie, outfit)
     end)
 end
 
-print("[PHNPC] Stats v0.0.16 loaded")
+print("[PHNPC] Stats v0.0.17 loaded")

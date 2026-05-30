@@ -1,6 +1,14 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
 _Version 0.0.16 (refactoring modulaire : armes a feu, XP, meteo)_
 
+> Mise a jour v0.0.17 (2026-05-30) — regles runtime/IA ajoutees.
+>
+> 1. **Methodes Java exposees** : avant tout appel sensible sur objet Java (meteo, inventaire, combat), verifier `PHNPC.hasMethod(obj, "method")`. Les appels manquants peuvent casser la frame meme dans un `pcall`.
+> 2. **Follow stable** : ne jamais forcer un re-path immediat quand `PHNPC_Moving` devient faux sur un tick transitoire. Respecter un delai minimal (`FOLLOW_REPATH_TICKS`).
+> 3. **Armes a feu** : pour engager a distance, choisir une arme ranged dediee (pas juste "meilleure arme globale"), puis verifier munitions juste avant le tir.
+> 4. **XP gameplay** : l'XP doit etre attribuee au moment des impacts (melee/ranged) pour que la progression soit visible pendant les tests.
+> 5. **Debug outfit** : exposer un resume lisible des scores defensifs par slot pour valider rapidement les remplacements de vetements.
+
 > Mise a jour v0.0.16 (2026-05-30) — nouveaux patterns ajoutes.
 >
 > 1. **Armes a feu (gate ammo + skill)** : avant de scorer une arme ranged, verifier TOUJOURS deux conditions : munitions dans l'inventaire (`hasAmmoForWeapon`) ET niveau Aiming suffisant (`getNPCSkillLevel(npc,"Aiming") >= RANGED_MIN_SKILL`). Ne jamais donner de bonus ranged si l'une des deux conditions echoue.

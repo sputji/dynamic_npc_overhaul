@@ -101,6 +101,13 @@ local function dbgShowState(player)
     print("  Health   : " .. tostring(phnpcHp) .. " / " .. tostring(phnpcMaxHp))
     print("  SpeedMod : " .. tostring(md.PHNPC_SpeedMod or "?"))
     print("  Strength : " .. tostring(md.PHNPC_Strength or "?"))
+    if PHNPC.getOutfitDefenseSummary then
+        local ds = ""
+        pcall(function() ds = PHNPC.getOutfitDefenseSummary(npc) end)
+        if ds and ds ~= "" then
+            print("  OutfitDef: " .. ds)
+        end
+    end
     local nx, ny, nz = "?", "?", "?"
     pcall(function() nx = npc:getX() ; ny = npc:getY() ; nz = npc:getZ() end)
     print("  Pos      : " .. tostring(nx) .. "," .. tostring(ny) .. "," .. tostring(nz))
@@ -333,4 +340,4 @@ end
 
 Events.OnPreFillWorldObjectContextMenu.Add(onFillDebugContextMenu)
 
-print("[PHNPC] Debug v0.0.9a loaded")
+print("[PHNPC] Debug v0.0.17 loaded")

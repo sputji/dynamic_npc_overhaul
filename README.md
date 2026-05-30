@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.16-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.17-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,11 +20,22 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.16**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.17**.
 
 ---
 
 ## Fonctionnalités actuelles (v0.0.16)
+
+### Nouveautes v0.0.17
+
+- Stabilisation runtime B42 : garde-fous d'appels Java (`hasMethod`/`tryCall`) pour supprimer les erreurs rouge repetitives en boucle.
+- Suivi plus stable : cadence de re-path reduite (`FOLLOW_REPATH_TICKS=45`) + throttling follow cote Update.
+- Combat firearms fiabilise : priorite armes a feu a distance, consommation munitions robuste, checks methodes defensifs.
+- Progression active : gain XP en combat (Aiming, Blunt, Strength, Fitness, Maintenance).
+- Debug outfits : score defensif par slot visible (`OutfitDef`) pour valider les remplacements d'equipement.
+- Detection meteo robuste : `ClimateManager` avec fallback `GameTime`.
+
+## Fonctionnalités actuelles (v0.0.17)
 
 ### PNJ & Professions
 

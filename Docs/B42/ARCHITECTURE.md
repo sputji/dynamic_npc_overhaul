@@ -1,4 +1,15 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.16
+# Architecture B42 — Dynamic NPC Overhaul v0.0.17
+
+> v0.0.17 — Stabilisation runtime B42, anti-saccades follow, combat/XP fiabilises (2026-05-30)
+>
+> Axes techniques appliques :
+>
+> 1. **Runtime-safe Java calls** : ajout de `PHNPC.hasMethod`/`PHNPC.tryCall` pour eviter les appels de methodes non exposees selon contexte Kahlua.
+> 2. **Follow cadence controlee** : `FOLLOW_REPATH_TICKS=45` + throttling `PHNPC_FollowTick` dans Update pour supprimer le spam `follow anchor`.
+> 3. **Combat contextuel** : selection ranged prioritaire a distance avec munitions + competence Aiming ; consommation munitions robuste.
+> 4. **Progression active** : gain XP au combat (Aiming/Blunt/Strength/Fitness/Maintenance).
+> 5. **Meteo B42 robuste** : detection via `ClimateManager` avec fallback `GameTime`.
+> 6. **Debug outfit** : score defensif visible par slot via `getOutfitDefenseSummary`.
 
 > v0.0.16 — Refactoring modulaire : IA armes a feu, progression XP, vetements auto, barks meteo (2026-05-30)
 >
@@ -64,9 +75,9 @@ PHNPC_Actions → PHNPC_Barks → PHNPC_Combat → PHNPC_Convert → PHNPC_Dange
 
 | Constante | Valeur | Fichier usage |
 |---|---|---|
-| `PHNPC.FOLLOW_STOP_DIST` | 2.5 | Actions |
-| `PHNPC.FOLLOW_RUN_DIST` | 6 | Actions |
-| `PHNPC.FOLLOW_REPATH_TICKS` | 20 | Actions |
+| `PHNPC.FOLLOW_STOP_DISTANCE` | 2 | Actions |
+| `PHNPC.RUN_DISTANCE` | 6 | Actions |
+| `PHNPC.FOLLOW_REPATH_TICKS` | 45 | Actions |
 | `PHNPC.FLEE_HP_RATIO` | 0.30 | Combat |
 | `PHNPC.COMBAT_RANGE` | 1.5 | Combat |
 | `PHNPC.RANGED_ATTACK_RANGE` | 10 | Combat (v0.0.16) |

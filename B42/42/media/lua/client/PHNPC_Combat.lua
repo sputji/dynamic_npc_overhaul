@@ -59,6 +59,29 @@ local function hasAmmoForWeapon(npc, weapon)
     return ammoItem ~= nil
 end
 
+local function consumeAmmoForWeapon(npc, weapon)
+    if not npc or not weapon then return false end
+    local ammoType = nil
+    pcall(function() ammoType = weapon:getAmmoType() end)
+    if not ammoType or ammoType == "" then return false end
+
+    local inv = nil
+    pcall(function() inv = npc:getInventory() end)
+    if not inv then return false end
+
+    local ammo = nil
+    pcall(function() ammo = inv:getFirstTypeRecurse(ammoType) end)
+    if not ammo then return false end
+
+    local removed = false
+    if PHNPC.hasMethod and PHNPC.hasMethod(inv, "Remove") then
+        pcall(function() inv:Remove(ammo); removed = true end)
+    elseif PHNPC.hasMethod and PHNPC.hasMethod(inv, "RemoveOneOf") then
+        pcall(function() inv:RemoveOneOf(ammoType); removed = true end)
+    end
+    return removed
+end
+
 -- scoreWeapon : score d'une arme (melee ou a feu si munitions disponibles)
 -- v0.0.16 : les armes a feu sont evaluees si munitions presentes + competence suffisante
 local function scoreWeapon(item, npc)
@@ -135,6 +158,37 @@ local function getNPCWeapon(npc)
         end
     end
     return bestItem
+end
+
+local function getBestRangedWeapon(npc)
+    if not npc then return nil end
+    local inv = nil
+    pcall(function() inv = npc:getInventory() end)
+    if not inv then return nil end
+
+    local items = nil
+    pcall(function() items = inv:getItems() end)
+    if not items then return nil end
+
+    local best, bestScore = nil, -1
+    local n = 0
+    pcall(function() n = items:size() end)
+    for i = 0, n - 1 do
+        local it = nil
+        pcall(function() it = items:get(i) end)
+        local ranged = false
+        if it then
+            pcall(function() ranged = it:isRanged() end)
+        end
+        if it and ranged and hasAmmoForWeapon(npc, it) then
+            local s = scoreWeapon(it, npc) + 100
+            if s > bestScore then
+                best = it
+                bestScore = s
+            end
+        end
+    end
+    return best
 end
 
 -- isRangedWeapon : helper rapide pour savoir si une arme est a feu
@@ -224,7 +278,11 @@ function PHNPC.npcCombatStep(npc)
         md.PHNPC_NoiseTimer = 200
     end
 
-    if dist <= (PHNPC.COMBAT_ATTACK_RANGE or 1.5) then
+    local meleeRange = PHNPC.COMBAT_ATTACK_RANGE or 1.5
+    local rangedRange = PHNPC.RANGED_ATTACK_RANGE or 10
+    local rangedWeapon = getBestRangedWeapon(npc)
+
+    if dist <= meleeRange then
         -- Assez proche : attaquer (melee)
         local targetDead = false
         pcall(function() targetDead = target:isDead() end)
@@ -237,7 +295,9 @@ function PHNPC.npcCombatStep(npc)
         -- v0.0.16 : getNPCWeapon prend desormais npc pour evaluer armes a feu
         local weapon = getNPCWeapon(npc)
         if weapon then
-            pcall(function() npc:setPrimaryHandItem(weapon) end)
+            if PHNPC.hasMethod and PHNPC.hasMethod(npc, "setPrimaryHandItem") then
+                pcall(function() npc:setPrimaryHandItem(weapon) end)
+            end
         end
 
         -- Si arme a feu equipee : tirer a distance (pas besoin d'etre au corps a corps)
@@ -247,24 +307,19 @@ function PHNPC.npcCombatStep(npc)
             pcall(function()
                 local tmd = target:getModData()
                 if not tmd.PHNPC_IsNPC then
-                    -- Degats arme a feu : retirer une munition + infliger degats
-                    local ammoType = nil
-                    pcall(function() ammoType = weapon:getAmmoType() end)
-                    if ammoType and ammoType ~= "" then
-                        local inv
-                        pcall(function() inv = npc:getInventory() end)
-                        if inv then
-                            local ammo
-                            pcall(function() ammo = inv:getFirstTypeRecurse(ammoType) end)
-                            if ammo then
-                                pcall(function() inv:Remove(ammo) end)
-                            end
-                        end
-                    end
+                    consumeAmmoForWeapon(npc, weapon)
                     local zh = target:getHealth() - RANGED_DAMAGE  -- armes a feu : plus de degats
                     if zh <= 0 then zh = 0 end
-                    target:setHealth(zh)
-                    target:knockDown(true)
+                    if PHNPC.hasMethod and PHNPC.hasMethod(target, "setHealth") then
+                        target:setHealth(zh)
+                    end
+                    if PHNPC.hasMethod and PHNPC.hasMethod(target, "knockDown") then
+                        target:knockDown(true)
+                    end
+                    if PHNPC.addNPCXP then
+                        PHNPC.addNPCXP(npc, "Aiming", 6)
+                        PHNPC.addNPCXP(npc, "Maintenance", 1)
+                    end
                 end
             end)
             md.PHNPC_AttackCooldown = RANGED_COOLDOWN
@@ -275,12 +330,22 @@ function PHNPC.npcCombatStep(npc)
             local anim = getAttackAnim(weapon)
             pcall(function() npc:setBumpType(anim) end)
             pcall(function()
-                target:knockDown(true)
+                if PHNPC.hasMethod and PHNPC.hasMethod(target, "knockDown") then
+                    target:knockDown(true)
+                end
                 local tmd = target:getModData()
                 if not tmd.PHNPC_IsNPC then
                     local zh = target:getHealth() - 25
                     if zh <= 0 then zh = 0 end
-                    target:setHealth(zh)
+                    if PHNPC.hasMethod and PHNPC.hasMethod(target, "setHealth") then
+                        target:setHealth(zh)
+                    end
+                    if PHNPC.addNPCXP then
+                        PHNPC.addNPCXP(npc, "Blunt", 4)
+                        PHNPC.addNPCXP(npc, "Strength", 2)
+                        PHNPC.addNPCXP(npc, "Fitness", 1)
+                        PHNPC.addNPCXP(npc, "Maintenance", 1)
+                    end
                 end
             end)
             md.PHNPC_AttackCooldown = 60
@@ -288,15 +353,16 @@ function PHNPC.npcCombatStep(npc)
             PHNPC.Log.debug("Combat", tostring(md.PHNPC_Name) .. " : " .. anim
                   .. " dist=" .. string.format("%.1f", dist))
         end
-    elseif isRangedWeapon(getNPCWeapon(npc)) and dist <= (PHNPC.RANGED_ATTACK_RANGE or 10) then
+    elseif rangedWeapon and dist <= rangedRange then
         -- Arme a feu : attaquer a distance si dans le rayon de tir
         local targetDead = false
         pcall(function() targetDead = target:isDead() end)
         if targetDead then return end
 
-        local weapon = getNPCWeapon(npc)
-        if weapon then
-            pcall(function() npc:setPrimaryHandItem(weapon) end)
+        if rangedWeapon then
+            if PHNPC.hasMethod and PHNPC.hasMethod(npc, "setPrimaryHandItem") then
+                pcall(function() npc:setPrimaryHandItem(rangedWeapon) end)
+            end
         end
 
         pcall(function() npc:faceLocationF(target:getX(), target:getY()) end)
@@ -304,21 +370,19 @@ function PHNPC.npcCombatStep(npc)
         pcall(function()
             local tmd = target:getModData()
             if not tmd.PHNPC_IsNPC then
-                local ammoType = nil
-                pcall(function() ammoType = weapon:getAmmoType() end)
-                if ammoType and ammoType ~= "" then
-                    local inv
-                    pcall(function() inv = npc:getInventory() end)
-                    if inv then
-                        local ammo
-                        pcall(function() ammo = inv:getFirstTypeRecurse(ammoType) end)
-                        if ammo then pcall(function() inv:Remove(ammo) end) end
-                    end
-                end
+                consumeAmmoForWeapon(npc, rangedWeapon)
                 local zh = target:getHealth() - RANGED_DAMAGE
                 if zh <= 0 then zh = 0 end
-                target:setHealth(zh)
-                target:knockDown(true)
+                if PHNPC.hasMethod and PHNPC.hasMethod(target, "setHealth") then
+                    target:setHealth(zh)
+                end
+                if PHNPC.hasMethod and PHNPC.hasMethod(target, "knockDown") then
+                    target:knockDown(true)
+                end
+                if PHNPC.addNPCXP then
+                    PHNPC.addNPCXP(npc, "Aiming", 6)
+                    PHNPC.addNPCXP(npc, "Maintenance", 1)
+                end
             end
         end)
         md.PHNPC_AttackCooldown = RANGED_COOLDOWN
@@ -419,4 +483,4 @@ function PHNPC.npcFlightStep(npc, player)
     end
 end
 
-print("[PHNPC] Combat v0.0.16 loaded")
+print("[PHNPC] Combat v0.0.17 loaded")

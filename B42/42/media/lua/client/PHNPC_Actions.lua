@@ -157,17 +157,18 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
     end
 
     local needPath = false
+    local sinceLastPath = (PHNPC._pathTickCounter or 0) - (md.PHNPC_LastPathTick or -9999)
     if not md.PHNPC_Moving then
-        needPath = true
+        -- Evite de relancer un path immediatement apres une micro-transition idle.
+        needPath = sinceLastPath >= (PHNPC.FOLLOW_REPATH_TICKS or 45)
     else
         local moveThreshold = PHNPC.FOLLOW_MOVE_THRESHOLD or 2
         local lpx = md.PHNPC_LastPX or px
         local lpy = md.PHNPC_LastPY or py
         local pdx = px - lpx
         local pdy = py - lpy
-        local sinceLastPath = (PHNPC._pathTickCounter or 0) - (md.PHNPC_LastPathTick or -9999)
         if (pdx * pdx + pdy * pdy) >= (moveThreshold * moveThreshold)
-            and sinceLastPath >= (PHNPC.FOLLOW_REPATH_TICKS or 20) then
+            and sinceLastPath >= (PHNPC.FOLLOW_REPATH_TICKS or 45) then
             needPath = true
         elseif (md.PHNPC_StuckTicks or 0) >= (PHNPC.STUCK_TICKS or 90) then
             needPath = true
@@ -606,7 +607,7 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.15 loaded")
+print("[PHNPC] Actions v0.0.17 loaded")
 
 -- ============================================================
 -- FENETRES (v0.0.9h NEW — Bug 6)

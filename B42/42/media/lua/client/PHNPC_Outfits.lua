@@ -172,4 +172,34 @@ function PHNPC.autoEquipFromInventory(npc)
     return PHNPC.autoEquipBestOutfit(npc)
 end
 
-print("[PHNPC] Outfits v0.0.16 loaded")
+-- ============================================================
+-- getOutfitDefenseSummary : expose les scores defensifs par slot equipe
+-- pour verification debug (checklist v0.0.16 "score defensif visible").
+-- ============================================================
+function PHNPC.getOutfitDefenseSummary(npc)
+    if not npc then return "" end
+    local worn = nil
+    pcall(function() worn = npc:getWornItems() end)
+    if not worn then return "" end
+
+    local out = {}
+    local n = 0
+    pcall(function() n = worn:size() end)
+    for i = 0, n - 1 do
+        local wi = nil
+        pcall(function() wi = worn:get(i) end)
+        if wi then
+            local loc, item = nil, nil
+            pcall(function() loc = wi:getLocation() end)
+            pcall(function() item = wi:getItem() end)
+            if loc and item then
+                local s = PHNPC.scoreClothing(item)
+                out[#out + 1] = tostring(loc) .. ":" .. string.format("%.1f", s)
+            end
+        end
+    end
+    table.sort(out)
+    return table.concat(out, " | ")
+end
+
+print("[PHNPC] Outfits v0.0.17 loaded")

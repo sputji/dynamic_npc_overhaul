@@ -1,3 +1,45 @@
+🎮 Checklist de re-test en jeu — v0.0.17
+
+Avant :
+- redemarrer completement PZ,
+- copier la version repo vers `C:\Users\Nicolas\Zomboid\mods\PH_DynamicNPCOverhaul`,
+- verifier dans `console.txt` les banners `v0.0.17 loaded` (Main/Manager/Actions/Barks/Combat/Inventory/Outfits/Pathfinding/Health/Loot).
+
+1. Stabilite runtime
+  [ ] Aucune erreur rouge PHNPC repetitive au demarrage (plus de boucle line 118/135 de Update).
+  [ ] Aucune erreur rouge PHNPC apres 5 minutes avec 5+ NPC recrutes.
+
+2. Suivi / recrutement
+  [ ] Le NPC garde ~2 tuiles d'ecart a l'arret (pas de collage joueur).
+  [ ] Plus de micro-saccades marche/course (plus de spam `follow anchor` toutes les secondes).
+  [ ] Changement de direction joueur fluide sans reset de path visible.
+  [ ] Franchissement portes/fenetres/clotures sans blocage milieu animation.
+
+3. Armes a feu
+  [ ] NPC avec arme a feu + munitions + Aiming>=1 tire a distance (<=10 tuiles).
+  [ ] Cooldown de tir respecte (pas de rafale continue).
+  [ ] NPC sans munitions ne tire pas et repasse melee.
+  [ ] NPC avec Aiming=0 n'utilise pas les armes a feu.
+
+4. Progression XP / competences
+  [ ] `getSkillSummary(npc)` affiche 13 competences (meme niveau 0).
+  [ ] Apres combat, l'XP evolue (Aiming/Blunt/Strength/Fitness/Maintenance).
+  [ ] Montee de niveau declenche un bark levelup visible.
+
+5. Vetements / Outfits
+  [ ] Vetements donnes sont equipes automatiquement (`onItemGiven`).
+  [ ] Si un vetement meilleur est donne sur meme slot, il remplace l'ancien.
+  [ ] Le score defensif est visible en debug (`OutfitDef`).
+
+6. Barks meteo
+  [ ] Par pluie : BarkRain1-3.
+  [ ] Par orage : BarkStorm1-3.
+  [ ] Par froid/neige : BarkSnow1-3.
+  [ ] Par canicule (>35 C) : BarkHot1-2.
+  [ ] Par brouillard dense : BarkFog1-2.
+
+---
+
 🎮 Checklist de re-test en jeu — v0.0.16
 
 Avant :
@@ -6,39 +48,39 @@ Avant :
 - verifier dans `console.txt` les banners `v0.0.16 loaded` (Main/Actions/Barks/Combat/Inventory/Outfits/Pathfinding/Health/Loot).
 
 1. Suivi / recrutement
-  [ ] Le NPC garde ~2 tuiles d'ecart a l'arret, sans collage.
-  [ ] Plus de micro-saccades marche/course (pas de spam re-path toutes les secondes).
-  [ ] Changement de direction joueur fluide.
-  [ ] Franchissement portes/fenetres/clotures sans blocage (pathToLocationF natif).
+  [❌] Le NPC garde ~2 tuiles d'ecart a l'arret, sans collage. colle toujours le joueur.
+  [❌] Plus de micro-saccades marche/course (pas de spam re-path toutes les secondes). Toujours des micro-saccades quand le NPC/PNJ Cours et marche, log montre un calcul a chaque secondes se qui fait les sacades il faut corriger cela !.
+  [❌] Changement de direction joueur fluide. toujours des micro-saccades quand le NPC/PNJ Cours et marche, log montre un calcul a chaque secondes se qui fait les sacades il faut corriger cela !.
+  [❌] Franchissement portes/fenetres/clotures sans blocage (pathToLocationF natif). ne fonctionne pas, le NPC/PNJ ne passe plus les barieres ou obstacles bas, il commance sont annimation pour passer de l'autres coter et reste bloqué au milieu. Voir log pour les erreurs.
 
 2. Armes a feu
-  [ ] NPC equipe une arme a feu si elle est dans son inventaire avec des munitions.
-  [ ] NPC tire sur les zombies a distance (<= 10 tuiles) et respecte le cooldown.
-  [ ] NPC sans munitions ne tente pas de tirer (reste en corps a corps).
-  [ ] NPC avec niveau Aiming = 0 n'utilise pas les armes a feu.
+  [❌] NPC equipe une arme a feu si elle est dans son inventaire avec des munitions. Utilise toujours les armes a contendante meme si il a une arme a feux avec un carton de munitions dans son inventaire. voir log pour les erreurs.
+  [❌] NPC tire sur les zombies a distance (<= 10 tuiles) et respecte le cooldown. : Non, le NPC/PNJ n'utilise pas les armes a feu pour tirer sur les zombies même s'il en a dans son inventaire avec des munitions, il utilise toujours les armes a contendante. voir log pour les erreurs.
+  [❌] NPC sans munitions ne tente pas de tirer (reste en corps a corps).
+  [❌] NPC avec niveau Aiming = 0 n'utilise pas les armes a feu.
 
 3. Progression XP / competences
-  [ ] `getSkillSummary(npc)` dans la console debug affiche les 13 competences.
-  [ ] Apres combat, l'XP augmente (verifiable via console debug).
-  [ ] Montee de niveau declenche un bark levelup visible.
+  [❌] `getSkillSummary(npc)` dans la console debug affiche les 13 competences.
+  [❌] Apres combat, l'XP augmente (verifiable via console debug).
+  [❌] Montee de niveau declenche un bark levelup visible.
 
 4. Vetements / Outfits
-  [ ] Vetements donnes portent automatiquement (appel onItemGiven).
-  [ ] Si le NPC a deja un vetement de score inferieur, il l'echange pour le meilleur.
-  [ ] Score defensif visible pour differents types de vetements.
+  [❌] Vetements donnes portent automatiquement (appel onItemGiven).
+  [❌] Si le NPC a deja un vetement de score inferieur, il l'echange pour le meilleur.
+  [❌] Score defensif visible pour differents types de vetements.
 
 5. Barks meteo
-  [ ] Par temps de pluie : NPC dit une phrase sur la pluie (BarkRain1-3).
-  [ ] Par orage intense : NPC dit une phrase sur l'orage (BarkStorm1-3).
-  [ ] Par temps froid/neige : NPC dit une phrase sur la neige (BarkSnow1-3).
-  [ ] Par canicule (>35 C) : NPC dit une phrase sur la chaleur (BarkHot1-2).
-  [ ] Par brouillard dense : NPC dit une phrase sur le brouillard (BarkFog1-2).
+  [❌] Par temps de pluie : NPC dit une phrase sur la pluie (BarkRain1-3).
+  [❌] Par orage intense : NPC dit une phrase sur l'orage (BarkStorm1-3).
+  [❌] Par temps froid/neige : NPC dit une phrase sur la neige (BarkSnow1-3).
+  [❌] Par canicule (>35 C) : NPC dit une phrase sur la chaleur (BarkHot1-2).
+  [❌] Par brouillard dense : NPC dit une phrase sur le brouillard (BarkFog1-2).
 
-6. Stabilite / console
+1. Stabilite / console
   [ ] Banners `v0.0.16 loaded` visibles pour Main/Manager/Actions/Barks/Combat/Inventory/Outfits/Pathfinding.
-  [ ] Aucune erreur rouge PHNPC au demarrage.
-  [ ] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif.
-  [ ] FPS stable avec 5+ NPC simultanes.
+  [❌] Aucune erreur rouge PHNPC au demarrage.
+  [❌] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif.
+  [✅] FPS stable avec 5+ NPC simultanes.
 
 ---
 
@@ -50,29 +92,29 @@ Avant :
 - verifier dans `console.txt` les banners `v0.0.15 loaded` (Actions/Enforce/Update/Combat/Inventory/Health/Loot).
 
 1. Suivi / recrutement
-  [ ] Le NPC garde ~2 tuiles d'ecart a l'arret, sans collage.
-  [ ] Plus de micro-saccades marche/course (pas de spam re-path toutes les secondes).
-  [ ] Changement de direction joueur fluide.
-  [ ] Franchissement clotures/obstacles bas sans blocage animation.
+  [❌] Le NPC garde ~2 tuiles d'ecart a l'arret, sans collage.
+  [❌] Plus de micro-saccades marche/course (pas de spam re-path toutes les secondes).
+  [❌] Changement de direction joueur fluide.
+  [❌] Franchissement clotures/obstacles bas sans blocage animation.
 
 1. Ordres de deplacement
-  [ ] "Va la-bas" atteint la cible puis reste en surveillance zone (pas de retour joueur).
-  [ ] "Mets-toi a l'abri" entre dans un batiment et bascule en `staying` sans sortir.
-  [ ] En zone cloturee : pas de boucle `ClimbOverFenceState`.
+  [❌] "Va la-bas" atteint la cible puis reste en surveillance zone (pas de retour joueur).
+  [❌] "Mets-toi a l'abri" entre dans un batiment et bascule en `staying` sans sortir.
+  [❌] En zone cloturee : pas de boucle `ClimbOverFenceState`.
 
 1. Combat / equipement
-  [ ] Combat stable sans erreurs rouges PHNPC.
-  [ ] Le NPC garde le verrou d'ordre `goingto/shelter` en presence de zombies.
+  [❌] Combat stable sans erreurs rouges PHNPC.
+  [❌] Le NPC garde le verrou d'ordre `goingto/shelter` en presence de zombies.
 
 1. Inventaire / tenue / mort
-  [ ] Vetements donnes au NPC portes automatiquement (slot libre/remplacement meilleur score).
-  [ ] Armes donnees visibles dans le cadavre apres mort.
-  [ ] Contenu cadavre coherent (inventaire + vetements + armes).
+  [❌] Vetements donnes au NPC portes automatiquement (slot libre/remplacement meilleur score).
+  [❌] Armes donnees visibles dans le cadavre apres mort.
+  [❌] Contenu cadavre coherent (inventaire + vetements + armes).
 
 1. Validation console
-  [ ] Banners modules `v0.0.15 loaded` visibles.
-  [ ] Aucune erreur rouge PHNPC au demarrage.
-  [ ] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif.
+  [❌] Banners modules `v0.0.15 loaded` visibles.
+  [❌] Aucune erreur rouge PHNPC au demarrage.
+  [❌] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif.
 
 ---
 
