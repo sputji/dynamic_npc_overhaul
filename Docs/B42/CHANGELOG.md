@@ -1,5 +1,63 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.16] — Refactoring modulaire : IA armes a feu, progression XP, vetements auto, barks meteo (2026-05-30)
+
+### Nouveaux modules
+
+- `PHNPC_Main.lua` *(client)* — point d'entree central v0.0.16 : verifie la sante de tous les modules au chargement, coordonne les hooks `OnGameStart` et `OnConnected`, expose `PHNPC.VERSION = "0.0.16"`.
+- `PHNPC_Pathfinding.lua` *(client)* — pathfinding nouvelle generation :
+  - utilise `pathToLocationF` natif (NavigatorGrid PZ) pour gerer automatiquement portes, fenetres et clotures.
+  - cooldown `PATH_MIN_TICKS = 15` pour eviter les micro-freezes lies au recalcul par seconde.
+  - `schedulePathTo(npc, x, y, z)` : remplace les appels directs a `pathToLocationF`.
+  - `checkNearbyDoor(npc, tx, ty)` : detecte une porte dans le rayon `DOOR_SEARCH_RADIUS = 4` et l'ouvre avant de pather.
+  - `findFreeSquareNear`, `findEscapeDirection`, `findClearAreaNear` ameliores.
+- `PHNPC_Outfits.lua` *(client)* — selection de vetements extraite de `PHNPC_Inventory.lua` :
+  - `scoreClothing(item)` : calcule le score defensif/confort d'un vetement.
+  - `getCurrentWorn(npc, bodyLocation)` : retourne le vetement porte sur un slot donne.
+  - `setWornItem(npc, bodyLocation, item)` : equipe un vetement avec fallback API B42.
+  - `autoEquipBestOutfit(npc)` : remplace les tenues de score inferieur, compatible `autoEquipFromInventory`.
+
+### Armes a feu (PHNPC_Combat.lua v0.0.16)
+
+- `hasAmmoForWeapon(npc, weapon)` : verifie la presence d'une munition correspondante (`weapon:getAmmoType()`) dans l'inventaire du NPC.
+- `scoreWeapon(npc, item)` : les armes a distance recoivent un bonus de +20 si le NPC a les munitions adaptees ET le niveau de competence `Aiming >= RANGED_MIN_SKILL` (1 par defaut).
+- Bloc d'attaque a distance ajoute : le NPC tire jusqu'a `PHNPC.RANGED_ATTACK_RANGE = 10` tuiles avec un cooldown `RANGED_COOLDOWN = 120` ticks entre deux tirs.
+- Constante `PHNPC.RANGED_ATTACK_RANGE = 10` ajoutee dans `PHNPC_Core.lua`.
+
+### Progression XP / competences (PHNPC_Stats.lua v0.0.16)
+
+- Table `OUTFIT_SKILLS` : 40+ tenues de spawn × 13 competences (Strength, Fitness, Aiming, Nimble, Sneaking, Reloading, Axe, Blunt, LongBlunt, SmallBlade, LongBlade, Spear, Maintenance).
+- `initSkills(npc)` : initialise les niveaux de base depuis `OUTFIT_SKILLS` et les stocke en `ModData`.
+- `getNPCSkillLevel(npc, skillName)` : retourne le niveau courant d'une competence.
+- `addNPCXP(npc, skillName, amount)` : ajoute de l'XP, fait monter le niveau selon la formule `xpForLevel(n) = XP_BASE * (n+1)^XP_EXPONENT` (`XP_BASE=150`, `XP_EXPONENT=1.5`, `MAX_LEVEL=10`), declenche un bark `levelup` si niveau augmente.
+- `getSkillSummary(npc)` : retourne une chaine resumant les niveaux actuels pour le debug.
+- `initStats()` appelle desormais `initSkills()` automatiquement.
+
+### Barks meteo (PHNPC_Barks.lua v0.0.16)
+
+- `getWeatherState()` : detecte la meteo via `GameTime.getInstance()` (pluie, orage, neige, canicule, brouillard).
+- `sayWeatherBark(npc)` : fait dire au NPC un bark adapte a la meteo courante.
+- Nouvelles cles `BARK_KEYS` : `weather_rain`, `weather_storm`, `weather_snow`, `weather_hot`, `weather_fog`, `levelup`.
+- Garde-fou `getText()` : appel lazisse pour eviter le retour de la cle brute au chargement de fichier.
+
+### Inventaire (PHNPC_Inventory.lua v0.0.16)
+
+- `autoEquipFromInventory` delegue desormais a `PHNPC_Outfits.autoEquipBestOutfit` (suppression de la logique dupliquee).
+- Hook `onItemGiven(npc, item)` : appelle `autoEquipBestOutfit` immediatement si l'objet donne est un vetement.
+
+### Traductions
+
+- `UI_PHNPC_EN.txt` : 14 nouvelles cles (BarkRain1-3, BarkStorm1-3, BarkSnow1-3, BarkHot1-2, BarkFog1-2, BarkLevelUp1-2).
+- `UI_PHNPC_FR.txt` : memes 14 cles en francais.
+
+### Version
+
+- `B42/42/mod.info` -> `version=0.0.16`.
+- `PHNPC_Manager.lua` reference les nouveaux modules (Main, Pathfinding, Outfits).
+- Banners modules alignes sur `v0.0.16 loaded`.
+
+---
+
 ## [0.0.15] — Stabilisation finale follow/ordres/clotures + inventaire/loot (2026-05-28)
 
 ### Correctifs gameplay

@@ -109,6 +109,17 @@ Events.OnTick.Add(function()
                 end
             end
 
+            -- Barks meteo : une fois par ~1000 ticks pour les NPC recrutes. (v0.0.16)
+            if md.PHNPC_Recruited then
+                md.PHNPC_WeatherBarkTimer = (md.PHNPC_WeatherBarkTimer or 0) + 1
+                if md.PHNPC_WeatherBarkTimer >= 1000 then
+                    md.PHNPC_WeatherBarkTimer = 0
+                    if PHNPC.sayWeatherBark then
+                        pcall(function() PHNPC.sayWeatherBark(npc) end)
+                    end
+                end
+            end
+
             -- v0.0.11 : SUPPRIME les appels checkAndOpenDoors/Windows ici.
             -- Ils sont desormais appeles UNIQUEMENT au lancement d'un path
             -- (dans startFollowing/startMovingTo) -> elimine le ping-pong

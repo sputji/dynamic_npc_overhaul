@@ -1,6 +1,101 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.15
+# Architecture B42 — Dynamic NPC Overhaul v0.0.16
 
-> v0.0.15 — Stabilisation post KO v0.0.14 (2026-05-28)
+> v0.0.16 — Refactoring modulaire : IA armes a feu, progression XP, vetements auto, barks meteo (2026-05-30)
+>
+> Axes techniques appliques :
+>
+> 1. **Pathfinding natif** : `PHNPC_Pathfinding.lua` remplace `PHNPC_Pathfind.lua` ; `pathToLocationF` (NavigatorGrid) gere automatiquement portes/fenetres/clotures avec cooldown `PATH_MIN_TICKS=15`.
+> 2. **Armes a feu** : `PHNPC_Combat.lua` detecte les munitions + le niveau `Aiming`, tire jusqu'a `RANGED_ATTACK_RANGE=10` tuiles avec cooldown 120 ticks.
+> 3. **Progression XP** : `PHNPC_Stats.lua` gere 13 competences + formule XP + bark levelup.
+> 4. **Module Outfits** : `PHNPC_Outfits.lua` centralise la selection/equipement de vetements (extrait de Inventory).
+> 5. **Barks meteo** : `PHNPC_Barks.lua` detecte pluie/orage/neige/canicule/brouillard via `GameTime`.
+> 6. **Init centrale** : `PHNPC_Main.lua` verifie la sante de tous les modules au demarrage.
+
+## Structure des fichiers (v0.0.16)
+
+```
+B42/42/
+  mod.info                              version=0.0.16
+  media/
+    lua/
+      shared/
+        PHNPC_Core.lua                  constantes globales + RANGED_ATTACK_RANGE
+        PHNPC_Stats.lua                 stats NPC + systeme XP/competences (v0.0.16)
+        Translate/
+          EN/UI_PHNPC_EN.txt            traductions anglaises (+ 14 cles meteo/levelup)
+          FR/UI_PHNPC_FR.txt            traductions francaises (+ 14 cles meteo/levelup)
+      client/
+        PHNPC_Main.lua                  [NOUVEAU v0.0.16] init centrale + health check
+        PHNPC_Manager.lua               point d'entree ; liste les dependances modules
+        PHNPC_Actions.lua               deplacement + fix proximity
+        PHNPC_Barks.lua                 barks + barks meteo (v0.0.16)
+        PHNPC_Combat.lua                IA combat / fuite + armes a feu (v0.0.16)
+        PHNPC_Convert.lua               spawn NPC
+        PHNPC_Debug.lua                 menu debug
+        PHNPC_Enforce.lua               comportement NPC + animation
+        PHNPC_Health.lua                sante NPC
+        PHNPC_Inventory.lua             inventaire NPC + onItemGiven (v0.0.16)
+        PHNPC_Loot.lua                  loot cadavre
+        PHNPC_Menu.lua                  menu clic-droit
+        PHNPC_Orders.lua                ordres recrutement/follow/stay/...
+        PHNPC_Outfits.lua               [NOUVEAU v0.0.16] selection vetements par score
+        PHNPC_Pathfind.lua              pathfinding legacy (conserve)
+        PHNPC_Pathfinding.lua           [NOUVEAU v0.0.16] pathfinding natif coroutine
+        PHNPC_Update.lua                events OnZombieUpdate / OnTick / OnGameStart
+        PHNPC_Danger.lua                danger attractif zombies
+        PHNPC_Dialogue.lua              dialogues Ollama
+```
+
+## Ordre de chargement PZ
+
+PZ charge `shared/` avant `client/`, puis les fichiers `client/` dans l'ordre alphabetique. L'ordre effectif cote client est donc :
+
+```
+PHNPC_Actions → PHNPC_Barks → PHNPC_Combat → PHNPC_Convert → PHNPC_Danger
+→ PHNPC_Debug → PHNPC_Dialogue → PHNPC_Enforce → PHNPC_Health
+→ PHNPC_Inventory → PHNPC_Loot → PHNPC_Main  ← health check ici
+→ PHNPC_Manager → PHNPC_Menu → PHNPC_Orders → PHNPC_Outfits
+→ PHNPC_Pathfind → PHNPC_Pathfinding → PHNPC_Update
+```
+
+`PHNPC_Main.lua` (lettre M) est charge apres la majorite des modules : c'est intentionnel pour que le health check puisse verifier la presence de toutes les fonctions essentielles.
+
+## Constantes cles (PHNPC_Core.lua)
+
+| Constante | Valeur | Fichier usage |
+|---|---|---|
+| `PHNPC.FOLLOW_STOP_DIST` | 2.5 | Actions |
+| `PHNPC.FOLLOW_RUN_DIST` | 6 | Actions |
+| `PHNPC.FOLLOW_REPATH_TICKS` | 20 | Actions |
+| `PHNPC.FLEE_HP_RATIO` | 0.30 | Combat |
+| `PHNPC.COMBAT_RANGE` | 1.5 | Combat |
+| `PHNPC.RANGED_ATTACK_RANGE` | 10 | Combat (v0.0.16) |
+| `PHNPC.DOOR_SEARCH_RADIUS` | 4 | Pathfinding (v0.0.16) |
+| `PHNPC.PATH_MIN_TICKS` | 15 | Pathfinding (v0.0.16) |
+| `PHNPC.RANGED_COOLDOWN` | 120 | Combat (v0.0.16) |
+| `PHNPC.RANGED_MIN_SKILL` | 1 | Combat (v0.0.16) |
+
+## Systeme de progression (PHNPC_Stats.lua v0.0.16)
+
+- 13 competences par NPC : `Strength`, `Fitness`, `Aiming`, `Nimble`, `Sneaking`, `Reloading`, `Axe`, `Blunt`, `LongBlunt`, `SmallBlade`, `LongBlade`, `Spear`, `Maintenance`.
+- Stockage en `ModData` : `PHNPC_Skill_<Name>` (niveau 0-10) + `PHNPC_XP_<Name>` (XP cumulee).
+- Formule de montee de niveau : `xpForLevel(n) = sum(150 * (i+1)^1.5)` pour i de 0 a n-1.
+- API : `PHNPC.getNPCSkillLevel(npc, skill)`, `PHNPC.addNPCXP(npc, skill, amount)`, `PHNPC.getSkillSummary(npc)`.
+
+## Detection meteo (PHNPC_Barks.lua v0.0.16)
+
+```lua
+local rain  = GameTime.getInstance():getRainIntensity()  -- 0.0 - 1.0
+local temp  = GameTime.getInstance():getTemperature()    -- Celsius
+local fog   = GameTime.getInstance():getFogIntensity()   -- 0.0 - 1.0
+-- storm  : rain > 0.7
+-- rain   : rain > 0.1
+-- snow   : rain > 0.1 AND temp < 0
+-- hot    : temp > 35
+-- fog    : fog > 0.3
+```
+
+> v0.0.15 — Stabilisation finale follow/ordres/clotures + inventaire/loot (2026-05-28)
 >
 > Axes techniques appliques :
 >

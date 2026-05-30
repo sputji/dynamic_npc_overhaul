@@ -1,6 +1,23 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 28 mai 2026 | Version **0.0.15** | Stabilisation post KO v0.0.14 : follow anti micro-saccades renforce, verrou d'ordres `goingto/shelter`, mitigation clotures non bloquante, shelter in-building -> staying, auto-equip vetements API B42 robuste, loot mort fiabilise pour items/armes donnes.
+> Mise a jour : 30 mai 2026 | Version **0.0.16** | Refactoring modulaire : pathfinding natif, armes a feu NPC, progression XP/competences, module outfits, barks meteo.
+
+---
+
+## Roadmap execution v0.0.16 (2026-05-30)
+
+### Patch v0.0.16 applique (30 mai 2026)
+
+- ✅ Nouveau module `PHNPC_Main.lua` : initialisation centrale + health check modules.
+- ✅ Nouveau module `PHNPC_Pathfinding.lua` : pathfinding natif `pathToLocationF` (NavigatorGrid), cooldown 15 ticks, smart-door detection.
+- ✅ Nouveau module `PHNPC_Outfits.lua` : selection/equipement de vetements par score defensif (extrait de Inventory).
+- ✅ `PHNPC_Combat.lua` : support armes a feu (detection munitions + competence Aiming, tir a distance <= 10 tuiles, cooldown 120 ticks).
+- ✅ `PHNPC_Stats.lua` : systeme XP/competences (13 skills, formule XP, `addNPCXP`, `getNPCSkillLevel`, bark levelup).
+- ✅ `PHNPC_Barks.lua` : barks meteo (pluie/orage/neige/canicule/brouillard) via `GameTime`.
+- ✅ `PHNPC_Inventory.lua` : delegation outfits + hook `onItemGiven`.
+- ✅ Traductions EN + FR : 14 nouvelles cles (meteo + levelup).
+- ✅ `mod.info` version 0.0.16.
+- ⏳ Validation finale via checklist v0.0.16 en jeu.
 
 ---
 

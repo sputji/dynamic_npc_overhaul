@@ -1,3 +1,47 @@
+🎮 Checklist de re-test en jeu — v0.0.16
+
+Avant :
+- redemarrer completement PZ,
+- copier la version repo vers `C:\Users\Nicolas\Zomboid\mods\PH_DynamicNPCOverhaul`,
+- verifier dans `console.txt` les banners `v0.0.16 loaded` (Main/Actions/Barks/Combat/Inventory/Outfits/Pathfinding/Health/Loot).
+
+1. Suivi / recrutement
+  [ ] Le NPC garde ~2 tuiles d'ecart a l'arret, sans collage.
+  [ ] Plus de micro-saccades marche/course (pas de spam re-path toutes les secondes).
+  [ ] Changement de direction joueur fluide.
+  [ ] Franchissement portes/fenetres/clotures sans blocage (pathToLocationF natif).
+
+2. Armes a feu
+  [ ] NPC equipe une arme a feu si elle est dans son inventaire avec des munitions.
+  [ ] NPC tire sur les zombies a distance (<= 10 tuiles) et respecte le cooldown.
+  [ ] NPC sans munitions ne tente pas de tirer (reste en corps a corps).
+  [ ] NPC avec niveau Aiming = 0 n'utilise pas les armes a feu.
+
+3. Progression XP / competences
+  [ ] `getSkillSummary(npc)` dans la console debug affiche les 13 competences.
+  [ ] Apres combat, l'XP augmente (verifiable via console debug).
+  [ ] Montee de niveau declenche un bark levelup visible.
+
+4. Vetements / Outfits
+  [ ] Vetements donnes portent automatiquement (appel onItemGiven).
+  [ ] Si le NPC a deja un vetement de score inferieur, il l'echange pour le meilleur.
+  [ ] Score defensif visible pour differents types de vetements.
+
+5. Barks meteo
+  [ ] Par temps de pluie : NPC dit une phrase sur la pluie (BarkRain1-3).
+  [ ] Par orage intense : NPC dit une phrase sur l'orage (BarkStorm1-3).
+  [ ] Par temps froid/neige : NPC dit une phrase sur la neige (BarkSnow1-3).
+  [ ] Par canicule (>35 C) : NPC dit une phrase sur la chaleur (BarkHot1-2).
+  [ ] Par brouillard dense : NPC dit une phrase sur le brouillard (BarkFog1-2).
+
+6. Stabilite / console
+  [ ] Banners `v0.0.16 loaded` visibles pour Main/Manager/Actions/Barks/Combat/Inventory/Outfits/Pathfinding.
+  [ ] Aucune erreur rouge PHNPC au demarrage.
+  [ ] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif.
+  [ ] FPS stable avec 5+ NPC simultanes.
+
+---
+
 🎮 Checklist de re-test en jeu — v0.0.15
 
 Avant :
