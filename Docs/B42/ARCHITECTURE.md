@@ -77,7 +77,7 @@ PHNPC_Actions → PHNPC_Barks → PHNPC_Combat → PHNPC_Convert → PHNPC_Dange
 
 ## Systeme de progression (PHNPC_Stats.lua v0.0.16)
 
-- 13 competences par NPC : `Strength`, `Fitness`, `Aiming`, `Nimble`, `Sneaking`, `Reloading`, `Axe`, `Blunt`, `LongBlunt`, `SmallBlade`, `LongBlade`, `Spear`, `Maintenance`.
+- 13 competences par NPC : `Strength`, `Fitness`, `Aiming`, `Nimble`, `Sneaking`, `Axe`, `Blunt`, `SmallBlade`, `Maintenance`, `Doctor`, `Cooking`, `Carpentry`, `Farming`.
 - Stockage en `ModData` : `PHNPC_Skill_<Name>` (niveau 0-10) + `PHNPC_XP_<Name>` (XP cumulee).
 - Formule de montee de niveau : `xpForLevel(n) = sum(150 * (i+1)^1.5)` pour i de 0 a n-1.
 - API : `PHNPC.getNPCSkillLevel(npc, skill)`, `PHNPC.addNPCXP(npc, skill, amount)`, `PHNPC.getSkillSummary(npc)`.

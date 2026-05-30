@@ -86,7 +86,7 @@ Animations humaines complètes grâce à un système d'AnimSets custom :
 ### Nouveautés v0.0.16
 
 - **Armes à feu NPC** : les PNJ utilisent les armes à feu s'ils ont les munitions adaptées ET un niveau `Aiming ≥ 1`. Tir jusqu'à 10 tuiles, cooldown 120 ticks entre deux rafales.
-- **Progression XP / compétences** : 13 compétences par NPC (Strength, Fitness, Aiming, Nimble, Sneaking, Reloading, Axe, Blunt, SmallBlade, LongBlade, Spear, Maintenance). L'XP est accumulée en combat et déclenche des montées de niveau avec barks dédiés.
+- **Progression XP / compétences** : 13 compétences par NPC (Strength, Fitness, Aiming, Nimble, Sneaking, Axe, Blunt, SmallBlade, Maintenance, Doctor, Cooking, Carpentry, Farming). L'XP est accumulée en combat et déclenche des montées de niveau avec barks dédiés.
 - **Module Outfits** : sélection et équipement automatique des vêtements selon le score défensif ; l'échange se déclenche immédiatement quand le joueur donne un vêtement (`onItemGiven`).
 - **Pathfinding natif** : `pathToLocationF` (NavigatorGrid PZ) gère automatiquement les portes, fenêtres et clôtures, avec cooldown 15 ticks pour éliminer les micro-freezes.
 - **Réactions météo** : barks contextuels selon la météo courante (pluie, orage, neige, canicule, brouillard) via l'API `GameTime`.

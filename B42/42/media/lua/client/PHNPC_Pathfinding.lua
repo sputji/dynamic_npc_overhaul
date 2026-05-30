@@ -71,15 +71,15 @@ function PHNPC.findEscapeDirection(npc, enemy, range)
     local ex, ey     = enemy:getX(), enemy:getY()
 
     local bx = nx - ex
-    local by_ = ny - ey
-    local bl = math.sqrt(bx * bx + by_ * by_)
-    if bl < 0.01 then bx, by_, bl = 1, 0, 1 end
+    local dirY = ny - ey
+    local bl = math.sqrt(bx * bx + dirY * dirY)
+    if bl < 0.01 then bx, dirY, bl = 1, 0, 1 end
     bx = bx / bl
-    by_ = by_ / bl
+    dirY = dirY / bl
 
     local cell = getCell()
     if not cell then
-        return nx + bx * range, ny + by_ * range
+        return nx + bx * range, ny + dirY * range
     end
 
     local angles = { 0, 45, -45, 90, -90, 135, -135, 180 }
@@ -87,8 +87,8 @@ function PHNPC.findEscapeDirection(npc, enemy, range)
         local ang = math.rad(angDeg)
         local cosA = math.cos(ang)
         local sinA = math.sin(ang)
-        local dx = bx * cosA - by_ * sinA
-        local dy = bx * sinA + by_ * cosA
+        local dx = bx * cosA - dirY * sinA
+        local dy = bx * sinA + dirY * cosA
         local tx = nx + dx * range
         local ty = ny + dy * range
         local ok, walkable = pcall(function()
@@ -100,7 +100,7 @@ function PHNPC.findEscapeDirection(npc, enemy, range)
         end
     end
 
-    return nx + bx * range, ny + by_ * range
+    return nx + bx * range, ny + dirY * range
 end
 
 -- ============================================================

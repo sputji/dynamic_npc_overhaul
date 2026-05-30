@@ -35,9 +35,11 @@
 -- ============================================================
 
 -- Seuil de competence Aiming minimal pour utiliser une arme a feu
-local RANGED_MIN_SKILL = 1  -- niveau 1 Aiming suffit (progression prise en compte)
+local RANGED_MIN_SKILL  = 1    -- niveau 1 Aiming suffit (progression prise en compte)
 -- Cooldown specifique armes a feu (plus long car bruit + munitions limitees)
-local RANGED_COOLDOWN  = 120  -- ticks
+local RANGED_COOLDOWN   = 120  -- ticks
+-- Degats infliges par un tir NPC (avant soustraction aux HP zombie)
+local RANGED_DAMAGE     = 40   -- HP par tir
 
 -- hasAmmoForWeapon : verifie si le NPC possede des munitions pour l'arme donnee
 local function hasAmmoForWeapon(npc, weapon)
@@ -259,7 +261,7 @@ function PHNPC.npcCombatStep(npc)
                             end
                         end
                     end
-                    local zh = target:getHealth() - 40  -- armes a feu : plus de degats
+                    local zh = target:getHealth() - RANGED_DAMAGE  -- armes a feu : plus de degats
                     if zh <= 0 then zh = 0 end
                     target:setHealth(zh)
                     target:knockDown(true)
@@ -313,7 +315,7 @@ function PHNPC.npcCombatStep(npc)
                         if ammo then pcall(function() inv:Remove(ammo) end) end
                     end
                 end
-                local zh = target:getHealth() - 40
+                local zh = target:getHealth() - RANGED_DAMAGE
                 if zh <= 0 then zh = 0 end
                 target:setHealth(zh)
                 target:knockDown(true)

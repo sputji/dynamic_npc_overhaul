@@ -26,7 +26,7 @@
 
 ### Progression XP / competences (PHNPC_Stats.lua v0.0.16)
 
-- Table `OUTFIT_SKILLS` : 40+ tenues de spawn × 13 competences (Strength, Fitness, Aiming, Nimble, Sneaking, Reloading, Axe, Blunt, LongBlunt, SmallBlade, LongBlade, Spear, Maintenance).
+- Table `OUTFIT_SKILLS` : 40+ tenues de spawn × 13 competences (Strength, Fitness, Aiming, Nimble, Sneaking, Axe, Blunt, SmallBlade, Maintenance, Doctor, Cooking, Carpentry, Farming).
 - `initSkills(npc)` : initialise les niveaux de base depuis `OUTFIT_SKILLS` et les stocke en `ModData`.
 - `getNPCSkillLevel(npc, skillName)` : retourne le niveau courant d'une competence.
 - `addNPCXP(npc, skillName, amount)` : ajoute de l'XP, fait monter le niveau selon la formule `xpForLevel(n) = XP_BASE * (n+1)^XP_EXPONENT` (`XP_BASE=150`, `XP_EXPONENT=1.5`, `MAX_LEVEL=10`), declenche un bark `levelup` si niveau augmente.

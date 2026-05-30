@@ -120,6 +120,16 @@ function PHNPC.sayBark(npc, state, r, g, b)
 end
 
 -- ============================================================
+-- Seuils de detection meteo (v0.0.16) — extraits pour faciliter le reglage
+-- ============================================================
+local WEATHER_STORM_THRESHOLD  = 0.7   -- intensite pluie au-dessus = orage
+local WEATHER_RAIN_THRESHOLD   = 0.1   -- intensite pluie au-dessus = pluie
+local WEATHER_SNOW_RAIN_MIN    = 0.05  -- precipitation minimale pour neige
+local WEATHER_HOT_TEMP         = 35    -- temperature (Celsius) au-dessus = canicule
+local WEATHER_SNOW_TEMP        = 0     -- temperature (Celsius) en-dessous = neige possible
+local WEATHER_FOG_THRESHOLD    = 0.3   -- intensite brouillard au-dessus = brouillard
+
+-- ============================================================
 -- PHNPC.getWeatherState() [NOUVEAU v0.0.16]
 -- Detecte la meteo courante via l'API native PZ.
 -- Retourne : "rain", "storm", "snow", "hot", "fog", "clear"
@@ -133,10 +143,10 @@ function PHNPC.getWeatherState()
         -- Verifier la pluie / orage
         local rainIntensity = 0
         pcall(function() rainIntensity = gt:getRainIntensity() end)
-        if rainIntensity > 0.7 then
+        if rainIntensity > WEATHER_STORM_THRESHOLD then
             state = "storm"
             return
-        elseif rainIntensity > 0.1 then
+        elseif rainIntensity > WEATHER_RAIN_THRESHOLD then
             state = "rain"
             return
         end
@@ -144,13 +154,13 @@ function PHNPC.getWeatherState()
         -- Verifier la neige (temperature basse + precipitations)
         local temp = 20
         pcall(function() temp = gt:getTemperature() end)
-        if temp < 0 and rainIntensity > 0.05 then
+        if temp < WEATHER_SNOW_TEMP and rainIntensity > WEATHER_SNOW_RAIN_MIN then
             state = "snow"
             return
         end
 
         -- Canicule
-        if temp > 35 then
+        if temp > WEATHER_HOT_TEMP then
             state = "hot"
             return
         end
@@ -158,7 +168,7 @@ function PHNPC.getWeatherState()
         -- Brouillard
         local fog = 0
         pcall(function() fog = gt:getFogIntensity() end)
-        if fog and fog > 0.3 then
+        if fog and fog > WEATHER_FOG_THRESHOLD then
             state = "fog"
             return
         end

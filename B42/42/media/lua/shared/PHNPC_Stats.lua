@@ -11,8 +11,8 @@
       - PHNPC.getNPCSkillLevel(npc, skillName) : lit le niveau d'une competence.
       - PHNPC.addNPCXP(npc, skillName, xpAmount) : ajoute de l'XP et fait monter
         de niveau si le seuil est atteint.
-      - Competences disponibles : Strength, Fitness, Aiming, Blunt, Blade,
-        Maintenance, Nimble, Sneaking, Doctor, Cooking, Carpentry, Farming.
+      - Competences disponibles : Strength, Fitness, Aiming, Blunt, SmallBlade,
+        Maintenance, Nimble, Sneaking, Doctor, Cooking, Carpentry, Farming, Axe.
 
     Appelé depuis PHNPC_Manager.lua convertToNPC()
     Nécessite PHNPC_Core.lua chargé avant (namespace PHNPC + PHNPC.OUTFIT_STATS)
@@ -37,25 +37,25 @@ local OUTFIT_SKILLS = {
     Security        = { Aiming=2, Nimble=3, Fitness=3, Strength=3, Blunt=3 },
     MallSecurity    = { Aiming=2, Nimble=2, Fitness=3, Strength=3, Blunt=2 },
     PrisonGuard     = { Aiming=3, Nimble=3, Fitness=4, Strength=5, Blunt=4 },
-    Veteran         = { Aiming=6, Nimble=5, Fitness=5, Strength=5, Blade=4 },
-    ArmyCamoGreen   = { Aiming=6, Nimble=5, Fitness=6, Strength=6, Blade=4 },
-    ArmyCamoDesert  = { Aiming=6, Nimble=5, Fitness=6, Strength=6, Blade=4 },
+    Veteran         = { Aiming=6, Nimble=5, Fitness=5, Strength=5, SmallBlade=4 },
+    ArmyCamoGreen   = { Aiming=6, Nimble=5, Fitness=6, Strength=6, SmallBlade=4 },
+    ArmyCamoDesert  = { Aiming=6, Nimble=5, Fitness=6, Strength=6, SmallBlade=4 },
     PrivateMilitia  = { Aiming=5, Nimble=4, Fitness=5, Strength=5, Blunt=4 },
-    BountyHunter    = { Aiming=5, Nimble=4, Fitness=4, Strength=4, Blade=3 },
+    BountyHunter    = { Aiming=5, Nimble=4, Fitness=4, Strength=4, SmallBlade=3 },
     Fireman         = { Fitness=6, Strength=6, Axe=4, Carpentry=2 },
     Doctor          = { Doctor=6, Fitness=2, Strength=2 },
     Nurse           = { Doctor=5, Fitness=2, Strength=1 },
     AmbulanceDriver = { Doctor=3, Fitness=3, Strength=2 },
     Pharmacist      = { Doctor=4, Fitness=1 },
     Farmer          = { Farming=5, Carpentry=3, Fitness=3, Strength=4 },
-    Chef            = { Cooking=6, Blade=3, Fitness=2 },
+    Chef            = { Cooking=6, SmallBlade=3, Fitness=2 },
     Mechanic        = { Maintenance=5, Carpentry=3, Strength=4 },
     ConstructionWorker = { Carpentry=5, Strength=5, Fitness=4, Blunt=3 },
     Trucker         = { Fitness=3, Strength=4, Maintenance=2 },
     Woodcut         = { Fitness=4, Strength=5, Axe=4 },
     MetalWorker     = { Strength=5, Fitness=3, Maintenance=3 },
-    Ranger          = { Aiming=4, Farming=3, Fitness=5, Sneaking=4, Blade=3 },
-    Hunter          = { Aiming=5, Fitness=4, Sneaking=4, Blade=3 },
+    Ranger          = { Aiming=4, Farming=3, Fitness=5, Sneaking=4, SmallBlade=3 },
+    Hunter          = { Aiming=5, Fitness=4, Sneaking=4, SmallBlade=3 },
     Fisherman       = { Fitness=3, Strength=3 },
     Camper          = { Farming=2, Fitness=3, Sneaking=2 },
     Survivalist     = { Fitness=4, Strength=4, Carpentry=2, Farming=2, Sneaking=3 },
@@ -69,7 +69,7 @@ local OUTFIT_SKILLS = {
     Biker           = { Fitness=3, Strength=4, Maintenance=2, Blunt=2 },
     Redneck         = { Aiming=3, Fitness=3, Strength=4, Axe=2 },
     Hobbo           = { Fitness=2, Strength=2, Sneaking=3 },
-    Inmate          = { Fitness=4, Strength=4, Blade=2, Blunt=3 },
+    Inmate          = { Fitness=4, Strength=4, SmallBlade=2, Blunt=3 },
     Priest          = { Fitness=1, Doctor=2 },
     FitnessInstructor = { Fitness=6, Strength=5, Nimble=4 },
     Generic01       = { Fitness=2, Strength=2 },
@@ -82,7 +82,7 @@ local OUTFIT_SKILLS = {
 
 -- Liste de toutes les competences supportees
 local ALL_SKILLS = {
-    "Strength", "Fitness", "Aiming", "Blunt", "Blade", "Axe",
+    "Strength", "Fitness", "Aiming", "Blunt", "SmallBlade", "Axe",
     "Maintenance", "Nimble", "Sneaking", "Doctor", "Cooking",
     "Carpentry", "Farming",
 }
