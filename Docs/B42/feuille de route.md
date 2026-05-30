@@ -29,13 +29,13 @@ Etat d'implementation des phases P0 a P7 :
 
 | Phase | Etat | Concret realise en v0.0.13 |
 |---|---|---|
-| P0 | ✅ applique | Follow anti-collage (ancre), maintien distance 2 tuiles, reduction des interruptions de mouvement dans Enforce |
-| P1 | ✅ applique | Durcissement etats de deplacement (`goingto/shelter/following`) contre `lunge/attack/eatBody` |
-| P2 | ✅ applique partiel | Loot inclut armes en main + dedupe ; arme `Chef` corrigee (`TinOpener`) |
-| P3 | ✅ applique partiel | Selection meilleure arme comparee a l'arme equipee |
-| P4 | ✅ applique partiel | Auto-equipement vetements depuis inventaire (slots libres) |
+| P0 | 🟡 en cours | Follow anti-collage (ancre), maintien distance 2 tuiles, reduction des interruptions de mouvement dans Enforce |
+| P1 | 🟡 en cours | Durcissement etats de deplacement (`goingto/shelter/following`) contre `lunge/attack/eatBody` |
+| P2 | 🟡 en cours | Loot inclut armes en main + dedupe ; arme `Chef` corrigee (`TinOpener`) |
+| P3 | 🟡 en cours | Selection meilleure arme comparee a l'arme equipee |
+| P4 | 🟡 en cours | Auto-equipement vetements depuis inventaire (slots libres) |
 | P5 | ✅ applique | Re-test structure v0.0.15 + checklist dediee ajoutee |
-| P6 | ✅ applique | Correctifs inventaire/loot finalises cote code |
+| P6 | 🟡 en cours | Correctifs inventaire/loot finalises cote code |
 | P7 | 🟡 en cours | Validation terrain finale + publication release stable |
 
 Objectif du prochain passage : valider en jeu l'extinction des regressions `Va la-bas`, `Abri`, et `ClimbOverFenceState` sur maps avec clotures.

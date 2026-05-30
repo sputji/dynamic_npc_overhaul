@@ -6,29 +6,29 @@ Avant :
 - verifier dans `console.txt` les banners `v0.0.15 loaded` (Actions/Enforce/Update/Combat/Inventory/Health/Loot).
 
 1. Suivi / recrutement
-  [ ] Le NPC garde ~2 tuiles d'ecart a l'arret, sans collage.
-  [ ] Plus de micro-saccades marche/course (pas de spam re-path toutes les secondes).
-  [ ] Changement de direction joueur fluide.
-  [ ] Franchissement clotures/obstacles bas sans blocage animation.
+  [❌] Le NPC garde ~2 tuiles d'ecart a l'arret, sans collage. : Continue de coller le joueur. Il faut voir comment font les mod exemple.
+  [❌] Plus de micro-saccades marche/course (pas de spam re-path toutes les secondes). Gros souci de Pathfinding.
+  [✅] Changement de direction joueur fluide. Fonctionne mais a revoir avec le pathfinding.
+  [❌] Franchissement clotures/obstacles bas sans blocage animation. : Ne fonctionne pas, le NPC/PNJ se bloque lorsqu'il tente de franchir des obstacles bas ou des clôtures dans l'annimation et rester bloquer.
 
 1. Ordres de deplacement
-  [ ] "Va la-bas" atteint la cible puis reste en surveillance zone (pas de retour joueur).
-  [ ] "Mets-toi a l'abri" entre dans un batiment et bascule en `staying` sans sortir.
-  [ ] En zone cloturee : pas de boucle `ClimbOverFenceState`.
+  [✅] "Va la-bas" atteint la cible puis reste en surveillance zone (pas de retour joueur).
+  [❌] "Mets-toi a l'abri" entre dans un batiment et bascule en `staying` sans sortir. : Ne fonctionne pas, ce met a coller le joueur et ne va pas dans un batiment, maison ou autre pour se mettre a l'abri.
+  [❌] En zone cloturee : pas de boucle `ClimbOverFenceState`. : Bug de passage de cloture ou obstacle bas, le NPC/PNJ commence sont annimation pour passer de l'autres coter et reste bloqué au milieu. Voir log pour les erreurs.
 
 1. Combat / equipement
-  [ ] Combat stable sans erreurs rouges PHNPC.
-  [ ] Le NPC garde le verrou d'ordre `goingto/shelter` en presence de zombies.
+  [❌] Combat stable sans erreurs rouges PHNPC. Tue un zombie et part pour revenir tuer un autre zombie, il doit rester sur la zone de combat et ne doit pas partir pour revenir tuer les autres zombies.
+  [⚠️] Le NPC garde le verrou d'ordre `goingto/shelter` en presence de zombies.
 
 1. Inventaire / tenue / mort
-  [ ] Vetements donnes au NPC portes automatiquement (slot libre/remplacement meilleur score).
-  [ ] Armes donnees visibles dans le cadavre apres mort.
-  [ ] Contenu cadavre coherent (inventaire + vetements + armes).
+  [❌] Vetements donnes au NPC portes automatiquement (slot libre/remplacement meilleur score). Ne porte pas les vetements que je lui donne reste dans la tenue de spawn.
+  [❌] Armes donnees visibles dans le cadavre apres mort. Non toujour rien quand il meut je ne trouve pas les vetements, objets ou armes, etc, que je lui est donner dans son inventaire dans le cadavre, il y a juste les items et les vêtements quand le fait spawner. Voir log pour les erreurs.
+  [⚠️] Contenu cadavre coherent (inventaire + vetements + armes). Oui pour les items et les vêtements du NPC/PNJ quand il spawn, mais il n'y a pas les armes, objets, vetements etc, que je lui est donner dans son inventaire. Voir log pour les erreurs.
 
 1. Validation console
-  [ ] Banners modules `v0.0.15 loaded` visibles.
-  [ ] Aucune erreur rouge PHNPC au demarrage.
-  [ ] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif.
+  [✅] Banners modules `v0.0.15 loaded` visibles.
+  [❌] Aucune erreur rouge PHNPC au demarrage.
+  [⚠️] Aucune erreur rouge PHNPC apres 5 minutes de jeu actif.
 
 ---
 
