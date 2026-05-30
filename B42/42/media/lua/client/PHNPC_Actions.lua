@@ -607,7 +607,7 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.17 loaded")
+print("[PHNPC] Actions v0.0.18 loaded")
 
 -- ============================================================
 -- FENETRES (v0.0.9h NEW — Bug 6)

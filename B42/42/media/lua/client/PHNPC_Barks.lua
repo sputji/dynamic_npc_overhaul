@@ -216,4 +216,4 @@ function PHNPC.sayWeatherBark(npc)
     PHNPC.sayBark(npc, barkState, 0.6, 0.8, 1.0)
 end
 
-print("[PHNPC] Barks v0.0.17 loaded")
+print("[PHNPC] Barks v0.0.18 loaded")

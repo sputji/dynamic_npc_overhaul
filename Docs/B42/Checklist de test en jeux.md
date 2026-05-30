@@ -1,42 +1,43 @@
-🎮 Checklist de re-test en jeu — v0.0.17
+🎮 Checklist de re-test en jeu — v0.0.18
 
 Avant :
 - redemarrer completement PZ,
 - copier la version repo vers `C:\Users\Nicolas\Zomboid\mods\PH_DynamicNPCOverhaul`,
-- verifier dans `console.txt` les banners `v0.0.17 loaded` (Main/Manager/Actions/Barks/Combat/Inventory/Outfits/Pathfinding/Health/Loot).
+- verifier dans `console.txt` les banners `v0.0.18 loaded` (Main/Manager/Actions/Barks/Combat/Inventory/Outfits/Pathfinding/Health/Loot).
 
 1. Stabilite runtime
-  [ ] Aucune erreur rouge PHNPC repetitive au demarrage (plus de boucle line 118/135 de Update).
-  [ ] Aucune erreur rouge PHNPC apres 5 minutes avec 5+ NPC recrutes.
+  [ ] Plus aucune erreur `PHNPC_Combat.lua:181` / `Object tried to call nil in pcall` pendant 5 minutes de combat.
+  [❌] Aucune erreur rouge PHNPC repetitive au demarrage (plus de boucle line 118/135 de Update).
+  [❌] Aucune erreur rouge PHNPC apres 5 minutes avec 5+ NPC recrutes.
 
 2. Suivi / recrutement
-  [ ] Le NPC garde ~2 tuiles d'ecart a l'arret (pas de collage joueur).
-  [ ] Plus de micro-saccades marche/course (plus de spam `follow anchor` toutes les secondes).
-  [ ] Changement de direction joueur fluide sans reset de path visible.
-  [ ] Franchissement portes/fenetres/clotures sans blocage milieu animation.
+  [❌] Le NPC garde ~2 tuiles d'ecart a l'arret (pas de collage joueur).
+  [❌] Plus de micro-saccades marche/course (plus de spam `follow anchor` toutes les secondes). : quand il ce deplace librement il ne sacade pas mais quand il me suis il sacade toujours.
+  [✅] Changement de direction joueur fluide sans reset de path visible.
+  [❌] Franchissement portes/fenetres/clotures sans blocage milieu animation. : Annimation en double qui creer un crash il ne bouge plus et reste bloquer.
 
 3. Armes a feu
-  [ ] NPC avec arme a feu + munitions + Aiming>=1 tire a distance (<=10 tuiles).
-  [ ] Cooldown de tir respecte (pas de rafale continue).
-  [ ] NPC sans munitions ne tire pas et repasse melee.
-  [ ] NPC avec Aiming=0 n'utilise pas les armes a feu.
+  [❌] NPC avec arme a feu + munitions + Aiming>=1 tire a distance (<=10 tuiles). Ne fonctionne pas !
+  [❌] Cooldown de tir respecte (pas de rafale continue).
+  [❌] NPC sans munitions ne tire pas et repasse melee.
+  [❌] NPC avec Aiming=0 n'utilise pas les armes a feu.
 
 4. Progression XP / competences
-  [ ] `getSkillSummary(npc)` affiche 13 competences (meme niveau 0).
-  [ ] Apres combat, l'XP evolue (Aiming/Blunt/Strength/Fitness/Maintenance).
-  [ ] Montee de niveau declenche un bark levelup visible.
+  [⚠️] `getSkillSummary(npc)` affiche 13 competences (meme niveau 0). : Je ne peux pas tester
+  [⚠️] Apres combat, l'XP evolue (Aiming/Blunt/Strength/Fitness/Maintenance). : Je ne peux pas tester
+  [⚠️] Montee de niveau declenche un bark levelup visible. : Je ne peux pas tester 
 
 5. Vetements / Outfits
-  [ ] Vetements donnes sont equipes automatiquement (`onItemGiven`).
-  [ ] Si un vetement meilleur est donne sur meme slot, il remplace l'ancien.
-  [ ] Le score defensif est visible en debug (`OutfitDef`).
+  [❌] Vetements donnes sont equipes automatiquement (`onItemGiven`). Aucun visuel pour savoir si il les equipe la tenue ne change pas!
+  [⚠️] Si un vetement meilleur est donne sur meme slot, il remplace l'ancien. : Aucun visuel pour savoir si il les equipe la tenue ne change pas!
+  [⚠️] Le score defensif est visible en debug (`OutfitDef`). : Aucun visuel pour savoir si il les equipe la tenue ne change pas!
 
 6. Barks meteo
-  [ ] Par pluie : BarkRain1-3.
-  [ ] Par orage : BarkStorm1-3.
-  [ ] Par froid/neige : BarkSnow1-3.
-  [ ] Par canicule (>35 C) : BarkHot1-2.
-  [ ] Par brouillard dense : BarkFog1-2.
+  [❌] Par pluie : BarkRain1-3.
+  [❌] Par orage : BarkStorm1-3.
+  [❌] Par froid/neige : BarkSnow1-3.
+  [❌] Par canicule (>35 C) : BarkHot1-2.
+  [❌] Par brouillard dense : BarkFog1-2.
 
 ---
 

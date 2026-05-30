@@ -202,4 +202,4 @@ function PHNPC.getOutfitDefenseSummary(npc)
     return table.concat(out, " | ")
 end
 
-print("[PHNPC] Outfits v0.0.17 loaded")
+print("[PHNPC] Outfits v0.0.18 loaded")

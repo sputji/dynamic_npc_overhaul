@@ -1,6 +1,14 @@
-# Architecture B42 — Dynamic NPC Overhaul v0.0.17
+# Architecture B42 — Dynamic NPC Overhaul v0.0.18
 
-> v0.0.17 — Stabilisation runtime B42, anti-saccades follow, combat/XP fiabilises (2026-05-30)
+> v0.0.18 — Hotfix crash combat ranged (2026-05-30)
+>
+> Axes techniques appliques :
+>
+> 1. **Filtrage typed items** : `getBestRangedWeapon` ne teste `isRanged()` que sur des `HandWeapon` valides.
+> 2. **Compat ammo B42** : normalisation `getAmmoType()` (retour string ou objet `ItemKey`) avant recherche/retrait dans inventaire.
+> 3. **Stabilite boucle combat** : suppression du crash recurrent `Object tried to call nil in pcall` qui polluait `OnTick`.
+
+> v0.0.18 — Stabilisation runtime B42, anti-saccades follow, combat/XP fiabilises (2026-05-30)
 >
 > Axes techniques appliques :
 >
@@ -22,11 +30,11 @@
 > 5. **Barks meteo** : `PHNPC_Barks.lua` detecte pluie/orage/neige/canicule/brouillard via `GameTime`.
 > 6. **Init centrale** : `PHNPC_Main.lua` verifie la sante de tous les modules au demarrage.
 
-## Structure des fichiers (v0.0.16)
+## Structure des fichiers (v0.0.18)
 
 ```
 B42/42/
-  mod.info                              version=0.0.16
+  mod.info                              version=0.0.18
   media/
     lua/
       shared/

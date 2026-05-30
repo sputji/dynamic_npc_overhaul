@@ -322,4 +322,4 @@ Events.OnTick.Add(function()
     end
 end)
 
-print("[PHNPC] Pathfinding v0.0.17 loaded")
+print("[PHNPC] Pathfinding v0.0.18 loaded")

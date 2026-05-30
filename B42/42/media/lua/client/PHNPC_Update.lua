@@ -151,7 +151,7 @@ Events.OnTick.Add(function()
                     PHNPC._followTimers[npc] = 0
 
                 else
-                    -- v0.0.17 : cadence de follow controlee pour eviter les
+                    -- v0.0.18 : cadence de follow controlee pour eviter les
                     -- micro-saccades dues aux relances trop frequentes.
                     local runDist = PHNPC.RUN_DISTANCE or 6
                     local wt = (dist > runDist) and "Run" or "Walk"
@@ -432,4 +432,4 @@ Events.OnGameStart.Add(function()
     print("[PHNPC] v0.0.15 pret")
 end)
 
-print("[PHNPC] Update v0.0.17 loaded")
+print("[PHNPC] Update v0.0.18 loaded")

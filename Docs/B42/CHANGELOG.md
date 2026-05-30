@@ -1,5 +1,20 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
+## [0.0.18] — Hotfix crash combat ranged B42 (2026-05-30)
+
+### Correctifs critiques
+
+- `PHNPC_Combat.lua`
+  - correction de la boucle d'erreur `Object tried to call nil in pcall` dans `getBestRangedWeapon` (ligne 181 du log): `isRanged()` n'est plus appele sur des items non `HandWeapon`.
+  - ajout d'un filtre strict `instanceof(it, "HandWeapon")` avant tout appel ranged.
+  - normalisation des munitions B42 via `normalizeAmmoType(...)` pour supporter `getAmmoType()` retourne en objet (`:getItemKey()`) ou en string.
+  - robustification de `hasAmmoForWeapon` et `consumeAmmoForWeapon` avec type ammo normalise.
+
+### Version
+
+- `B42/42/mod.info` -> `version=0.0.18`.
+- Banners modules principaux alignes sur `v0.0.18 loaded`.
+
 ## [0.0.17] — Stabilisation runtime B42 + suivi/combat/XP/outfits (2026-05-30)
 
 ### Correctifs critiques
@@ -29,8 +44,8 @@
 
 ### Version
 
-- `B42/42/mod.info` -> `version=0.0.17`.
-- Banners modules principaux alignes sur `v0.0.17 loaded`.
+- `B42/42/mod.info` -> `version=0.0.18`.
+- Banners modules principaux alignes sur `v0.0.18 loaded`.
 
 ## [0.0.16] — Refactoring modulaire : IA armes a feu, progression XP, vetements auto, barks meteo (2026-05-30)
 

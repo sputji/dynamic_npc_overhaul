@@ -41,13 +41,27 @@ local RANGED_COOLDOWN   = 120  -- ticks
 -- Degats infliges par un tir NPC (avant soustraction aux HP zombie)
 local RANGED_DAMAGE     = 40   -- HP par tir
 
+local function normalizeAmmoType(ammoType)
+    if not ammoType then return nil end
+    if type(ammoType) == "string" then
+        return (ammoType ~= "") and ammoType or nil
+    end
+    local key = nil
+    pcall(function() key = ammoType:getItemKey() end)
+    if type(key) == "string" and key ~= "" then
+        return key
+    end
+    return nil
+end
+
 -- hasAmmoForWeapon : verifie si le NPC possede des munitions pour l'arme donnee
 local function hasAmmoForWeapon(npc, weapon)
     if not npc or not weapon then return false end
 
     local ammoType = nil
     pcall(function() ammoType = weapon:getAmmoType() end)
-    if not ammoType or ammoType == "" then return false end
+    ammoType = normalizeAmmoType(ammoType)
+    if not ammoType then return false end
 
     local inv
     pcall(function() inv = npc:getInventory() end)
@@ -63,7 +77,8 @@ local function consumeAmmoForWeapon(npc, weapon)
     if not npc or not weapon then return false end
     local ammoType = nil
     pcall(function() ammoType = weapon:getAmmoType() end)
-    if not ammoType or ammoType == "" then return false end
+    ammoType = normalizeAmmoType(ammoType)
+    if not ammoType then return false end
 
     local inv = nil
     pcall(function() inv = npc:getInventory() end)
@@ -176,11 +191,15 @@ local function getBestRangedWeapon(npc)
     for i = 0, n - 1 do
         local it = nil
         pcall(function() it = items:get(i) end)
-        local ranged = false
+        local isHandWeapon = false
         if it then
+            pcall(function() isHandWeapon = instanceof(it, "HandWeapon") end)
+        end
+        local ranged = false
+        if it and isHandWeapon then
             pcall(function() ranged = it:isRanged() end)
         end
-        if it and ranged and hasAmmoForWeapon(npc, it) then
+        if it and isHandWeapon and ranged and hasAmmoForWeapon(npc, it) then
             local s = scoreWeapon(it, npc) + 100
             if s > bestScore then
                 best = it
@@ -194,6 +213,9 @@ end
 -- isRangedWeapon : helper rapide pour savoir si une arme est a feu
 local function isRangedWeapon(weapon)
     if not weapon then return false end
+    local isHandWeapon = false
+    pcall(function() isHandWeapon = instanceof(weapon, "HandWeapon") end)
+    if not isHandWeapon then return false end
     local v = false
     pcall(function() v = weapon:isRanged() end)
     return v
@@ -483,4 +505,4 @@ function PHNPC.npcFlightStep(npc, player)
     end
 end
 
-print("[PHNPC] Combat v0.0.17 loaded")
+print("[PHNPC] Combat v0.0.18 loaded")
