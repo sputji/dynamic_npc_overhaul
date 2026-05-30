@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.18-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.19-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,14 +20,17 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.18**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.19**.
 
 ---
 
-## Fonctionnalités actuelles (v0.0.18)
+## Fonctionnalités actuelles (v0.0.19)
 
-### Nouveautes v0.0.18
+### Nouveautes v0.0.19
 
+- Patch complet pathfind/mouvement: `schedulePathTo` integre dans le suivi et les deplacements pour reduire les relances de path inutiles.
+- Ouverture de portes fiabilisee en pathfinding B42: suppression des appels risquant un crash (`ToggleDoor(npc)`), utilisation d'ouvertures safe (porte standard/double/garage).
+- Transitions d'animation corrigees: arret en `RunToIdle` apres course et `WalkToIdle` apres marche, avec reset running plus propre.
 - Hotfix critique combat ranged : suppression du crash console `Object tried to call nil in pcall` dans `getBestRangedWeapon` (filtre strict `HandWeapon` avant `isRanged`).
 - Compat munitions B42 renforcee : `getAmmoType()` accepte les retours objet (`getItemKey`) ou string via normalisation.
 - Stabilisation runtime B42 : garde-fous d'appels Java (`hasMethod`/`tryCall`) pour supprimer les erreurs rouge repetitives en boucle.
@@ -36,8 +39,6 @@
 - Progression active : gain XP en combat (Aiming, Blunt, Strength, Fitness, Maintenance).
 - Debug outfits : score defensif par slot visible (`OutfitDef`) pour valider les remplacements d'equipement.
 - Detection meteo robuste : `ClimateManager` avec fallback `GameTime`.
-
-## Fonctionnalités actuelles (v0.0.18)
 
 ### PNJ & Professions
 

@@ -84,4 +84,4 @@ Events.OnConnected.Add(function()
     onGameStart()
 end)
 
-print("[PHNPC] Main v0.0.18 loaded")
+print("[PHNPC] Main v0.0.19 loaded")

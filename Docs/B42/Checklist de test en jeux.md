@@ -1,18 +1,20 @@
-🎮 Checklist de re-test en jeu — v0.0.18
+🎮 Checklist de re-test en jeu — v0.0.19
 
 Avant :
 - redemarrer completement PZ,
 - copier la version repo vers `C:\Users\Nicolas\Zomboid\mods\PH_DynamicNPCOverhaul`,
-- verifier dans `console.txt` les banners `v0.0.18 loaded` (Main/Manager/Actions/Barks/Combat/Inventory/Outfits/Pathfinding/Health/Loot).
+- verifier dans `console.txt` les banners `v0.0.19 loaded` (Main/Manager/Actions/Barks/Combat/Inventory/Outfits/Pathfinding/Health/Loot).
 
 1. Stabilite runtime
   [ ] Plus aucune erreur `PHNPC_Combat.lua:181` / `Object tried to call nil in pcall` pendant 5 minutes de combat.
+  [ ] Plus aucune erreur liee a `ToggleDoor(npc)` / `isLocalPlayer` en console pendant les deplacements NPC.
   [❌] Aucune erreur rouge PHNPC repetitive au demarrage (plus de boucle line 118/135 de Update).
   [❌] Aucune erreur rouge PHNPC apres 5 minutes avec 5+ NPC recrutes.
 
 2. Suivi / recrutement
   [❌] Le NPC garde ~2 tuiles d'ecart a l'arret (pas de collage joueur).
   [❌] Plus de micro-saccades marche/course (plus de spam `follow anchor` toutes les secondes). : quand il ce deplace librement il ne sacade pas mais quand il me suis il sacade toujours.
+  [ ] Arret de course fluide: pas de freeze/teleport, transition animation `RunToIdle` visible apres sprint.
   [✅] Changement de direction joueur fluide sans reset de path visible.
   [❌] Franchissement portes/fenetres/clotures sans blocage milieu animation. : Annimation en double qui creer un crash il ne bouge plus et reste bloquer.
 

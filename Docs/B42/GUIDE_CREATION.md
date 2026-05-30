@@ -1,7 +1,7 @@
 # GUIDE DE CRÉATION DE NPC — PH Dynamic NPC Overhaul B42
-_Version 0.0.18 (hotfix combat ranged B42 + stabilisation runtime)_
+_Version 0.0.19 (hotfix combat ranged B42 + stabilisation runtime)_
 
-> Mise a jour v0.0.18 (2026-05-30) — regles runtime/IA ajoutees.
+> Mise a jour v0.0.19 (2026-05-30) — regles runtime/IA ajoutees.
 >
 > 1. **Methodes Java exposees** : avant tout appel sensible sur objet Java (meteo, inventaire, combat), verifier `PHNPC.hasMethod(obj, "method")`. Les appels manquants peuvent casser la frame meme dans un `pcall`.
 > 2. **Follow stable** : ne jamais forcer un re-path immediat quand `PHNPC_Moving` devient faux sur un tick transitoire. Respecter un delai minimal (`FOLLOW_REPATH_TICKS`).
@@ -10,6 +10,9 @@ _Version 0.0.18 (hotfix combat ranged B42 + stabilisation runtime)_
 > 5. **AmmoType B42** : `getAmmoType()` peut renvoyer un objet (avec `getItemKey`) ou une string ; normaliser avant `containsTypeRecurse/getFirstTypeRecurse`.
 > 6. **XP gameplay** : l'XP doit etre attribuee au moment des impacts (melee/ranged) pour que la progression soit visible pendant les tests.
 > 7. **Debug outfit** : exposer un resume lisible des scores defensifs par slot pour valider rapidement les remplacements de vetements.
+> 8. **Pipeline mouvement unique** : centraliser les path dans `schedulePathTo(...)` plutot que rappeler `pathToLocationF` a plusieurs endroits.
+> 9. **Portes en pathfind** : pour des NPC non joueur, eviter `ToggleDoor(npc)` et preferer une ouverture safe (`ToggleDoorSilent` ou helper porte dedie).
+> 10. **Transition animation d'arret** : conserver le dernier mode de locomotion et basculer vers `RunToIdle` ou `WalkToIdle` selon ce mode.
 
 > Mise a jour v0.0.16 (2026-05-30) — nouveaux patterns ajoutes.
 >

@@ -95,4 +95,4 @@ Events.OnHitZombie.Add(function(zombie, character, bodyPart, handWeapon)
     end
 end)
 
-print("[PHNPC] Health v0.0.15 loaded")
+print("[PHNPC] Health v0.0.19 loaded")

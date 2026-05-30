@@ -264,7 +264,9 @@ function PHNPC.enforceNPC(zombie)
     pcall(function() zombie:setWalkType(wt) end)
     if md.PHNPC_Moving then
         pcall(function() zombie:setRunning(wt == "Run") end)
+    else
+        pcall(function() zombie:setRunning(false) end)
     end
 end
 
-print("[PHNPC] Enforce v0.0.15 loaded")
+print("[PHNPC] Enforce v0.0.19 loaded")

@@ -278,4 +278,4 @@ if Events.OnDeadBodySpawn then
 end
 Events.OnTick.Add(tickPendingLoot)
 
-print("[PHNPC] Loot v0.0.15 loaded")
+print("[PHNPC] Loot v0.0.19 loaded")

@@ -151,7 +151,7 @@ Events.OnTick.Add(function()
                     PHNPC._followTimers[npc] = 0
 
                 else
-                    -- v0.0.18 : cadence de follow controlee pour eviter les
+                    -- v0.0.19 : cadence de follow controlee pour eviter les
                     -- micro-saccades dues aux relances trop frequentes.
                     local runDist = PHNPC.RUN_DISTANCE or 6
                     local wt = (dist > runDist) and "Run" or "Walk"
@@ -402,10 +402,12 @@ Events.OnTick.Add(function()
                     end
                     if tx then
                         md.PHNPC_PatrolActive = 200
-                        pcall(function()
-                            npc:setUseless(false)
-                            npc:pathToLocationF(tx, ty, npc:getZ())
-                        end)
+                        pcall(function() npc:setUseless(false) end)
+                        if PHNPC.startMovingTo then
+                            PHNPC.startMovingTo(npc, tx, ty, npc:getZ(), "Walk")
+                        else
+                            pcall(function() npc:pathToLocationF(tx, ty, npc:getZ()) end)
+                        end
                         if ZombRand(4) == 0 then
                             PHNPC.sayBark(npc, "idle", 1.0, 1.0, 1.0)
                         end
@@ -432,4 +434,4 @@ Events.OnGameStart.Add(function()
     print("[PHNPC] v0.0.15 pret")
 end)
 
-print("[PHNPC] Update v0.0.18 loaded")
+print("[PHNPC] Update v0.0.19 loaded")

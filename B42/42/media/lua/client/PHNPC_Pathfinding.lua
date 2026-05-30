@@ -35,6 +35,51 @@ local PATH_COROUTINE_STEPS = 4   -- cases evaluees par tick de coroutine
 local PATH_MIN_TICKS       = 15  -- ticks minimum entre deux pathToLocationF
 local DOOR_SEARCH_RADIUS   = 4   -- tuiles : rayon de recherche de porte proche
 
+local function getTickCounter()
+    return PHNPC._pathTickCounter or 0
+end
+
+local function openDoorForPath(doorObj, doorSq)
+    if not doorObj then return false end
+    local opened = false
+
+    local isIsoDoor = false
+    pcall(function() isIsoDoor = instanceof(doorObj, "IsoDoor") end)
+    if isIsoDoor then
+        local isDoubleDoor = false
+        pcall(function() isDoubleDoor = IsoDoor and IsoDoor.getDoubleDoorIndex(doorObj) > -1 end)
+        if isDoubleDoor then
+            pcall(function() IsoDoor.toggleDoubleDoor(doorObj, true); opened = true end)
+        end
+
+        if not opened then
+            local isGarage = false
+            pcall(function() isGarage = IsoDoor and IsoDoor.getGarageDoorIndex(doorObj) > -1 end)
+            if isGarage then
+                pcall(function() IsoDoor.toggleGarageDoor(doorObj, true); opened = true end)
+            end
+        end
+
+        if not opened then
+            pcall(function() doorObj:ToggleDoorSilent(); opened = true end)
+        end
+    else
+        local isThumpDoor = false
+        pcall(function() isThumpDoor = doorObj.isDoor and doorObj:isDoor() end)
+        if isThumpDoor then
+            pcall(function() doorObj:ToggleDoorSilent(); opened = true end)
+        end
+    end
+
+    if opened and doorSq then
+        pcall(function()
+            doorSq:InvalidateSpecialObjectPaths()
+            doorSq:RecalcProperties()
+        end)
+    end
+    return opened
+end
+
 -- ============================================================
 -- findFreeSquareNear : tuile libre dans un rayon (ZombRand)
 -- Retourne tx, ty si trouve, nil sinon
@@ -213,7 +258,11 @@ function PHNPC.checkNearbyDoor(npc, tx, ty, tz)
                         if obj then
                             local isDoor = false
                             pcall(function()
-                                isDoor = instanceof(obj, "IsoDoor") or instanceof(obj, "IsoThumpable")
+                                if instanceof(obj, "IsoDoor") then
+                                    isDoor = true
+                                elseif instanceof(obj, "IsoThumpable") then
+                                    isDoor = obj.isDoor and obj:isDoor() or false
+                                end
                             end)
                             if isDoor then
                                 local isOpen = true
@@ -266,16 +315,17 @@ function PHNPC.schedulePathTo(npc, tx, ty, tz)
     local prevX = md.PHNPC_PathX or -9999
     local prevY = md.PHNPC_PathY or -9999
     local diffSq = (tx - prevX)^2 + (ty - prevY)^2
+    local sinceLastPath = getTickCounter() - (md.PHNPC_LastPathTick or -9999)
 
     -- Re-path seulement si deplacement significatif (> 1.5 tuile) ou premier path
-    if diffSq < 2.25 and md.PHNPC_Moving then
+    if diffSq < 2.25 and md.PHNPC_Moving and sinceLastPath < PATH_MIN_TICKS then
         return false
     end
 
     -- Essayer d'ouvrir une porte proche avant de lancer le path
-    local door = PHNPC.checkNearbyDoor(npc, tx, ty, tz)
+    local door, doorSq = PHNPC.checkNearbyDoor(npc, tx, ty, tz)
     if door then
-        pcall(function() door:ToggleDoor(npc) end)
+        openDoorForPath(door, doorSq)
     end
 
     -- Lancer le pathfinding natif PZ
@@ -290,7 +340,12 @@ function PHNPC.schedulePathTo(npc, tx, ty, tz)
     if ok then
         md.PHNPC_PathX  = tx
         md.PHNPC_PathY  = ty
+        md.PHNPC_PathZ  = tz or npc:getZ()
         md.PHNPC_Moving = true
+        md.PHNPC_LastPathTick = getTickCounter()
+        md.PHNPC_LastMoveX = npc:getX()
+        md.PHNPC_LastMoveY = npc:getY()
+        md.PHNPC_StuckTicks = 0
         PHNPC._pathTimers[id] = PATH_MIN_TICKS
     end
 
@@ -322,4 +377,4 @@ Events.OnTick.Add(function()
     end
 end)
 
-print("[PHNPC] Pathfinding v0.0.18 loaded")
+print("[PHNPC] Pathfinding v0.0.19 loaded")

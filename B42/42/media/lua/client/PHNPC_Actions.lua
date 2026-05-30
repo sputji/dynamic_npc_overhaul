@@ -82,6 +82,7 @@ local function applyMoveStart(npc, x, y, walkType)
 end
 local function applyMoveTick(npc, walkType)
     pcall(function() npc:setVariable("BanditWalkType", walkType) end)
+    pcall(function() npc:setWalkType(walkType) end)
     pcall(function() npc:setRunning(walkType == "Run") end)
 end
 PHNPC._applyMoveStart = applyMoveStart
@@ -202,7 +203,13 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
     else
         applyMoveTick(npc, walkType)
     end
-    pcall(function() npc:pathToLocationF(tx, ty, pz) end)
+    local didSchedule = false
+    if PHNPC.schedulePathTo then
+        pcall(function() didSchedule = PHNPC.schedulePathTo(npc, tx, ty, pz) end)
+    end
+    if not didSchedule then
+        pcall(function() npc:pathToLocationF(tx, ty, pz) end)
+    end
     md.PHNPC_Moving   = true
     md.PHNPC_PathX    = tx
     md.PHNPC_PathY    = ty
@@ -266,7 +273,13 @@ function PHNPC.startMovingTo(npc, x, y, z, forceWalkType)
         else
             applyMoveTick(npc, walkType)
         end
-        pcall(function() npc:pathToLocationF(x, y, z) end)
+        local didSchedule = false
+        if PHNPC.schedulePathTo then
+            pcall(function() didSchedule = PHNPC.schedulePathTo(npc, x, y, z) end)
+        end
+        if not didSchedule then
+            pcall(function() npc:pathToLocationF(x, y, z) end)
+        end
         md.PHNPC_Moving   = true
         md.PHNPC_PathX    = x
         md.PHNPC_PathY    = y
@@ -301,13 +314,14 @@ end
 function PHNPC.stopMoving(npc)
     local md = npc:getModData()
     if md.PHNPC_Moving then
+        local lastWalkType = md.PHNPC_WalkType or "Walk"
         md.PHNPC_Moving   = false
         md.PHNPC_PathX    = nil
         md.PHNPC_PathY    = nil
         md.PHNPC_PathZ    = nil
         md.PHNPC_WalkType = "Walk"
         -- Transition Walk->Idle (NHM pattern) : Bob_WalkToStop via ZSWalkToIdle.xml
-        pcall(function() npc:setBumpType("WalkToIdle") end)
+        pcall(function() npc:setBumpType(lastWalkType == "Run" and "RunToIdle" or "WalkToIdle") end)
         pcall(function() npc:setRunning(false) end)
         pcall(function() npc:setVariable("BanditWalkType", "Walk") end)
         pcall(function() npc:setVariable("PHNPC_WalkType", "Walk") end)
@@ -607,7 +621,7 @@ function PHNPC.findNearestZombie(npc, range)
     return bestZ, math.sqrt(bestSq)
 end
 
-print("[PHNPC] Actions v0.0.18 loaded")
+print("[PHNPC] Actions v0.0.19 loaded")
 
 -- ============================================================
 -- FENETRES (v0.0.9h NEW — Bug 6)

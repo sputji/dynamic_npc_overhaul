@@ -1,9 +1,21 @@
 # CHANGELOG B42 — Dynamic NPC Overhaul
 
-## [0.0.18] — Hotfix crash combat ranged B42 (2026-05-30)
+## [0.0.19] — Patch complet pathfind + mouvements + animations B42 (2026-05-30)
 
 ### Correctifs critiques
 
+- `PHNPC_Pathfinding.lua`
+  - suppression de l'ouverture de porte risquee `ToggleDoor(npc)` ; utilisation d'une ouverture safe B42 (`ToggleDoorSilent`, doubles portes, garage).
+  - detection porte amelioree : les `IsoThumpable` sont consideres comme portes uniquement si `isDoor()` est vrai.
+  - `schedulePathTo(...)` renforce: anti re-path trop frequent (`PATH_MIN_TICKS`), sync des metadata de mouvement (`LastPathTick`, `LastMoveX/Y`, `PathZ`, `StuckTicks`).
+- `PHNPC_Actions.lua`
+  - `startFollowing` et `startMovingTo` passent par `schedulePathTo(...)` quand disponible (fallback `pathToLocationF` garde).
+  - coherence locomotion: `applyMoveTick` remet aussi `setWalkType(...)` pour eviter les desync Walk/Run.
+  - transition d'arret corrigee: `RunToIdle` si dernier mode Run, sinon `WalkToIdle`.
+- `PHNPC_Update.lua`
+  - les NPC non recrutes utilisent aussi `startMovingTo(...)` pour beneficier du pipeline complet mouvement/animation.
+- `PHNPC_Enforce.lua`
+  - reset explicite `setRunning(false)` hors mouvement pour stabiliser les animations idle.
 - `PHNPC_Combat.lua`
   - correction de la boucle d'erreur `Object tried to call nil in pcall` dans `getBestRangedWeapon` (ligne 181 du log): `isRanged()` n'est plus appele sur des items non `HandWeapon`.
   - ajout d'un filtre strict `instanceof(it, "HandWeapon")` avant tout appel ranged.
@@ -12,10 +24,10 @@
 
 ### Version
 
-- `B42/42/mod.info` -> `version=0.0.18`.
-- Banners modules principaux alignes sur `v0.0.18 loaded`.
+- `B42/42/mod.info` -> `version=0.0.19`.
+- Banners modules principaux alignes sur `v0.0.19 loaded`.
 
-## [0.0.17] — Stabilisation runtime B42 + suivi/combat/XP/outfits (2026-05-30)
+## [0.0.18] — Stabilisation runtime B42 + suivi/combat/XP/outfits (2026-05-30)
 
 ### Correctifs critiques
 
@@ -47,7 +59,7 @@
 - `B42/42/mod.info` -> `version=0.0.18`.
 - Banners modules principaux alignes sur `v0.0.18 loaded`.
 
-## [0.0.16] — Refactoring modulaire : IA armes a feu, progression XP, vetements auto, barks meteo (2026-05-30)
+## [0.0.17] — Refactoring modulaire : IA armes a feu, progression XP, vetements auto, barks meteo (2026-05-30)
 
 ### Nouveaux modules
 

@@ -1,13 +1,16 @@
 # Dynamic NPC Overhaul — Feuille de route B42
 
-> Mise a jour : 30 mai 2026 | Version **0.0.18** | Stabilisation runtime B42 + follow/combat/XP/outfits.
+> Mise a jour : 30 mai 2026 | Version **0.0.19** | Stabilisation runtime B42 + follow/combat/XP/outfits.
 
 ---
 
-## Roadmap execution v0.0.18 (2026-05-30)
+## Roadmap execution v0.0.19 (2026-05-30)
 
-### Patch v0.0.18 applique
+### Patch v0.0.19 applique
 
+- ✅ Pathfinding: suppression `ToggleDoor(npc)` dans la pipeline de path (ouverture safe B42 portes standard/doubles/garage).
+- ✅ Mouvements: `startFollowing/startMovingTo` utilisent `schedulePathTo(...)` pour limiter les relances de path et lisser les deplacements.
+- ✅ Animations: transition d'arret contextuelle `RunToIdle`/`WalkToIdle` + reset running hors mouvement.
 - ✅ Hotfix critique: suppression du crash combat `Object tried to call nil in pcall` sur `getBestRangedWeapon`.
 - ✅ Filtrage strict `HandWeapon` avant `isRanged()` pour eviter les appels Java non exposes.
 - ✅ Compat ammo B42: normalisation `getAmmoType()` (objet `ItemKey` ou string) avant checks/retrait inventaire.
@@ -18,7 +21,7 @@
 - ✅ `getSkillSummary` conforme checklist (13 competences affichees).
 - ✅ Score defensif outfit visible en debug (`OutfitDef`).
 - ✅ Detection meteo robuste B42 (`ClimateManager` + fallback `GameTime`).
-- ⏳ Re-test en jeu complet sur checklist v0.0.18.
+- ⏳ Re-test en jeu complet sur checklist v0.0.19.
 
 > Mise a jour : 30 mai 2026 | Version **0.0.16** | Refactoring modulaire : pathfinding natif, armes a feu NPC, progression XP/competences, module outfits, barks meteo.
 
