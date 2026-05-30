@@ -1,32 +1,65 @@
 --[[
-    PHNPC_Combat.lua  v0.0.9c  (client)
+    PHNPC_Combat.lua  v0.0.16  (client)
     IA Combat NPC : attaquer les zombies proches (npcCombatStep)
     IA Fuite NPC  : fuir si HP < 30% (npcFlightStep)
+
+    v0.0.16 :
+      - Support armes a feu : le NPC peut utiliser une arme a feu si
+        a) il possede les munitions adaptees dans son inventaire
+        b) son niveau de competence Aiming >= RANGED_MIN_SKILL
+        La priorite reste : meilleure arme (score total : degats + condition).
+        Pour une arme a feu : score += 50 si munitions disponibles.
+      - Nouvelle fonction hasAmmoForWeapon(npc, weapon) pour verifier les
+        munitions.
+      - Nouvelle fonction getNPCSkillLevel(npc, skillName) pour lire les
+        competences (niveaux) du NPC.
+      - Cooldown armes a feu separe (plus long que melee).
 
     v0.0.9c :
       - npcCombatStep : utilise les armes de l'inventaire NPC (weapon type check)
         + NoiseTimer pour signaler le bruit des attaques a PHNPC_Danger.lua
-      - npcFlightStep : utilise findEscapeDirection (PHNPC_Pathfind.lua) pour
+      - npcFlightStep : utilise findEscapeDirection (PHNPC_Pathfinding.lua) pour
         trouver une direction de fuite libre en 8 angles. Si zone degagee disponible
         (findClearAreaNear), fuir vers cette zone ; sinon se replier vers le joueur.
 
     Pattern : NHM GCCombatActionsAttack.lua + GCHelpersEscape.lua simplifies
     Necessite :
-      PHNPC_Actions.lua  (PHNPC.startMovingTo, PHNPC.stopMoving, PHNPC.findNearestZombie)
-      PHNPC_Barks.lua    (PHNPC.sayBark)
-      PHNPC_Pathfind.lua (PHNPC.findEscapeDirection, PHNPC.findClearAreaNear)
+      PHNPC_Actions.lua    (PHNPC.startMovingTo, PHNPC.stopMoving, PHNPC.findNearestZombie)
+      PHNPC_Barks.lua      (PHNPC.sayBark)
+      PHNPC_Pathfinding.lua (PHNPC.findEscapeDirection, PHNPC.findClearAreaNear)
+      PHNPC_Stats.lua      (PHNPC.getNPCSkillLevel)
 ]]
 
 -- ============================================================
 -- Helpers internes : detecter et utiliser les armes de l'inventaire
 -- ============================================================
 
--- Retourne l'arme la plus adaptee dans l'inventaire NPC
--- v0.0.12 : durcissement Kahlua B42
---   - Evite item:isWeapon() (non fiable selon type d'item expose Lua)
---   - Utilise instanceof(item, "HandWeapon") + garde-fous methodes
---   - Plus de crash en boucle sur scoreWeapon/getNPCWeapon
-local function scoreWeapon(item)
+-- Seuil de competence Aiming minimal pour utiliser une arme a feu
+local RANGED_MIN_SKILL = 1  -- niveau 1 Aiming suffit (progression prise en compte)
+-- Cooldown specifique armes a feu (plus long car bruit + munitions limitees)
+local RANGED_COOLDOWN  = 120  -- ticks
+
+-- hasAmmoForWeapon : verifie si le NPC possede des munitions pour l'arme donnee
+local function hasAmmoForWeapon(npc, weapon)
+    if not npc or not weapon then return false end
+
+    local ammoType = nil
+    pcall(function() ammoType = weapon:getAmmoType() end)
+    if not ammoType or ammoType == "" then return false end
+
+    local inv
+    pcall(function() inv = npc:getInventory() end)
+    if not inv then return false end
+
+    -- Chercher les munitions dans l'inventaire
+    local ammoItem = nil
+    pcall(function() ammoItem = inv:getFirstTypeRecurse(ammoType) end)
+    return ammoItem ~= nil
+end
+
+-- scoreWeapon : score d'une arme (melee ou a feu si munitions disponibles)
+-- v0.0.16 : les armes a feu sont evaluees si munitions presentes + competence suffisante
+local function scoreWeapon(item, npc)
     if not item then return 0 end
 
     local isHandWeapon = false
@@ -35,7 +68,25 @@ local function scoreWeapon(item)
 
     local isRanged = false
     pcall(function() isRanged = item:isRanged() end)
-    if isRanged then return 0 end  -- pas d'armes a feu en combat melee NPC pour l'instant
+
+    -- Arme a feu : eligible seulement si munitions + competence
+    if isRanged then
+        if not npc then return 0 end
+        -- Verifier la competence Aiming du NPC
+        local aimSkill = 0
+        if PHNPC.getNPCSkillLevel then
+            pcall(function() aimSkill = PHNPC.getNPCSkillLevel(npc, "Aiming") end)
+        else
+            -- Fallback : lire depuis ModData si Stats.lua n'est pas charge
+            local md
+            pcall(function() md = npc:getModData() end)
+            if md then aimSkill = md.PHNPC_SkillAiming or 0 end
+        end
+        if aimSkill < RANGED_MIN_SKILL then return 0 end
+
+        -- Verifier les munitions
+        if not hasAmmoForWeapon(npc, item) then return 0 end
+    end
 
     local dmg = 1.0
     pcall(function()
@@ -48,20 +99,25 @@ local function scoreWeapon(item)
     pcall(function() cond = item:getCondition() or 1 end)
     pcall(function() condMax = item:getConditionMax() or 1 end)
     local condRatio = (condMax > 0) and (cond / condMax) or 0.5
-    return (dmg * 10) + (condRatio * 1)
+
+    -- Bonus arme a feu : degats generalement plus eleves, portee superieure
+    local rangedBonus = isRanged and 20 or 0
+
+    return (dmg * 10) + (condRatio * 1) + rangedBonus
 end
 
+-- getNPCWeapon : retourne la meilleure arme disponible dans l'inventaire NPC
+-- v0.0.16 : prend le NPC en parametre pour evaluer les armes a feu
 local function getNPCWeapon(npc)
     local primary
     pcall(function() primary = npc:getPrimaryHandItem() end)
-    local bestItem = primary
-    local bestScore = scoreWeapon(primary)
+    local bestItem  = primary
+    local bestScore = scoreWeapon(primary, npc)
 
     local inv
     pcall(function() inv = npc:getInventory() end)
     if not inv then return bestItem end
 
-    -- Scan complet et selection du meilleur score
     local items
     pcall(function() items = inv:getItems() end)
     if not items then return bestItem end
@@ -70,13 +126,21 @@ local function getNPCWeapon(npc)
     for i = 0, n - 1 do
         local it
         pcall(function() it = items:get(i) end)
-        local s = scoreWeapon(it)
+        local s = scoreWeapon(it, npc)
         if s > bestScore then
             bestScore = s
-            bestItem = it
+            bestItem  = it
         end
     end
     return bestItem
+end
+
+-- isRangedWeapon : helper rapide pour savoir si une arme est a feu
+local function isRangedWeapon(weapon)
+    if not weapon then return false end
+    local v = false
+    pcall(function() v = weapon:isRanged() end)
+    return v
 end
 
 -- Variantes d'attaque selon le type d'arme
@@ -159,44 +223,104 @@ function PHNPC.npcCombatStep(npc)
     end
 
     if dist <= (PHNPC.COMBAT_ATTACK_RANGE or 1.5) then
-        -- Assez proche : attaquer
+        -- Assez proche : attaquer (melee)
         local targetDead = false
         pcall(function() targetDead = target:isDead() end)
         if targetDead then return end
 
         pcall(function() npc:faceLocationF(target:getX(), target:getY()) end)
 
-        -- Equiper l'arme si disponible
-        -- v0.0.10 FIX BUG #3 : setEquippedItem N'EXISTE PAS en B42.18 sur IsoZombie.
-        -- Depuis v0.0.7a, l'appel etait masque silencieusement par pcall =>
-        -- les NPCs n'equipaient JAMAIS leur arme et frappaient toujours a mains
-        -- nues. La bonne methode est setPrimaryHandItem (verifie : utilise dans
-        -- PHNPC_Convert.lua:47 et PHNPC_Loot.lua:105).
+        -- Equiper la meilleure arme disponible (melee ou a feu si munitions)
+        -- v0.0.10 FIX BUG #3 : setPrimaryHandItem (setEquippedItem N'EXISTE PAS B42.18)
+        -- v0.0.16 : getNPCWeapon prend desormais npc pour evaluer armes a feu
         local weapon = getNPCWeapon(npc)
         if weapon then
             pcall(function() npc:setPrimaryHandItem(weapon) end)
         end
 
-        local anim = getAttackAnim(weapon)
-        pcall(function() npc:setBumpType(anim) end)
-        -- Endommager le zombie (knockDown + setHealth pour le tuer proprement)
+        -- Si arme a feu equipee : tirer a distance (pas besoin d'etre au corps a corps)
+        if isRangedWeapon(weapon) then
+            -- Tir : utiliser l'animation de tir et consommer une munition
+            pcall(function() npc:setBumpType("Shove") end)  -- placeholder anim tir
+            pcall(function()
+                local tmd = target:getModData()
+                if not tmd.PHNPC_IsNPC then
+                    -- Degats arme a feu : retirer une munition + infliger degats
+                    local ammoType = nil
+                    pcall(function() ammoType = weapon:getAmmoType() end)
+                    if ammoType and ammoType ~= "" then
+                        local inv
+                        pcall(function() inv = npc:getInventory() end)
+                        if inv then
+                            local ammo
+                            pcall(function() ammo = inv:getFirstTypeRecurse(ammoType) end)
+                            if ammo then
+                                pcall(function() inv:Remove(ammo) end)
+                            end
+                        end
+                    end
+                    local zh = target:getHealth() - 40  -- armes a feu : plus de degats
+                    if zh <= 0 then zh = 0 end
+                    target:setHealth(zh)
+                    target:knockDown(true)
+                end
+            end)
+            md.PHNPC_AttackCooldown = RANGED_COOLDOWN
+            md.PHNPC_NoiseTimer = (md.PHNPC_NoiseTimer or 0) + 400  -- tir = bruit important
+            PHNPC.Log.debug("Combat", tostring(md.PHNPC_Name) .. " : TIR dist=" .. string.format("%.1f", dist))
+        else
+            -- Attaque melee standard
+            local anim = getAttackAnim(weapon)
+            pcall(function() npc:setBumpType(anim) end)
+            pcall(function()
+                target:knockDown(true)
+                local tmd = target:getModData()
+                if not tmd.PHNPC_IsNPC then
+                    local zh = target:getHealth() - 25
+                    if zh <= 0 then zh = 0 end
+                    target:setHealth(zh)
+                end
+            end)
+            md.PHNPC_AttackCooldown = 60
+            md.PHNPC_NoiseTimer = (md.PHNPC_NoiseTimer or 0) + 150
+            PHNPC.Log.debug("Combat", tostring(md.PHNPC_Name) .. " : " .. anim
+                  .. " dist=" .. string.format("%.1f", dist))
+        end
+    elseif isRangedWeapon(getNPCWeapon(npc)) and dist <= (PHNPC.RANGED_ATTACK_RANGE or 10) then
+        -- Arme a feu : attaquer a distance si dans le rayon de tir
+        local targetDead = false
+        pcall(function() targetDead = target:isDead() end)
+        if targetDead then return end
+
+        local weapon = getNPCWeapon(npc)
+        if weapon then
+            pcall(function() npc:setPrimaryHandItem(weapon) end)
+        end
+
+        pcall(function() npc:faceLocationF(target:getX(), target:getY()) end)
+        pcall(function() npc:setBumpType("Shove") end)
         pcall(function()
-            target:knockDown(true)
             local tmd = target:getModData()
-            -- Ne pas endommager nos propres NPCs
             if not tmd.PHNPC_IsNPC then
-                local zh = target:getHealth() - 25
+                local ammoType = nil
+                pcall(function() ammoType = weapon:getAmmoType() end)
+                if ammoType and ammoType ~= "" then
+                    local inv
+                    pcall(function() inv = npc:getInventory() end)
+                    if inv then
+                        local ammo
+                        pcall(function() ammo = inv:getFirstTypeRecurse(ammoType) end)
+                        if ammo then pcall(function() inv:Remove(ammo) end) end
+                    end
+                end
+                local zh = target:getHealth() - 40
                 if zh <= 0 then zh = 0 end
                 target:setHealth(zh)
+                target:knockDown(true)
             end
         end)
-
-        md.PHNPC_AttackCooldown = 60
-        -- Bruit de l'attaque
-        md.PHNPC_NoiseTimer = (md.PHNPC_NoiseTimer or 0) + 150
-
-        print("[PHNPC][COMBAT] " .. tostring(md.PHNPC_Name) .. " : " .. anim
-              .. " dist=" .. string.format("%.1f", dist))
+        md.PHNPC_AttackCooldown = RANGED_COOLDOWN
+        md.PHNPC_NoiseTimer = (md.PHNPC_NoiseTimer or 0) + 400
     else
         -- Trop loin : se deplacer vers le zombie EN COURANT (v0.0.9k)
         PHNPC.startMovingTo(npc, target:getX(), target:getY(), target:getZ(), "Run")
@@ -293,4 +417,4 @@ function PHNPC.npcFlightStep(npc, player)
     end
 end
 
-print("[PHNPC] Combat v0.0.15 loaded")
+print("[PHNPC] Combat v0.0.16 loaded")

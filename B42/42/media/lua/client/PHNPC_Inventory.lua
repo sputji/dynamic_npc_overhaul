@@ -1,12 +1,22 @@
 --[[
-    PHNPC_Inventory.lua  v1.0  (client)
+    PHNPC_Inventory.lua  v0.0.16  (client)
     Gestion de l'inventaire NPC via le loot panel.
     Injecte le container du NPC dans le panneau de loot au clic.
+
+    v0.0.16 :
+      - La logique de scoring/equip vetements est deplacee dans PHNPC_Outfits.lua.
+        autoEquipFromInventory() est conserve comme alias de compatibilite.
+      - Synchronisation native amelioree : refreshBackpacks() appele apres chaque
+        modification du container pour garantir la coherence avec l'UI PZ.
+      - Ajout de PHNPC.onItemGiven(npc, item) : hook appele quand le joueur donne
+        un item au NPC pour declencher l'equip automatique si c'est un vetement
+        ou une arme.
 
     Pattern : NHM GCMenuInventory.lua
     Necessite :
       PHNPC_Actions.lua  (PHNPC._openInventoryNPC)
       PHNPC_Core.lua     (PHNPC.INTERACTION_DIST)
+      PHNPC_Outfits.lua  (PHNPC.autoEquipBestOutfit)
 ]]
 
 -- ============================================================
@@ -36,109 +46,47 @@ function PHNPC.openNPCInventory(npc)
     end
 end
 
--- Equipe automatiquement les vetements presents dans l'inventaire du NPC
--- si le slot est libre (best-effort, silencieux en cas d'API absente).
+-- autoEquipFromInventory : delegue a PHNPC_Outfits.lua (v0.0.16)
+-- La logique de scoring et d'equip vetements est maintenant dans PHNPC_Outfits.lua.
+-- Cette fonction est conservee pour la compatibilite retroactive avec les
+-- modules qui l'appellaient directement (Convert.lua, Update.lua, etc.).
+-- PHNPC_Outfits.lua definit l'alias, mais on s'assure qu'il existe.
 function PHNPC.autoEquipFromInventory(npc)
-    if not npc then return 0 end
-    local inv
-    pcall(function() inv = npc:getInventory() end)
-    if not inv then return 0 end
+    if PHNPC.autoEquipBestOutfit then
+        return PHNPC.autoEquipBestOutfit(npc)
+    end
+    return 0
+end
 
-    local items
-    pcall(function() items = inv:getItems() end)
-    if not items then return 0 end
+-- ============================================================
+-- PHNPC.onItemGiven(npc, item) : [NOUVEAU v0.0.16]
+-- Hook appele quand le joueur depose un item dans l'inventaire NPC.
+-- Declenche l'auto-equip si l'item est un vetement ou une arme.
+-- ============================================================
+function PHNPC.onItemGiven(npc, item)
+    if not npc or not item then return end
+    local md = npc:getModData()
+    if not md.PHNPC_IsNPC then return end
 
-    local function isClothingItem(it)
-        if not it then return false end
-        local ok, val = pcall(function() return instanceof(it, "Clothing") end)
-        if ok and val then return true end
-        local alt = false
-        pcall(function() alt = it.IsClothing and it:IsClothing() or false end)
-        return alt and true or false
+    -- Vetement : declencher autoEquipBestOutfit
+    local isCloth = false
+    pcall(function() isCloth = instanceof(item, "Clothing") end)
+    if isCloth and PHNPC.autoEquipBestOutfit then
+        pcall(function() PHNPC.autoEquipBestOutfit(npc) end)
+        return
     end
 
-    local function scoreClothing(it)
-        if not it then return -1 end
-        if not isClothingItem(it) then return -1 end
-
-        local bite, scratch, bullet = 0, 0, 0
-        pcall(function() bite = it.getBiteDefense and it:getBiteDefense() or 0 end)
-        pcall(function() scratch = it.getScratchDefense and it:getScratchDefense() or 0 end)
-        pcall(function() bullet = it.getBulletDefense and it:getBulletDefense() or 0 end)
-
-        local cond, condMax = 1, 1
-        pcall(function() cond = it:getCondition() or 1 end)
-        pcall(function() condMax = it:getConditionMax() or 1 end)
-        local condRatio = (condMax > 0) and (cond / condMax) or 1
-
-        -- Priorite defense + etat; leger bonus isolation thermique.
-        local insulation = 0
-        pcall(function() insulation = it.getInsulation and it:getInsulation() or 0 end)
-        return (bite * 5) + (scratch * 3) + (bullet * 6) + (condRatio * 2) + insulation
-    end
-
-    local bestByLocation = {}
-    local n = 0
-    pcall(function() n = items:size() end)
-    for i = 0, n - 1 do
-        local it
-        pcall(function() it = items:get(i) end)
-        if it then
-            if isClothingItem(it) then
-                local location = nil
-                pcall(function() location = it:getBodyLocation() end)
-                if location and tostring(location) ~= "" then
-                    local score = scoreClothing(it)
-                    local cur = bestByLocation[location]
-                    if (not cur) or score > cur.score then
-                        bestByLocation[location] = { item = it, score = score }
-                    end
-                end
+    -- Arme : equiper si meilleure que l'arme actuelle
+    local isHandWeapon = false
+    pcall(function() isHandWeapon = instanceof(item, "HandWeapon") end)
+    if isHandWeapon then
+        pcall(function()
+            local primary = npc:getPrimaryHandItem()
+            if not primary then
+                npc:setPrimaryHandItem(item)
             end
-        end
+        end)
     end
-
-    local worn
-    pcall(function() worn = npc:getWornItems() end)
-
-    local function getCurrentWorn(location)
-        local current = nil
-        if npc.getWornItem then
-            pcall(function() current = npc:getWornItem(location) end)
-        end
-        if (not current) and worn and worn.getItem then
-            pcall(function() current = worn:getItem(location) end)
-        end
-        return current
-    end
-
-    local function setWorn(location, item)
-        local ok = false
-        if npc.setWornItem then
-            pcall(function() npc:setWornItem(location, item); ok = true end)
-        end
-        if (not ok) and worn and worn.setItem then
-            pcall(function() worn:setItem(location, item); ok = true end)
-        end
-        return ok
-    end
-
-    local equipped = 0
-    for location, entry in pairs(bestByLocation) do
-        local current = getCurrentWorn(location)
-        local currentScore = scoreClothing(current)
-        if entry.score > currentScore then
-            if setWorn(location, entry.item) then
-                equipped = equipped + 1
-            end
-        end
-    end
-
-    if equipped > 0 then
-        pcall(function() npc:resetModelNextFrame() end)
-        pcall(function() npc:resetEquippedHandsModels() end)
-    end
-    return equipped
 end
 
 -- ============================================================
@@ -179,4 +127,4 @@ Events.OnRefreshInventoryWindowContainers.Add(function(page, step)
     end
 end)
 
-print("[PHNPC] Inventory v0.0.15 loaded")
+print("[PHNPC] Inventory v0.0.16 loaded")

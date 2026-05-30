@@ -68,6 +68,33 @@ UI_EN = {
     UI_PHNPC_BarkIdle3          = "Thank God I'm still alive.",
     UI_PHNPC_BarkIdle4          = "It's cold tonight.",
 
+    -- Barks meteo — pluie (v0.0.16)
+    UI_PHNPC_BarkRain1          = "Great, now it's raining too...",
+    UI_PHNPC_BarkRain2          = "I'm soaked. We need shelter.",
+    UI_PHNPC_BarkRain3          = "At least the rain covers the noise.",
+
+    -- Barks meteo — orage (v0.0.16)
+    UI_PHNPC_BarkStorm1         = "This storm is dangerous. We need to find cover!",
+    UI_PHNPC_BarkStorm2         = "Lightning won't help us...",
+    UI_PHNPC_BarkStorm3         = "I can barely see anything in this storm!",
+
+    -- Barks meteo — neige (v0.0.16)
+    UI_PHNPC_BarkSnow1          = "It's freezing. We need to find warm clothes.",
+    UI_PHNPC_BarkSnow2          = "Snow... this just keeps getting worse.",
+    UI_PHNPC_BarkSnow3          = "Our tracks in the snow could give us away.",
+
+    -- Barks meteo — canicule (v0.0.16)
+    UI_PHNPC_BarkHot1           = "This heat is unbearable...",
+    UI_PHNPC_BarkHot2           = "We need water. Now.",
+
+    -- Barks meteo — brouillard (v0.0.16)
+    UI_PHNPC_BarkFog1           = "I can't see a thing in this fog.",
+    UI_PHNPC_BarkFog2           = "Stay close. Anything could be out there.",
+
+    -- Bark montee de niveau (v0.0.16)
+    UI_PHNPC_BarkLevelUp1       = "I'm getting better at this.",
+    UI_PHNPC_BarkLevelUp2       = "Surviving teaches you things.",
+
     -- Mort du NPC
     UI_PHNPC_BarkDeath          = "%s: Argh...",
 

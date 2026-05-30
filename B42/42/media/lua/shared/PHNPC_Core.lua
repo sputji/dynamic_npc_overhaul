@@ -61,6 +61,7 @@ PHNPC.ZONE_PATROL_TICKS    = 200  -- ticks entre deux mouvements de patrouille d
 -- ============================================================
 PHNPC.COMBAT_RANGE        = 8    -- tiles : rayon detection zombie pour combat auto
 PHNPC.COMBAT_ATTACK_RANGE = 1.5  -- tiles : distance d'attaque melee
+PHNPC.RANGED_ATTACK_RANGE = 10   -- tiles : distance d'attaque arme a feu (v0.0.16)
 PHNPC.COMBAT_TICK_RATE    = 30   -- ticks entre evaluations combat
 PHNPC.FLEE_HP_RATIO       = 0.30 -- ratio HP pour declencher la fuite (30%)
 PHNPC.FLEE_DISTANCE       = 15   -- tiles : distance cible de fuite
@@ -251,4 +252,4 @@ function PHNPC.getOutfitStats(outfit)
     return PHNPC.OUTFIT_STATS[outfit] or PHNPC.OUTFIT_STATS["Survivor"]
 end
 
-print("[PHNPC] Core v0.0.9l loaded")
+print("[PHNPC] Core v0.0.16 loaded")
