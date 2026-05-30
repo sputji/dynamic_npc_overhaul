@@ -8,7 +8,7 @@
 
 *Des survivants humains autonomes avec IA, professions, inventaire et système de santé*
 
-[![Version](https://img.shields.io/badge/version-0.0.15-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
+[![Version](https://img.shields.io/badge/version-0.0.16-blue)](https://github.com/sputji/dynamic_npc_overhaul/releases)
 [![PZ Build](https://img.shields.io/badge/Project%20Zomboid-B42-green)](https://store.steampowered.com/app/108600)
 [![Statut](https://img.shields.io/badge/statut-en%20d%C3%A9veloppement-orange)]()
 
@@ -20,11 +20,11 @@
 
 **Dynamic NPC Overhaul** ajoute des PNJ humains autonomes dans Project Zomboid. Chaque PNJ a une **profession**, des **stats propres**, un **inventaire réaliste** et peut être **recruté** pour vous suivre ou rester en place. Ils encaissent les coups, jouent des animations de douleur, et meurent si leurs points de vie tombent à zéro.
 
-> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.15**.
+> Ce mod est en développement actif. Les fonctionnalités ci-dessous sont fonctionnelles en **v0.0.16**.
 
 ---
 
-## Fonctionnalités actuelles (v0.0.15)
+## Fonctionnalités actuelles (v0.0.16)
 
 ### PNJ & Professions
 
@@ -82,6 +82,15 @@ Animations humaines complètes grâce à un système d'AnimSets custom :
 | WaveHi / Shrug / Yes / No | Expressions sociales |
 
 > Animations masculines (Bob) et féminines (Kate) supportées.
+
+### Nouveautés v0.0.16
+
+- **Armes à feu NPC** : les PNJ utilisent les armes à feu s'ils ont les munitions adaptées ET un niveau `Aiming ≥ 1`. Tir jusqu'à 10 tuiles, cooldown 120 ticks entre deux rafales.
+- **Progression XP / compétences** : 13 compétences par NPC (Strength, Fitness, Aiming, Nimble, Sneaking, Axe, Blunt, SmallBlade, Maintenance, Doctor, Cooking, Carpentry, Farming). L'XP est accumulée en combat et déclenche des montées de niveau avec barks dédiés.
+- **Module Outfits** : sélection et équipement automatique des vêtements selon le score défensif ; l'échange se déclenche immédiatement quand le joueur donne un vêtement (`onItemGiven`).
+- **Pathfinding natif** : `pathToLocationF` (NavigatorGrid PZ) gère automatiquement les portes, fenêtres et clôtures, avec cooldown 15 ticks pour éliminer les micro-freezes.
+- **Réactions météo** : barks contextuels selon la météo courante (pluie, orage, neige, canicule, brouillard) via l'API `GameTime`.
+- **Architecture modulaire** : ajout de `PHNPC_Main.lua` (init centrale), `PHNPC_Pathfinding.lua` et `PHNPC_Outfits.lua`.
 
 ### Correctifs récents (v0.0.15)
 
