@@ -54,26 +54,39 @@ function PHNPC.enforceNPC(zombie)
     end)
     if inFenceState then
         md.PHNPC_FenceStateTicks = (md.PHNPC_FenceStateTicks or 0) + 1
-        if md.PHNPC_FenceStateTicks >= 45 then
-            md.PHNPC_FenceStateTicks = 0
-            md.PHNPC_Moving = false
-            md.PHNPC_PathX = nil
-            md.PHNPC_PathY = nil
-            md.PHNPC_PathZ = nil
-            md.PHNPC_FenceRecoverTicks = 60
-            pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
-            pcall(function() zombie:setBumpType("Shrug") end)
-            pcall(function() zombie:setTarget(nil) end)
-            pcall(function() zombie:clearAggroList() end)
-            pcall(function() zombie:setRunning(false) end)
+        -- Inspiré des patterns Bandits: laisser vivre l'état de climb,
+        -- ne reset qu'en blocage long pour éviter l'animation cassée au milieu.
+        if md.PHNPC_FenceStateTicks >= 180 then
+            local cx, cy = zombie:getX(), zombie:getY()
+            local lx = md.PHNPC_LastFenceX or cx
+            local ly = md.PHNPC_LastFenceY or cy
+            local moved = math.sqrt((cx - lx) * (cx - lx) + (cy - ly) * (cy - ly))
+            if moved < 0.2 then
+                md.PHNPC_FenceStateTicks = 0
+                md.PHNPC_Moving = false
+                md.PHNPC_PathX = nil
+                md.PHNPC_PathY = nil
+                md.PHNPC_PathZ = nil
+                pcall(function() zombie:changeState(ZombieIdleState.instance()) end)
+                pcall(function() zombie:setBumpType("Shrug") end)
+                pcall(function() zombie:setTarget(nil) end)
+                pcall(function() zombie:clearAggroList() end)
+                pcall(function() zombie:setRunning(false) end)
+            else
+                md.PHNPC_FenceStateTicks = 0
+            end
+            md.PHNPC_LastFenceX = cx
+            md.PHNPC_LastFenceY = cy
         end
     else
         md.PHNPC_FenceStateTicks = 0
+        md.PHNPC_LastFenceX = zombie:getX()
+        md.PHNPC_LastFenceY = zombie:getY()
     end
 
-    if (md.PHNPC_FenceRecoverTicks or 0) > 0 then
-        md.PHNPC_FenceRecoverTicks = md.PHNPC_FenceRecoverTicks - 1
-    end
+    -- V0.0.20: retire la logique de recover forcee qui perturbait le passage
+    -- des barriers basses/obstacles hopables.
+    md.PHNPC_FenceRecoverTicks = 0
 
     -- 3. Genre + vitesse (pas les variables AnimSet — celles-ci vont en step 10 apres changeState)
     pcall(function() zombie:setFemaleEtc(md.PHNPC_Female or false) end)
@@ -129,6 +142,10 @@ function PHNPC.enforceNPC(zombie)
 
         elseif asn == "pathfind" then
             md.PHNPC_IdleTicks = 0  -- v0.0.9l reset si on pathfind
+            skipSecurity = true
+
+        elseif asn == "climbfence" then
+            md.PHNPC_IdleTicks = 0
             skipSecurity = true
 
         elseif asn == "bumped" then

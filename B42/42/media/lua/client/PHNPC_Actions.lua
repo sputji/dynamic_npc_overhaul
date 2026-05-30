@@ -91,6 +91,64 @@ PHNPC._applyMoveTick  = applyMoveTick
 PHNPC._applyMoveSetup = applyMoveStart
 local applyMoveSetup  = applyMoveStart
 
+-- Inspiré de Bandits: si le NPC collisionne un low-fence/hoppable,
+-- déclencher explicitement l'état de climb plutôt que forcer une redirection.
+local function tryClimbNearbyLowFence(npc)
+    if not npc then return false end
+    local cell = npc:getCell()
+    if not cell then return false end
+
+    local nx = math.floor(npc:getX())
+    local ny = math.floor(npc:getY())
+    local nz = math.floor(npc:getZ())
+    local fd = npc:getForwardDirection()
+    local fdx = math.floor((fd and fd:getX() or 0) + 0.5)
+    local fdy = math.floor((fd and fd:getY() or 0) + 0.5)
+
+    local sqs = {
+        { x = nx, y = ny, z = nz },
+        { x = nx + fdx, y = ny + fdy, z = nz },
+    }
+
+    for _, s in ipairs(sqs) do
+        local sq = nil
+        pcall(function() sq = cell:getGridSquare(s.x, s.y, s.z) end)
+        if sq then
+            local objs = nil
+            pcall(function() objs = sq:getObjects() end)
+            if objs then
+                local n = 0
+                pcall(function() n = objs:size() end)
+                for i = 0, n - 1 do
+                    local obj = nil
+                    pcall(function() obj = objs:get(i) end)
+                    if obj then
+                        local lowFence, hoppable = false, false
+                        pcall(function()
+                            local props = obj:getProperties()
+                            lowFence = props and props:get("FenceTypeLow") ~= nil
+                            hoppable = obj.isHoppable and obj:isHoppable() or false
+                        end)
+                        if lowFence or hoppable then
+                            local facing = false
+                            pcall(function() facing = npc:isFacingObject(obj, 0.5) end)
+                            if not facing then
+                                pcall(function() npc:faceThisObject(obj) end)
+                                return false
+                            end
+                            pcall(function() npc:changeState(ClimbOverFenceState.instance()) end)
+                            pcall(function() npc:setBumpType("ClimbFenceEnd") end)
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return false
+end
+
 -- Doit-on (re)lancer un pathfind ? Vrai si destination differente ou NPC a l'arret.
 -- v0.0.9l : ajoute cooldown 8 ticks anti-spam (evite saccades quand le moteur
 -- alterne entre etats idle/pathfind transitoires).
@@ -176,22 +234,22 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
         end
     end
 
+    -- Evite les relances d'ancre quasi identiques en suivi mixte combat.
+    if needPath and md.PHNPC_LastAnchorX and md.PHNPC_LastAnchorY then
+        local adx = tx - md.PHNPC_LastAnchorX
+        local ady = ty - md.PHNPC_LastAnchorY
+        local anchorDiffSq = adx * adx + ady * ady
+        if anchorDiffSq < 1.0 and sinceLastPath < ((PHNPC.FOLLOW_REPATH_TICKS or 45) * 2) then
+            needPath = false
+        end
+    end
+
     if walkType and walkType ~= md.PHNPC_WalkType then
         md.PHNPC_WalkType = walkType
         applyMoveTick(npc, walkType)
     end
 
     if not needPath then return end
-
-    -- v0.0.13b : pendant recovery fence, on force une micro-redirection locale
-    -- pour casser les tentatives repetitives de franchissement de cloture.
-    if (md.PHNPC_FenceRecoverTicks or 0) > 0 and PHNPC.findFreeSquareNear then
-        local rx, ry = PHNPC.findFreeSquareNear(npc:getX(), npc:getY(), pz, 3, 8)
-        if rx then
-            tx, ty = rx, ry
-            walkType = "Walk"
-        end
-    end
 
     pcall(function() npc:setTarget(nil) end)
     pcall(function() npc:setAttackedBy(nil) end)
@@ -203,12 +261,14 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
     else
         applyMoveTick(npc, walkType)
     end
-    local didSchedule = false
+    local didPath = false
     if PHNPC.schedulePathTo then
-        pcall(function() didSchedule = PHNPC.schedulePathTo(npc, tx, ty, pz) end)
+        pcall(function() didPath = PHNPC.schedulePathTo(npc, tx, ty, pz) end)
+    else
+        pcall(function() npc:pathToLocationF(tx, ty, pz); didPath = true end)
     end
-    if not didSchedule then
-        pcall(function() npc:pathToLocationF(tx, ty, pz) end)
+    if not didPath then
+        return
     end
     md.PHNPC_Moving   = true
     md.PHNPC_PathX    = tx
@@ -221,6 +281,8 @@ function PHNPC.startFollowing(npc, player, forceWalkType)
     md.PHNPC_StuckTicks = 0
     md.PHNPC_LastMoveX  = npc:getX()
     md.PHNPC_LastMoveY  = npc:getY()
+    md.PHNPC_LastAnchorX = tx
+    md.PHNPC_LastAnchorY = ty
     PHNPC.Log.debug("Actions", tostring(md.PHNPC_Name) .. " -> "..walkType.." follow anchor(" .. string.format("%.1f,%.1f", tx, ty) .. ")")
 end
 
@@ -228,16 +290,6 @@ end
 function PHNPC.startMovingTo(npc, x, y, z, forceWalkType)
     local md = npc:getModData()
     npc:setUseless(false)
-
-    -- v0.0.13b : si recovery fence actif, on passe d'abord par une cible locale
-    -- pour eviter de re-rentrer dans ClimbOverFenceState.
-    if (md.PHNPC_FenceRecoverTicks or 0) > 0 and PHNPC.findFreeSquareNear then
-        local rx, ry = PHNPC.findFreeSquareNear(npc:getX(), npc:getY(), z or npc:getZ(), 3, 8)
-        if rx then
-            x, y = rx, ry
-            forceWalkType = "Walk"
-        end
-    end
 
     local d = math.sqrt((x - npc:getX())^2 + (y - npc:getY())^2)
     local walkType = forceWalkType or pickWalkType(npc, md, d)
@@ -273,12 +325,14 @@ function PHNPC.startMovingTo(npc, x, y, z, forceWalkType)
         else
             applyMoveTick(npc, walkType)
         end
-        local didSchedule = false
+        local didPath = false
         if PHNPC.schedulePathTo then
-            pcall(function() didSchedule = PHNPC.schedulePathTo(npc, x, y, z) end)
+            pcall(function() didPath = PHNPC.schedulePathTo(npc, x, y, z) end)
+        else
+            pcall(function() npc:pathToLocationF(x, y, z); didPath = true end)
         end
-        if not didSchedule then
-            pcall(function() npc:pathToLocationF(x, y, z) end)
+        if not didPath then
+            return
         end
         md.PHNPC_Moving   = true
         md.PHNPC_PathX    = x
@@ -538,6 +592,9 @@ function PHNPC.handleStuck(npc)
     end
     if (md.PHNPC_StuckTicks or 0) >= 30 then
         md.PHNPC_StuckTicks = 0
+        if tryClimbNearbyLowFence(npc) then
+            return
+        end
         local cell = npc:getCell()
         if not cell then return end
         local snx = npc:getX()

@@ -156,8 +156,10 @@ Events.OnTick.Add(function()
                     local runDist = PHNPC.RUN_DISTANCE or 6
                     local wt = (dist > runDist) and "Run" or "Walk"
                     md.PHNPC_FollowTick = (md.PHNPC_FollowTick or 0) + 1
-                    local forceImmediate = dist > (runDist + 4)
-                    if forceImmediate or md.PHNPC_FollowTick >= (PHNPC.FOLLOW_TICK_RATE or 20) then
+                    local forceImmediate = dist > (runDist + 5)
+                    local baseRate = PHNPC.FOLLOW_TICK_RATE or 20
+                    local slowRate = (wt == "Run") and math.max(baseRate, 30) or math.max(baseRate, 24)
+                    if forceImmediate or md.PHNPC_FollowTick >= slowRate then
                         md.PHNPC_FollowTick = 0
                         PHNPC.startFollowing(npc, player, wt)
                     end

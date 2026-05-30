@@ -1,3 +1,72 @@
+🎮 Checklist complete depuis v0.0.19 (retest integral)
+
+Avant :
+- redemarrer completement PZ,
+- copier la version repo vers `C:\Users\Nicolas\Zomboid\mods\PH_DynamicNPCOverhaul`,
+- creer une nouvelle partie sandbox,
+- verifier les banners `v0.0.19 loaded` dans `console.txt`.
+
+1. Chargement / stabilite
+  [ ] Aucun ERROR rouge PHNPC au demarrage.
+  [ ] Aucun ERROR rouge PHNPC apres 5 minutes (1 NPC puis 5+ NPC recrutes).
+  [ ] Aucun message `Object tried to call nil in pcall` lie a PHNPC_Combat/Update.
+  [ ] Aucun message `ToggleDoor(npc)` / `isLocalPlayer` en console.
+
+2. Suivi joueur (anti-saccades)
+  [ ] A >6 tuiles, NPC passe en course rapidement.
+  [ ] A ~2 tuiles, NPC s'arrete sans coller le joueur.
+  [ ] Changement de direction joueur: suivi fluide sans micro-teleports.
+  [ ] Le log `follow anchor(...)` n'apparait plus en rafale continue a cadence fixe.
+  [ ] Transition d'arret correcte: `RunToIdle` apres sprint, `WalkToIdle` apres marche.
+
+3. Barrières / obstacles bas / clotures
+  [ ] Collision low-fence/hoppable: NPC franchit sans rester bloque au milieu.
+  [ ] Pas de boucle infinie `ClimbOverFenceState`.
+  [ ] Ordre "Va la-bas" a travers cloture basse: arrive a destination.
+  [ ] Ordre "Mets-toi a l'abri" en zone cloturee: atteint un point valide sans ping-pong.
+
+4. Portes / fenetres / pathing
+  [ ] NPC ouvre une porte fermee sur son trajet sans crash.
+  [ ] NPC ouvre une fenetre sur trajet si necessaire.
+  [ ] Pas de tape infini sur obstacle alors qu'un passage est possible.
+  [ ] En shelter/staying, fermeture defensive des ouvertures reste coherent.
+
+5. Ordres IA
+  [ ] "Va la-bas" : atteint la cible puis passe en staying (sans retour auto joueur).
+  [ ] "Reste ici" : patrouille locale stable dans le rayon.
+  [ ] "Mets-toi a l'abri" : rejoint un batiment/zone sure et y reste.
+  [ ] "Sois libre" : errance autonome sans casser l'equipe.
+  [ ] "Quitte l'equipe" : liberation correcte.
+
+6. Combat melee / ranged
+  [ ] NPC choisit la meilleure arme melee disponible.
+  [ ] NPC avec arme a feu + munitions + Aiming>=1 tire a distance.
+  [ ] Cooldown de tir respecte (pas de rafale infinie).
+  [ ] Sans munitions, NPC repasse melee.
+  [ ] Avec Aiming=0, NPC n'utilise pas d'arme a feu.
+
+7. XP / competences
+  [ ] `getSkillSummary(npc)` affiche 13 competences.
+  [ ] L'XP augmente en combat (Aiming/Blunt/Strength/Fitness/Maintenance).
+  [ ] Bark levelup visible lors d'un gain de niveau.
+
+8. Vetements / outfits
+  [ ] Vetement donne -> equipement auto si slot libre.
+  [ ] Vetement meilleur score -> remplacement de l'existant sur meme slot.
+  [ ] `OutfitDef` visible et coherent dans debug.
+
+9. Mort / loot
+  [ ] Cadavre NPC contient inventaire donne en jeu (pas seulement items de spawn).
+  [ ] Armes donnees au NPC presentes dans le cadavre.
+  [ ] Vetements portes visibles dans le cadavre.
+
+10. Comportement global IA
+  [ ] Le NPC n'attaque jamais un autre NPC PHNPC.
+  [ ] Les zombies peuvent correctement aggro le NPC en combat/sprint.
+  [ ] FPS reste stable avec 5-15 NPC actifs.
+
+---
+
 🎮 Checklist de re-test en jeu — v0.0.19
 
 Avant :
